@@ -321,9 +321,11 @@ riportati dall'Utente e accettati. Nessuna modifica PAM/authselect necessaria;
 runtime/template mantenuti e test completato da non ripetere.
 Un avviso SELinux osservato durante il successo resta da qualificare: nessun
 AVC/cause attribution disponibile, classificazione finale SUPPORTED pending.
-Prossimo gate read-only in `deployment/minimal-runtime/R4_KSCREENLOCKER_VM.md`:
-leggere il report del singolo avviso già registrato, senza nuova live, policy
-o rollback. Dopo la closure, prima dei successivi consumer si ricostruisce la
+Lookup nel visualizzatore NOT_FOUND; unlock riferito alle 09:06 CEST circa del
+23/09/2026. Prossimo gate in `deployment/minimal-runtime/R4_KSCREENLOCKER_VM.md`:
+una query audit read-only con sudo nella VM, finestra 07:01–07:11 UTC
+(09:01–09:11 CEST), senza nuova live, policy o rollback. L'assenza dal viewer
+non prova assenza di AVC. Dopo la closure, prima dei successivi consumer si ricostruisce la
 loro catena PAM effettiva guest; system-auth non è assunto come percorso universale.
 
 Una volta ottenuti:

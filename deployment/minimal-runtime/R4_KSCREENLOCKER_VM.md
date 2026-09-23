@@ -11,53 +11,59 @@ does not explain the alert or establish its harmlessness.
 
 ## Current gate: read the existing SELinux alert
 
-**HUMAN_REQUIRED — read the alert in the VM, with the sensor detached.**
-The smallest useful evidence is the detail of the alert already shown. There
-is no new fingerprint attempt, lock/unlock, installation or rollback in this
-gate. Keep SELinux Enforcing and the qualified runtime/template in place.
+**HUMAN_REQUIRED — one read-only audit query in the VM, with the sensor detached.**
+The alert-viewer lookup is **completed: NOT_FOUND**, as reported by the user.
+No alert ID/report/raw AVC is available. Do not repeat the viewer lookup or
+scan all sealert entries. This does not establish that no denial occurred.
 
-Open the existing SELinux notification's details, or select that same alert
-in the VM's SELinux alert viewer. Copy its report, especially:
+The successful unlock was approximately **23 September 2026, 09:06 CEST
+(Europe/Rome, UTC+2)**. Query only **09:01–09:11 CEST = 07:01–07:11 UTC**, a
+five-minute margin on either side. Use the original VM and its existing audit
+logs. Keep the reader detached, SELinux Enforcing, runtime and template intact.
+Close other authentication clients. There is no new biometric test, lock/unlock,
+service action, installation or rollback in this gate.
 
-- alert ID and first/last-seen timestamps, including the displayed timezone;
-- denied operation, process/executable and target path;
-- the raw AVC/audit records, with event ID, source/target contexts and class.
-
-Also give the approximate time of the successful fingerprint unlock, to tell
-a contemporaneous denial from an older or delayed notification. An alert can
-aggregate repeated events: preserve its occurrence count and timestamps.
-Read only; do not apply suggested fixes, ignore/delete the alert, change labels
-or policy, enable permissive mode, or run commands proposed in the report.
-
-If the viewer exposes the alert's **exact local ID**, a text lookup is an
-alternative to copying the report from the GUI. Replace the placeholder with
-that one ID; do not use `*` or a log-scanning option. Run as the ordinary user
-in the VM, without sudo; the lookup does not require a repository cwd.
+Run this block once in an ordinary-user VM terminal; no repository cwd is needed.
+Sudo is expected only to read the configured audit logs; its normal password
+prompt may appear. `LC_ALL=C` fixes the audit date format (`09/23/26`), and
+`TZ=UTC` fixes interpretation independently of the VM's display timezone.
 
 ```bash
-sealert -l 'EXACT_ALERT_ID'
+(
+  systemd-detect-virt --vm --quiet || exit
+  r4_audit_rc=0
+  sudo env LC_ALL=C TZ=UTC ausearch --input-logs \
+    -m AVC,USER_AVC,SELINUX_ERR \
+    -ts 09/23/26 07:01:00 -te 09/23/26 07:11:00 --raw \
+    || r4_audit_rc=$?
+  printf 'R4_AUDIT_QUERY_EXIT=%s\n' "$r4_audit_rc"
+  exit "$r4_audit_rc"
+)
 ```
 
-This is the documented single-alert lookup, not a policy generator. If the
-viewer/command is unavailable, access is denied, or the ID/report cannot be
-found, return the exact error and the notification text/time still available.
-Do not install tools, escalate, dump all alerts or repeat the live to recreate
-the notification. A missing record is not proof that SELinux denied nothing;
-any further audit query will be scoped to the resulting evidence.
+Return the complete output, including stderr and the exit marker. The selection
+includes complete events matching the SELinux record types; accompanying PATH,
+SYSCALL or other records with the same event ID can be relevant. Do not filter
+by an assumed executable, truncate the events or apply advice found in logs.
+It reads configured audit files, not just the current boot; no new audit rule
+or checkpoint is created. No protected material/template contents are requested.
 
-Return the report/error, unlock time, and confirmation that the reader remains
-detached and runtime/template/policy are unchanged. If still present in the
-original test terminal, include the checkout SHA and package output already
-printed by the completed preparation; do not rerun it to recreate provenance.
+Exit 0 normally means matching events were found. Exit 1 can mean no matches,
+a date/argument error or a file-access/read error: return the actual message,
+not just the number. Missing events do not prove harmlessness or absence of a
+denial; the time is approximate and log retention/notification delay remain
+unknown. If the tool is absent or access fails, return that error. Do not
+install tools, broaden the interval, change policy/labels, switch permissive,
+run audit2allow, or reproduce the live to generate new evidence.
 
-**PASS_IF (evidence only):** the report identifies the recorded event and allows
-comparison with the successful unlock; it does not itself declare the denial
-benign. **STOP_IF:** details are missing/inaccessible or retrieval asks for a
-configuration change. No new installer/inverse is needed for reading a report.
-The retained installation and saved inverse remain documented below, but no
-rollback is called for on this functional PASS without evidence of instability.
-After alert review, close the classification and inspect the next stock
-consumer's actual guest PAM route before preparing its live test.
+**PASS_IF (query only):** existing events in the stated window are returned for
+review. **STOP_IF:** no matching event, query error, wrong VM or attached sensor;
+return the observation without another query/live. Confirm that the sensor is
+still detached and runtime/template/SELinux policy are unchanged. No rollback
+is required for this diagnostic result. The retained installation/inverse below
+remain available; a functional PASS is not rolled back for missing evidence.
+After this review, determine final consumer classification and the next stock
+consumer's actual guest PAM route before another live test.
 
 ## Completed live procedure and original criteria
 

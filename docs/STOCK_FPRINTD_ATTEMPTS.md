@@ -354,5 +354,6 @@ Architectural review: no increased distro coupling, no Fedora-owned auth
 component changed, and no new password/desktop dependency. An incompatible
 driver still has the intended class-C failure boundary; R5 must establish
 survivability empirically. This repository preparation changes no installed
-file; the next step reads an existing alert in the VM and does not authenticate
-or reach the sensor.
+file. The alert viewer lookup returned NOT_FOUND; the next step is a human
+sudo read of existing VM audit records in the documented ten-minute window,
+with the sensor detached and no new biometric test.

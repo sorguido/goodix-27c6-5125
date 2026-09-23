@@ -19,8 +19,9 @@ BACKUP_BRANCH_POLICY=READ_ONLY
 ### Stato corrente — R4 KScreenLocker PASS funzionale, review avviso SELinux (23 settembre 2026)
 
 La fonte operativa attiva resta `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`.
-Recovery da `9eb72cc6698b5727f6fb9754a73a6e9e36f231cf`, `development`
-pulito e allineato a origin, su handoff Utente
+Ripresa da `6986a6b772fecc8843e40f926ad2eaaa64d49522`, `development`
+pulito e allineato a origin, sull'aggiornamento Utente
+`R4_KSCREENLOCKER_SELINUX_ALERT_LOOKUP=NOT_FOUND`, successivo all'handoff
 `CODEX_HANDOFF_R4_KSCREENLOCKER_PASS.md`.
 **KScreenLocker stock PASS funzionale:** password unlock con lettore assente,
 poi fingerprint unlock al primo contatto dell'indice DESTRO, campo password
@@ -84,11 +85,14 @@ percorso PAM che può disconnettersi prima della coda di rilascio, non prova di
 quiescenza device né, da soli, un failure. L'ordine causale non è ricostruibile
 dal solo estratto; non si forza un altro contatto per completare quei contatori.
 
-Il prossimo passo minimo è la **lettura dei dettagli dell'avviso SELinux già
-registrato nella VM**, dalla notifica o tramite lookup del suo singolo ID.
-Il README R4 contiene questo gate read-only: nessuna nuova live, modifica
-policy/label, permissive, installazione o rollback. `HUMAN_REQUIRED` per
-l'evidenza guest mancante, secondo roadmap §4. Runtime, template e inversa
+Il lookup nel visualizzatore è **NOT_FOUND**: nessun ID/report/AVC conservato
+reperito dall'Utente. Il successo è collocato alle **09:06 CEST circa del
+23 settembre 2026**, cioè 07:06 UTC. Prossimo passo minimo: una sola lettura
+audit della VM nella finestra 09:01–09:11 CEST / 07:01–07:11 UTC, senza
+filtro sul processo presunto. Il README R4 contiene il blocco esatto.
+`HUMAN_REQUIRED` per esecuzione VM e sudo di sola lettura (roadmap §4,
+AGENTS §6.2): nessuna nuova live, modifica policy/label, permissive,
+installazione o rollback. Runtime, template e inversa
 salvata sono mantenuti. La query precedente non colma retroattivamente la
 provenance guest mancante del VERIFY R3; anche l'handoff live KScreenLocker
 omette SHA guest e output RPM completi, senza invalidare il risultato osservato.
@@ -1241,29 +1245,49 @@ non nega il precedente lock per la password.
 
 #### Avviso SELinux: evidenza mancante e prossimo gate
 
-L'Utente osserva l'avviso in Enforcing durante B e dichiara nessun ausearch,
-permissive, allow rule, cambio policy, replay o rollback. Mancano evento AVC,
-processo/path, contesti, permesso negato e timestamp. Il PASS non rende benigno
-il diniego; l'avviso non dimostra da solo un failure del driver o un blocker
-password/desktop. I precedenti AVC sul manifest e su nr_hugepages, documentati
-nel manuale, sono episodi distinti e non identificano il nuovo avviso.
+L'Utente osserva l'avviso in Enforcing durante B. Il successivo aggiornamento
+riporta `R4_KSCREENLOCKER_SELINUX_ALERT_LOOKUP=NOT_FOUND`: alla riapertura del
+visualizzatore non risulta un alert registrato relativo all'evento; ID, report,
+raw AVC, first/last seen e occurrence count non sono disponibili. Nessun
+ausearch, scansione generale sealert, sudo diagnostico, modifica policy/label,
+permissive, nuova live o rollback eseguito. Password/fingerprint PASS, desktop
+ritornato, fprintd inactive/MainPID 0, lettore scollegato, Enforcing e runtime/
+template invariati sono riconfermati. Il lookup è chiuso come NOT_FOUND, non
+come assenza dimostrata di un diniego né come nuova regressione.
 
-**CURRENT_TASK:** consolidare la live e ottenere il minimo dettaglio dell'evento
-esistente. Il gate in testa a `deployment/minimal-runtime/R4_KSCREENLOCKER_VM.md`
-richiede lettura del singolo report dalla notifica/viewer già disponibile nella
-VM, con ID, first/last seen, occurrence count, raw AVC e orario approssimativo
-dell'unlock. Se il suo ID locale è disponibile, `sealert -l 'ID_ESATTO'` è
-l'alternativa testuale non privilegiata. `sealert(8)` installato documenta il
-lookup di un ID nel database delle notifiche; wildcard e scansione log non
-sono richieste. Il report può proporre rimedi: leggerli non ne autorizza
-l'esecuzione. Non ignorare/cancellare l'avviso per far sparire l'anomalia.
+Nuova evidenza temporale: unlock fingerprint **2026-09-23 circa 09:06 CEST**,
+Europe/Rome UTC+2; conversione 07:06 UTC. Il timestamp dell'AVC resta ignoto.
+Mancano processo/path, contesti e permesso negato. Il PASS non rende benigno
+l'avviso e non ne localizza la causa. I precedenti AVC manifest/nr_hugepages
+restano episodi distinti, non identificazione del nuovo evento.
 
-Non serve partire con ausearch privilegiato su tutto il boot o riprodurre
-l'evento. Se report/ID sono inaccessibili, si riporta l'errore e il testo/orario
-ancora disponibili; solo allora si sceglierà una query audit circoscritta.
-Nessun installer nuovo, accesso sensore, modifica service/PAM/authselect/label,
-policy custom o lettura materiali/template. L'installazione e l'inversa R3
-restano recuperabili; nessuna rimozione viene preparata per il solo avviso.
+**CURRENT_TASK:** consolidare il lookup negativo e preparare una sola query
+mirata sui log audit esistenti. `deployment/minimal-runtime/R4_KSCREENLOCKER_VM.md`
+seleziona AVC/USER_AVC/SELINUX_ERR fra **07:01:00 e 07:11:00 UTC del 23/09/2026**
+(09:01–09:11 CEST, margine ±5 minuti sull'orario approssimativo). Non filtra
+comm/exe presunti, né richiede tutti gli alert/il boot intero. `ausearch
+--input-logs` legge i log configurati, `--raw` conserva i record; gli altri
+record appartenenti agli eventi selezionati sono parte dell'evidenza.
+Il comando opera con LC_ALL=C e TZ=UTC, non con il fuso implicito del guest.
+
+Verifica offline della sintassi reale su input temporaneo sintetico, senza
+leggere log audit host: con LC_ALL=C la data a quattro cifre 09/23/2026 è
+rifiutata dall'ausearch installato; il formato C 09/23/26 è accettato e seleziona
+correttamente l'evento sintetico del 2026 dentro la finestra, escludendo quelli
+prima/dopo. Il comando consegnato usa quel formato. La conversione
+Europe/Rome → UTC è verificata separatamente; non si inventa un timestamp
+esatto del MATCH né si assume l'orologio guest necessariamente privo di scarto.
+
+Sudo serve all'Utente per leggere i log nella VM: sensore già scollegato,
+normale password prevista, nessun nuovo test di autenticazione biometrica.
+La query non tocca regole, labels, servizi, checkpoint, template o materiali.
+Exit 1 può significare nessun match oppure errore di argomenti/accesso/lettura:
+si riporta il messaggio completo insieme al codice. Output vuoto o mancante
+non prova che l'avviso fosse innocuo; restano possibili limiti temporali,
+retention o ritardo di notifica, senza sceglierne uno come causa osservata.
+Su assenza/errori si torna alla review senza ampliare automaticamente la
+ricerca o riprodurre la live. Nessun installer/inversa nuovo, rollback o
+rimedio SELinux è giustificato dalle evidenze correnti.
 
 **Classificazione finale SUPPORTED sospesa sulla qualificazione dell'avviso**,
 non sul funzionamento già dimostrato. Se risulta irrilevante per il failure
@@ -1274,11 +1298,12 @@ closure, il successivo consumer R4 richiederà la propria catena PAM guest:
 la presenza di pam_fprintd in system-auth non prova l'inclusione da parte di
 sudo, PolicyKit o login. Non si anticipa una nuova live su questi consumer.
 
-Verifica offline del delta: confronto completo della telemetria con l'handoff,
-correlazione della review con sorgenti PAM/daemon e test esistente, sintassi
-lookup e sua semantica read-only da manpage, link locali, live-critical set e
-install/inversa invariati. Nessun servizio/consumer/query SELinux eseguito
-dall'AI, nessuna build o suite runtime ripetuta. Le 10 verifiche sintattiche del
+Verifica offline del delta: formato e filtro temporale ausearch su soli dati
+sintetici, conversione del fuso, sintassi Bash, semantica da manpage, link
+locali e live-critical set/install/inversa invariati. La precedente review
+della telemetria e del percorso PAM resta valida. Nessun log audit reale,
+servizio, consumer o query SELinux host/VM eseguito dall'AI; nessuna build
+o suite runtime ripetuta. Le 10 verifiche sintattiche del
 precedente handoff e le suite VM restano evidenze storiche. Review PM: coupling
 aggiuntivo NO, file auth Fedora modificati NO, nessuna nuova dipendenza di
 password/desktop dal driver. Il failure model da update resta da provare in R5.
@@ -1286,7 +1311,7 @@ password/desktop dal driver. Il failure model da update resta da provare in R5.
 ```text
 OUTCOME=HUMAN_REQUIRED
 ACTIVE_PHASE=R4
-ADVANCEMENT=NATIVE_STOCK_KSCREENLOCKER_FIRST_CONTACT_UNLOCK_AND_HOST_CLEANUP_OBSERVED
+ADVANCEMENT=ALERT_VIEWER_LOOKUP_NOT_FOUND_UNLOCK_TIME_KNOWN_BOUNDED_AUDIT_QUERY_PREPARED
 R3=CLOSED_BIOMETRIC_BOUNDARY
 R4_PREFLIGHT=PASS_QUERY_ONLY_HUMAN_REPORTED
 R4_PREFLIGHT_GUEST_COMMIT=90a3c46beeead6b50e13426870e3d30f496c67f9
@@ -1299,22 +1324,26 @@ R4_HOST_CLEANUP=PASS_DRAINED_CLOSED_INACTIVE_PID0
 R4_DEVICE_RELEASE_TAIL=COMPLETION_NOT_OBSERVED
 R4_KSCREENLOCKER_CLASSIFICATION=PENDING_SELINUX_ALERT_REVIEW
 SELINUX=ENFORCING_HUMAN_REPORTED
-SELINUX_ALERT_VISIBLE=true
+SELINUX_ALERT_VISIBLE_DURING_LIVE=true
 SELINUX_ALERT_CAUSE=UNKNOWN_NO_AVC_SUPPLIED
+R4_KSCREENLOCKER_SELINUX_ALERT_LOOKUP=NOT_FOUND_HUMAN_REPORTED
+R4_UNLOCK_APPROXIMATE_TIME=2026-09-23_09:06_CEST_07:06_UTC
+R4_AUDIT_QUERY_WINDOW=2026-09-23_07:01:00_TO_07:11:00_UTC
+R4_AUDIT_QUERY=NOT_YET_EXECUTED_IN_VM
 ENROLLMENT_STORED_LABEL=left-index-finger
 ENROLLMENT_PHYSICAL_FINGER=right-index-finger
 ENROLLMENT_LABEL_MISMATCH=KNOWN_LAB_STATE_PRESERVED_FOR_R4_BY_USER_DECISION
 RUNTIME_TEMPLATE_RETAINED=true
 ROLLBACK_REQUIRED_ON_THIS_PASS=false
-EXECUTABLE_CLOSURE=OFFLINE_READ_ONLY_LOOKUP_REVIEW_PASS_VM_REPORT_REQUIRES_HUMAN
+EXECUTABLE_CLOSURE=OFFLINE_SYNTHETIC_AUDIT_QUERY_PASS_VM_PRIVILEGED_READ_REQUIRES_HUMAN
 RESIDUAL_BLOCKER_OR_RISK=SELINUX_EVENT_UNQUALIFIED_OTHER_CONSUMERS_R5_R6_R7_OPEN
 CANONICAL_DOCUMENTATION=THIS_MANUAL
-REVIEW_SET=GIT_DIFF_FROM_9eb72cc6698b5727f6fb9754a73a6e9e36f231cf
+REVIEW_SET=GIT_DIFF_FROM_6986a6b772fecc8843e40f926ad2eaaa64d49522
 PRODUCTION_DRIVER_CHANGED=false
 PAM_AUTHSELECT_RUNTIME_DELTA=NONE
 ROADMAP_CHANGE=PHASE_STATUS_ONLY
 AI_PHYSICAL_RUNTIME_MUTATION=false
-NEXT_BOUNDARY=HUMAN_VM_READ_EXISTING_SELINUX_ALERT
+NEXT_BOUNDARY=HUMAN_VM_READ_AUDIT_SELINUX_2026_09_23_0701_0711_UTC
 ```
 
 ### Governance corrente
