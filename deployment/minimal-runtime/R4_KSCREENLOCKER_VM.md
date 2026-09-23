@@ -9,8 +9,10 @@ baseline**, with the non-fatal SELinux denial below documented. Preserve
 runtime/template and do not repeat the test or its completed audit query.
 The subsequent [ordinary stock sudo test](R4_SUDO_VM.md) also passed password
 and first-contact fingerprint authentication, with closed/drained cleanup.
-The next human gate is the [stock PolicyKit live procedure](R4_POLKIT_VM.md),
-password first with the reader detached, then the bounded fingerprint series.
+Stock PolicyKit subsequently passed password and first-contact fingerprint
+authentication too. The next human gate is the
+[read-only VM login configuration query](R4_LOGIN_PREFLIGHT_VM.md),
+reader detached and desktop open.
 
 ## Completed SELinux review
 
@@ -81,7 +83,7 @@ is required for this diagnostic result. The retained installation/inverse below
 remain available; a functional PASS is not rolled back for missing evidence.
 That review is now complete. The next stock consumer's actual guest PAM route
 was subsequently established by the completed sudo preflight and live PASS;
-follow the current PolicyKit configuration guide linked above.
+PolicyKit has also passed. Follow the current login query linked above.
 
 ## Completed live procedure and original criteria
 

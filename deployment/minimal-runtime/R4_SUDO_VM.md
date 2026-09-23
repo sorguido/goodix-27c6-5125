@@ -15,7 +15,7 @@ timestamp was supplied. No policy change, rollback or repeat live is needed.
 `sudo -i` authentication is configuration-covered by the observed auth include
 and ordinary PASS; its login shell/session remains untested, without an extended
 SUPPORTED claim. The next human gate is the
-[stock PolicyKit live procedure](R4_POLKIT_VM.md), password first with reader detached.
+[read-only VM login configuration query](R4_LOGIN_PREFLIGHT_VM.md), reader detached and desktop open.
 Keep runtime/template and the known RIGHT-index/left-index-finger label mismatch.
 
 ## Completed procedure and original criteria

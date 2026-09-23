@@ -314,7 +314,7 @@ riportato sopra. La semantica dei tentativi resta invariata.
 
 ## R4 — Consumer di autenticazione: solo percorso stock
 
-**Stato: ATTIVA; KScreenLocker e sudo ordinario SUPPORTED sulla baseline provata (23 settembre 2026).**
+**Stato: ATTIVA; KScreenLocker, sudo ordinario e PolicyKit SUPPORTED sulla baseline provata (23 settembre 2026).**
 Per KScreenLocker, password unlock a lettore assente e fingerprint unlock al primo contatto senza password,
 cleanup drained/closed, servizio inactive/MainPID 0 e lettore scollegato sono
 riportati dall'Utente e accettati. Nessuna modifica PAM/authselect necessaria;
@@ -357,9 +357,10 @@ authority/helper stock e RPM polkit/polkit-kde exit 0. Nessuna autenticazione
 PolicyKit. Il supplemento successivo è completato al checkout riportato
 `d5e890b`: POLICY_FILES=0 nelle tre sedi PKLA, verifica pkla-compat exit 0,
 raccolta dei corpi delle regole confermata dall'Utente (riepilogo nell'handoff).
-Nessun override legacy emerso; default wheel corroborato. Ultimo fprintd
-active/running/PID 8053 dopo sudo senza lettore: compatibile con attivazione
-stock, non failure da ripulire. PID 6749 resta lo snapshot del preflight iniziale.
+Nessun override legacy emerso; default wheel corroborato. Lo snapshot fprintd
+active/running/PID 8053 del supplemento dopo sudo senza lettore è storico e
+compatibile con attivazione stock, non failure da ripulire. PID 6749 resta lo
+snapshot del preflight iniziale; entrambi superati dal cleanup live sotto.
 
 **Query azione PASS** a `0d8ccb7482fb10d7520f8830f59fb2e979c04380`:
 `/usr/bin/true` risolve a sé stesso, nessuna azione annotata concorrente,
@@ -367,18 +368,31 @@ selezione `org.freedesktop.policykit.exec`, default auth_admin in tutti i casi.
 Sensore assente, nessun sudo/autenticazione/modifica; nessuna nuova misura
 fprintd. Preflight completato: non ripetere query, supplemento o catalogo.
 Non sono emersi grant automatici di questa azione dalle regole riportate;
-la prova password nativa deve confermare una richiesta reale per guido, prima
-che il sensore sia collegato. Un successo silenzioso non qualifica il consumer.
+la successiva prova nativa ha confermato una richiesta reale per guido.
 
-**Prossimo gate:** `deployment/minimal-runtime/R4_POLKIT_VM.md`, password via
-KDE stock a lettore assente, poi stessa azione con indice DESTRO, massimo tre
-contatti nella prima serie PAM e stop al MATCH. Autorizzazioni temporanee
-revocate prima di A/B; nessun input/cambio identità con USB collegato, detach
-prima del fallback o restart. Cleanup/telemetria e inversa salvata previsti.
-Nessuna nuova patch o reinstallazione. PolicyKit resta UNTESTED fino alla live;
-PASS qualifica la baseline, failure password-safe richiede review come limitation
-senza bridge privato, password/desktop compromessi sono blocker. Runtime/template
-preservati su PASS; login e R5 restano aperti.
+**Live PolicyKit stock PASS**, handoff `CODEX_HANDOFF_R4_POLKIT_PASS.md`, guida
+`deployment/minimal-runtime/R4_POLKIT_VM.md` al commit riportato `8ed5218`
+(risolto localmente a `8ed52181897c4078dfb2be26fe67481e7a7b6961`; nessuno SHA
+checkout guest stampato nell'handoff). Per la stessa azione exec su /usr/bin/true:
+password reale nel dialogo KDE per guido con lettore assente ed exit 0; poi
+indice DESTRO, MATCH al primo contatto senza password/input ed exit 0.
+Autorizzazioni temporanee revocate e lista vuota prima di A/B; nessun cambio
+identità/restart/seconda serie. Una VERIFY/epoch, nessun retry/reopen/reset o
+famiglia persistente rilevata, cleanup drained/closed, fprintd inactive/MainPID 0,
+sensore detached. release_tail=0/single_terminal=0 compatibili con ritorno
+anticipato PAM al MATCH. Nessuna regressione desktop riportata. **PolicyKit =
+SUPPORTED_ON_TESTED_BASELINE**; non ripetere. Runtime/template e inversa
+mantenuti, nessuna patch/PAM/policy/SELinux change o rollback. L'handoff non
+conferma una nuova ricorrenza SELinux PolicyKit: nessun nuovo evento dedotto.
+
+**Prossimo gate:** `deployment/minimal-runtime/R4_LOGIN_PREFLIGHT_VM.md`, una
+sola query read-only nella VM, senza sudo, sensore assente e desktop aperto.
+Identificare display manager effettivo, unità/override, configurazione/autologin,
+PAM e authselect prima di preparare una live login. Non usare la vecchia managed
+candidate o il Fedora fisico come prova della configurazione guest. Nessun
+logout/riavvio/test/password/USB, nuova patch o reinstallazione. **HUMAN_REQUIRED**
+per l'evidenza VM (§4); login live NOT READY. Password/desktop devono restare
+sicuri, nessuna patch consumer privata o recovery TTY. Login e R5 restano aperti.
 
 Una volta ottenuti:
 

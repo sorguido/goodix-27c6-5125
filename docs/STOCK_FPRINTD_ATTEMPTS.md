@@ -29,7 +29,7 @@ Runtime and template are retained, sensor detached, fprintd inactive. No second
 verify, no relabeling or rollback. **R3 is closed at the biometric boundary.**
 This single MATCH does not qualify a real NO_MATCH series inside one Claim or
 impose a cumulative driver cap. The current gate is
-[R4 stock PolicyKit live procedure](../deployment/minimal-runtime/R4_POLKIT_VM.md), password first with reader detached.
+[R4 read-only VM login configuration query](../deployment/minimal-runtime/R4_LOGIN_PREFLIGHT_VM.md), reader detached and desktop open.
 Stock KScreenLocker subsequently passed password unlock with the reader absent
 and fingerprint unlock at contact 1 without a password. MATCH was terminal and
 resources closed/drained; release_tail/single_terminal were zero, consistent
@@ -353,11 +353,13 @@ R4_SUDO_HOST_CLEANUP=PASS_DRAINED_CLOSED_INACTIVE_PID0_SENSOR_DETACHED
 SUDO_I_AUTH=CONFIGURATION_COVERED_NOT_LIVE_TESTED
 SUDO_I_LOGIN_SHELL_SESSION=UNTESTED
 R4_POLKIT_CONFIG_QUERY=PASS_HUMAN_REPORTED_ALL_PREFLIGHT_QUERIES_CLOSED
-R4_POLKIT_AUTHENTICATION=NOT_YET_TESTED
+R4_POLKIT_AUTHENTICATION=PASS_PASSWORD_AND_FIRST_CONTACT_MATCH_HUMAN_REPORTED
+R4_POLKIT_CLASSIFICATION=SUPPORTED_ON_TESTED_BASELINE
+R4_POLKIT_HOST_CLEANUP=PASS_DRAINED_CLOSED_INACTIVE_PID0_SENSOR_DETACHED
 R4_POLKIT_POLICY_SUPPLEMENT=COMPLETED_HUMAN_REPORTED_NO_PKLA_OVERRIDES_OBSERVED
 R4_POLKIT_TRUE_ACTION_QUERY=PASS_HUMAN_REPORTED_EXEC_SELECTED_AUTH_ADMIN_DEFAULTS
-CURRENT_GATE=HUMAN_REQUIRED_VM_STOCK_POLKIT_PASSWORD_THEN_FINGERPRINT
-NEXT_SENSOR_LIVE_HANDOFF_READY=OFFLINE_VERIFIED_HUMAN_EXECUTION_REQUIRED
+CURRENT_GATE=HUMAN_REQUIRED_VM_LOGIN_CONFIG_QUERY_SENSOR_ABSENT_DESKTOP_OPEN
+NEXT_SENSOR_LIVE_HANDOFF_READY=false_LOGIN_ROUTE_NOT_YET_ESTABLISHED
 CURRENT_INSTALLED_RUNTIME=QUALIFIED_R3_BUILD_RETAINED
 ```
 
@@ -366,7 +368,7 @@ not current failures. The qualified build already exists at
 `/home/guido/goodix-r3-20260922-111144`; do not rerun the synthetic gate or build.
 The [clean replacement procedure](../deployment/minimal-runtime/README.md) and
 native enrollment/verify are completed evidence; do not repeat them. Proceed
-to the native R4 PolicyKit live gate, retaining the qualified runtime,
+to the read-only R4 login configuration query, retaining the qualified runtime,
 template, reconciled receipt and saved inverse. Sudo configuration and native authentication
 have passed; do not repeat them. The KScreenLocker SELinux review is closed.
 
@@ -382,11 +384,15 @@ RPM verification exit 0. Rule bodies were collected according to the user;
 the handoff supplies a summary. The targeted query at
 `0d8ccb7482fb10d7520f8830f59fb2e979c04380` closes path/action selection:
 `/usr/bin/true` resolves to itself, no annotated competitor, exec selected with
-auth_admin defaults. No reported automatic grant for this action; native
-password authentication must visibly challenge guido before the fingerprint
-stage. All queries are closed. The next gate uses KDE stock, revokes temporary
-authorizations before both stages, limits B to the first PAM series and requires
-detach before fallback/restart. No private bridge or new runtime patch.
-The repeated nr_hugepages read denial was also non-fatal
-during the completed sudo query and, as reported, the successful sudo live;
-no policy change is prepared. PolicyKit, login and R5 remain unqualified.
+auth_admin defaults. The subsequent PolicyKit live passed: real KDE password
+authentication for guido with the reader absent, then first-contact RIGHT-index
+MATCH with no password/input/restart and exit 0 in both. Temporary authorizations
+were revoked and empty before each stage. One VERIFY/epoch and clean drain/close,
+zero retry/reopen/reset/persistent family counters, final inactive/MainPID 0 and
+sensor detached. PolicyKit is SUPPORTED on the tested baseline. Guide commit
+`8ed5218` resolves locally to `8ed52181897c4078dfb2be26fe67481e7a7b6961`; no
+measured guest checkout SHA is supplied. No new PolicyKit SELinux recurrence
+is confirmed by the handoff. No repeat, patch, reinstall or rollback is required.
+The nr_hugepages denial remains non-fatal in the previously observed paths.
+Graphical login and R5 remain unqualified; inspect the actual VM login route
+with the desktop open before preparing its authentication test.

@@ -22,26 +22,26 @@ RIGHT index at the first attempt, with clean release/drain/close. **R3 is closed
 at the biometric boundary. R4 KScreenLocker password unlock and first-contact
 fingerprint unlock also passed, with closed/drained host cleanup: SUPPORTED on
 the tested baseline. Ordinary stock sudo also passed password and first-contact
-fingerprint authentication. Next human gate:
-[Stock PolicyKit live procedure](R4_POLKIT_VM.md), password first with reader detached.**
+fingerprint authentication. Stock PolicyKit is now also SUPPORTED after password
+and first-contact fingerprint PASS. Next human gate:
+[Read-only VM login configuration query](R4_LOGIN_PREFLIGHT_VM.md), reader detached and desktop open.**
 The audit query identified three nr_hugepages read denials, non-fatal for the
 tested KScreenLocker path; its [SELinux review](R4_KSCREENLOCKER_VM.md#completed-selinux-review) is closed. Keep
 the runtime/template and known label mismatch; no rollback or repeated KScreenLocker live.
 The completed sudo live ended with exit 0, no password during MATCH, closed/drained
 cleanup and fprintd inactive/MainPID 0. It is SUPPORTED on the tested baseline;
 do not repeat it. sudo-i auth is configuration-covered, its login shell/session
-untested. PolicyKit's initial configuration query has since passed: stock PAM
-through system-auth, active KDE agent, stock helper and clean polkit/polkit-kde
-RPM verification. The supplement completed at reported checkout `d5e890b`:
-zero files in all three PKLA locations, pkla-compat verification exit 0 and rule
-body collection confirmed by the user. Final reader-absent fprintd PID 8053 is
-compatible with sudo activation; no newer service measurement is supplied.
-The targeted query passed at `0d8ccb7482fb10d7520f8830f59fb2e979c04380`:
-`/usr/bin/true` resolves to itself, no competing annotation, action exec selected
-with auth_admin defaults. All queries are closed. The next gate is stock KDE
-password then fingerprint, with temporary authorizations revoked before each,
-only the first PAM series and detach before fallback/restart. No new patch,
-reinstall or qualification based on silent success.
+untested. PolicyKit's configuration/action queries and native test are all closed.
+The KDE agent authenticated guido for exec on /usr/bin/true as root: A real
+password with reader absent, B one RIGHT-index contact/MATCH with no password,
+input or restart, both exit 0. Temporary authorizations were empty after revocation
+before both stages. One VERIFY/epoch, closed/drained cleanup, no retry/reopen/reset
+or persistent family observed, final fprintd inactive/MainPID 0, reader detached.
+This supersedes historical preflight PID 8053. Guide commit `8ed5218` resolves
+locally to `8ed52181897c4078dfb2be26fe67481e7a7b6961`; the handoff does not print
+the guest checkout SHA. No new PolicyKit SELinux recurrence is confirmed.
+No repeat, runtime/PAM/policy change or rollback. The next query identifies the
+actual VM display manager and login PAM route; graphical login live is not ready.
 
 The user reports PM-accepted normal **44/44** and ASan/UBSan **44/44** synthetic
 results, and a clean, reviewed normal runtime build from

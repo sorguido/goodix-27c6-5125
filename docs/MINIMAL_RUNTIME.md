@@ -45,7 +45,7 @@ label, with clean release/drain/close and no retries or persistent families
 reported. **R3 is closed at the biometric boundary.** The canonical manual
 records full evidence, missing guest SHA/RPM/preflight output and limits of the
 qualification. The current human gate is
-[R4 stock PolicyKit live procedure](../deployment/minimal-runtime/R4_POLKIT_VM.md), password first with reader detached.
+[R4 read-only VM login configuration query](../deployment/minimal-runtime/R4_LOGIN_PREFLIGHT_VM.md), reader detached and desktop open.
 Stock KScreenLocker is SUPPORTED on the tested baseline: password unlock and
 first-contact fingerprint unlock passed, with closed/drained host cleanup.
 The audit query reports three nr_hugepages read denials, non-fatal for the
@@ -55,19 +55,19 @@ Ordinary stock sudo subsequently passed password authentication with reader
 absent and first-contact MATCH without a password, exit 0 and closed/drained
 cleanup: SUPPORTED on the tested baseline. Its known nr_hugepages warning was
 non-fatal during success; no new event metadata was supplied. sudo-i auth is
-configuration-covered; its login shell/session is untested. PolicyKit configuration
-has passed at `b674dd8842cf336e6d74ec81070498879b856330`: stock PAM through
-system-auth, active KDE agent, stock helper and clean polkit/polkit-kde verification.
-The supplement completed at reported checkout `d5e890b`: zero files in all three
-PKLA locations, pkla-compat verification exit 0 and rule body collection confirmed
-by the user. The targeted query then passed at
-`0d8ccb7482fb10d7520f8830f59fb2e979c04380`: `/usr/bin/true` resolves to itself,
-no competing annotated action, default exec selected with auth_admin defaults.
-All queries are completed. Native authentication is still untested: the next
-gate requires a real KDE password dialog for guido while detached, then MATCH
-without input in the first PAM series (up to three contacts). Temporary session
-authorizations are revoked before each stage; detach before fallback/restart.
-No new patch or reinstall, no automatic-success qualification.
+configuration-covered; its login shell/session is untested. PolicyKit is now also
+SUPPORTED on the tested baseline: real KDE password authentication for guido
+with the reader absent, then first-contact RIGHT-index MATCH without password,
+input or restart; both exit 0. The action was exec on /usr/bin/true as root,
+with temporary authorizations revoked and empty before both stages. One VERIFY
+and closed/drained cleanup, no retry/reopen/reset/persistent family observed,
+final fprintd inactive/MainPID 0, sensor detached and runtime/template retained.
+The handoff reports guide commit `8ed5218`, locally resolved to
+`8ed52181897c4078dfb2be26fe67481e7a7b6961`, not a measured guest checkout SHA.
+No new SELinux recurrence during PolicyKit is confirmed. All PolicyKit queries
+and the live are closed; no repeat, new patch/reinstall or rollback. The next
+query must establish the actual VM display manager and login PAM/configuration;
+no logout or authentication is requested. Graphical login live is not ready.
 The user retains the anatomical label mismatch through this R4 phase; present
 the RIGHT index. No template mutation, rebuild/reinstall or repeat CLI biometric test.
 A cold VM snapshot is only an external lab fallback, not a product dependency.
@@ -281,7 +281,7 @@ also refuses this physical host from an unrelated cwd before mutation. Both
 shell wrappers pass syntax checks; the driver-only source audit remains PASS.
 
 The current **HUMAN_REQUIRED** is
-[R4 stock PolicyKit live procedure](../deployment/minimal-runtime/R4_POLKIT_VM.md), password first with reader detached.
+[R4 read-only VM login configuration query](../deployment/minimal-runtime/R4_LOGIN_PREFLIGHT_VM.md), reader detached and desktop open.
 Stock KScreenLocker is SUPPORTED on the tested baseline: password unlock and
 first-contact fingerprint unlock passed, with closed/drained host cleanup.
 The audit query reports three nr_hugepages read denials, non-fatal for the
@@ -291,21 +291,21 @@ Ordinary stock sudo subsequently passed password authentication with reader
 absent and first-contact MATCH without a password, exit 0 and closed/drained
 cleanup: SUPPORTED on the tested baseline. Its known nr_hugepages warning was
 non-fatal during success; no new event metadata was supplied. sudo-i auth is
-configuration-covered; its login shell/session is untested. PolicyKit configuration
-has passed at `b674dd8842cf336e6d74ec81070498879b856330`: stock PAM through
-system-auth, active KDE agent, stock helper and clean polkit/polkit-kde verification.
-The supplement completed at reported checkout `d5e890b`: zero files in all three
-PKLA locations, pkla-compat verification exit 0 and rule body collection confirmed
-by the user. The targeted query then passed at
-`0d8ccb7482fb10d7520f8830f59fb2e979c04380`: `/usr/bin/true` resolves to itself,
-no competing annotated action, default exec selected with auth_admin defaults.
-All queries are completed. Native authentication is still untested: the next
-gate requires a real KDE password dialog for guido while detached, then MATCH
-without input in the first PAM series (up to three contacts). Temporary session
-authorizations are revoked before each stage; detach before fallback/restart.
-No new patch or reinstall, no automatic-success qualification.
+configuration-covered; its login shell/session is untested. PolicyKit is now also
+SUPPORTED on the tested baseline: real KDE password authentication for guido
+with the reader absent, then first-contact RIGHT-index MATCH without password,
+input or restart; both exit 0. The action was exec on /usr/bin/true as root,
+with temporary authorizations revoked and empty before both stages. One VERIFY
+and closed/drained cleanup, no retry/reopen/reset/persistent family observed,
+final fprintd inactive/MainPID 0, sensor detached and runtime/template retained.
+The handoff reports guide commit `8ed5218`, locally resolved to
+`8ed52181897c4078dfb2be26fe67481e7a7b6961`, not a measured guest checkout SHA.
+No new SELinux recurrence during PolicyKit is confirmed. All PolicyKit queries
+and the live are closed; no repeat, new patch/reinstall or rollback. The next
+query must establish the actual VM display manager and login PAM/configuration;
+no logout or authentication is requested. Graphical login live is not ready.
 The accepted R3 build/load/material/Claim/enrollment/verify and functional
-KScreenLocker and ordinary sudo gates are not repeated. The review finds
+KScreenLocker, ordinary sudo and PolicyKit gates are not repeated. The review finds
 no increased coupling to critical distro components, no expected update failure
 beyond fingerprint and no replacement of Fedora-owned authentication files.
 Recovery remains removal/reinstall/update of Goodix integration. R5 remains

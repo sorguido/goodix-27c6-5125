@@ -11,7 +11,7 @@ The canonical manual contains the complete telemetry and review. Preserve the
 procedure below as evidence; **do not repeat it**. Subsequent
 [native verification of the RIGHT index using that stored label](R3_VERIFY_VM.md)
 also passed at the first attempt. R3 is closed; the current human gate is
-[R4 stock PolicyKit live procedure](R4_POLKIT_VM.md), password first with reader detached.
+[R4 read-only VM login configuration query](R4_LOGIN_PREFLIGHT_VM.md), reader detached and desktop open.
 KScreenLocker and ordinary sudo are SUPPORTED on the tested baseline, with a
 documented recurring non-fatal nr_hugepages read denial. Their completed tests
 must not be repeated.

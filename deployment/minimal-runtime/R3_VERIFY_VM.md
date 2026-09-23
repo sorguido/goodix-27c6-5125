@@ -9,7 +9,7 @@ runtime/template retained, sensor detached, fprintd inactive/MainPID 0.
 The canonical manual contains the complete evidence and review. The RIGHT-index
 template still has the left-index label; preserve it as known laboratory state.
 **Do not repeat the completed procedure below.** The current human gate is
-[R4 stock PolicyKit live procedure](R4_POLKIT_VM.md), password first with reader detached.
+[R4 read-only VM login configuration query](R4_LOGIN_PREFLIGHT_VM.md), reader detached and desktop open.
 KScreenLocker and ordinary sudo are SUPPORTED on the tested baseline, with a
 documented recurring non-fatal nr_hugepages read denial. Their completed tests
 must not be repeated.

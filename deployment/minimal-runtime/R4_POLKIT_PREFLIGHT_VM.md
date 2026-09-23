@@ -15,12 +15,13 @@ The supplement already established zero files in all three PKLA locations and
 pkla-compat RPM verification exit 0. Full rule bodies were collected according
 to the user; the handoff supplies their summary, with no reported automatic
 grant for this action. This is not an exhaustive direct JavaScript audit.
-The native password test must visibly authenticate guido; a silent success
-will not qualify. No new service snapshot was requested/reported by the
-metadata query; PID 8053 remains the last historical measurement.
+The subsequent [native PolicyKit test](R4_POLKIT_VM.md) passed: real password
+with reader absent, first-contact MATCH without password, both exit 0. PolicyKit
+is SUPPORTED on the tested baseline. Its cleanup inactive/MainPID 0 and sensor
+detached supersede historical PID 8053; runtime/template remain preserved.
 
-Next human gate: [stock KDE PolicyKit password and fingerprint](R4_POLKIT_VM.md).
-Runtime/template remain preserved. The instructions below are **historical**.
+Next human gate: [read-only VM login configuration query](R4_LOGIN_PREFLIGHT_VM.md).
+The instructions below are **historical**; no query or authentication repeat.
 
 ## Completed targeted query and original criteria
 

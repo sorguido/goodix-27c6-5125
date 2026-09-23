@@ -1,7 +1,30 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # R4: stock PolicyKit authentication through the KDE agent
 
-**HUMAN_REQUIRED — human-only VM preparation, authentication and USB.**
+**COMPLETED — password and first-contact fingerprint authentication PASS,
+human-reported; PolicyKit = SUPPORTED_ON_TESTED_BASELINE. Do not repeat.**
+The KDE dialog authenticated `guido` for `org.freedesktop.policykit.exec` and
+`/usr/bin/true` as root. A used a real password with the reader absent; B used
+the RIGHT index, one contact, no password/empty response/identity change/restart,
+with exit 0 in both. Temporary authorizations were revoked and empty before each.
+One terminal VERIFY/MATCH, no retry/reopen/reset/persistent family observed,
+outstanding=0, drained=1, context_closed=1. The zero release-tail/single-terminal
+counters are consistent with early PAM return after MATCH. Final fprintd
+inactive/MainPID 0, sensor detached; no desktop regression reported.
+
+The handoff identifies guide commit `8ed5218`, locally resolved to
+`8ed52181897c4078dfb2be26fe67481e7a7b6961`; it does not print the guest checkout
+SHA. Runtime/template are reported unchanged and retained. The dialog is a
+human-reported visual observation, not a screenshot inspected by this review.
+No new PolicyKit SELinux event is confirmed by the handoff's conditional wording.
+Full telemetry and limits are in the canonical manual. No rollback or new patch.
+
+Next human gate: [read-only VM login configuration query](R4_LOGIN_PREFLIGHT_VM.md).
+Keep the desktop open and reader absent; graphical login live is not ready.
+
+## Completed procedure and original criteria
+
+**Historical human gate — do not rerun the procedure below.**
 All three [configuration queries](R4_POLKIT_PREFLIGHT_VM.md) are completed;
 do not repeat them. At `0d8ccb7482fb10d7520f8830f59fb2e979c04380`, the guest
 resolved `/usr/bin/true` to itself, with no competing path annotation:
