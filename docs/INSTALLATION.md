@@ -40,7 +40,11 @@ five entries and are ordinary files, not links. Keep this folder private and do
 not share or commit it. The directory and files must belong to your normal user;
 files must not be executable and must not allow other users to modify them. The installer checks names, metadata, formats and file
 bindings before importing anything; another reader's bundle is not a substitute.
-Acquisition, extraction and construction of these files are outside this guide.
+If you do not already have the complete five-file bundle, follow the detailed
+[device-material acquisition reference](DEVICE_MATERIALS.md) before continuing.
+That procedure is documented separately because it uses the reader's OEM Windows
+environment and capture evidence; the Linux installer itself does not extract
+secrets or open USB to manufacture the bundle.
 
 ## Install
 

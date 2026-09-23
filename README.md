@@ -25,9 +25,12 @@ and installs the login integration and removal commands. It requests normal
 sudo authentication when needed. The reader stays connected throughout.
 
 You need a working password login, administrative access, and your own valid
-[five-file device-material bundle](docs/DEVICE_MATERIALS.md). Place the five files
-in `$HOME/goodix-5125-materials/`, outside the clone. The project does not supply,
-extract or generate protected material. Fedora prerequisites are included in the
+[five-file device-material bundle](docs/DEVICE_MATERIALS.md). If you do not
+already have the bundle, that page contains the detailed acquisition reference
+for deriving the five final files from the same reader and qualified OEM Windows
+environment. Place the finished files in `$HOME/goodix-5125-materials/`, outside
+the clone. The project does not distribute protected material or ship automated
+acquisition/extraction tooling. Fedora prerequisites are included in the
 installation guide's single block; separate build instructions are unnecessary.
 
 ## Using fingerprint authentication

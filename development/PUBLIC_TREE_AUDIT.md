@@ -173,3 +173,32 @@ la copia del nuovo tree; l'AI non esegue questa pubblicazione.
 **Esito review documentale/strutturale: ACCEPT per la closure offline.** Rimangono
 le condizioni esplicite di pubblicazione Utente e prova fisica del medesimo
 blocco pubblico; nessuna delle due è stata simulata come già avvenuta.
+
+
+## Post-review correction — device-material acquisition guide
+
+Independent review after the R6/R7 restructuring found that the public
+`docs/DEVICE_MATERIALS.md` had been reduced to the runtime contract and had
+lost the detailed acquisition reference that was present at
+`4f244fa2946da94406f03991332f8a70e9a8b401`. That removal was not required by
+the publication boundary.
+
+The acquisition reference has been restored from that commit as the technical
+base and reconciled with the current public release tree:
+
+- standard final staging is `$HOME/goodix-5125-materials/`;
+- the public `./install.sh` performs validation/import into
+  `/var/lib/goodix-5125-poc/`;
+- the retired managed importer and roadmap references are not restored;
+- the current binding implementation path is
+  `libfprint-driver/goodix_action_binding.c`;
+- Step 10 builds the canonical `goodix-5125-device-materials-v1` manifest
+  directly; the historical `d232-target-material-v1` format is not an
+  end-user input;
+- the guide remains informational acquisition documentation: the public release
+  does not ship automated DPAPI/USBPcap/manifest-generation tools.
+
+README, installation and validation wording were aligned so a first-time user is
+sent to the detailed material guide instead of being told only to arrive with a
+pre-existing bundle. No runtime, installer, protocol or safety code changed in
+this documentation correction.

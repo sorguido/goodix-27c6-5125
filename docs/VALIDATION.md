@@ -52,7 +52,9 @@ recognition accuracy, hardware behavior or complete operating-system recovery.
 
 - No broad independent-reader, cross-firmware or cross-distribution qualification.
 - No measured universal false-acceptance or false-rejection rate.
-- No supported acquisition or construction of the five protected input files.
+- No automated acquisition/extraction tooling is shipped or qualified as part
+  of the release; the detailed [device-material acquisition reference](DEVICE_MATERIALS.md)
+  documents how the five final files are derived.
 - Physical qualification of the combined public installer remains pending.
 - Console/sudo authentication can offer fingerprint before password. The expected
   untouched-reader timeout is about 30 seconds, depending on Fedora policy; no
