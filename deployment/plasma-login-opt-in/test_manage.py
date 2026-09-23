@@ -125,12 +125,44 @@ class Lifecycle(unittest.TestCase):
         self.assertEqual(self.config.read_bytes(), b'foreign appeared')
         self.assertFalse(self.support.exists())
 
-    def test_missing_vendor_blocks_uninstall_without_deletion(self):
+    def test_missing_vendor_does_not_block_project_override_removal(self):
         m.install(self.output)
         self.vendor.unlink()
-        with self.assertRaises(FileNotFoundError):
+        self.vendor.parent.rmdir()
+        with patch.object(m, 'vendor_ready', side_effect=AssertionError('vendor must not be inspected')):
             m.uninstall()
-        self.assertTrue(self.config.exists())
+        self.assertFalse(self.config.exists())
+        self.assertFalse(self.support.exists())
+        self.assertFalse(self.vendor.parent.exists(), 'uninstall must not restore Fedora paths')
+        m.environment.assert_called_with(removal=True)
+        m.uninstall()
+
+    def test_vendor_replaced_by_foreign_symlink_is_untouched_on_removal(self):
+        m.install(self.output)
+        self.vendor.unlink()
+        target = self.root / 'relocated-vendor'
+        target.write_bytes(b'new Fedora configuration\n')
+        self.vendor.symlink_to(target)
+        m.uninstall()
+        self.assertFalse(self.config.exists())
+        self.assertFalse(self.support.exists())
+        self.assertTrue(self.vendor.is_symlink())
+        self.assertEqual(target.read_bytes(), b'new Fedora configuration\n')
+
+    def test_missing_vendor_does_not_relax_project_receipt_and_drift_checks(self):
+        m.install(self.output)
+        self.vendor.unlink()
+        original_config = self.config.read_bytes()
+        self.config.write_bytes(b'foreign changed config')
+        with self.assertRaisesRegex(RuntimeError, 'configuration drift'):
+            m.uninstall()
+        self.assertEqual(self.config.read_bytes(), b'foreign changed config')
+        self.assertTrue((self.support / m.MODULE).exists())
+        self.config.write_bytes(original_config)
+        (self.support / 'receipt.json').unlink()
+        with self.assertRaisesRegex(RuntimeError, 'missing receipt'):
+            m.uninstall()
+        self.assertEqual(self.config.read_bytes(), original_config)
         self.assertTrue((self.support / m.MODULE).exists())
 
     def test_support_mode_drift_and_cleanup_resume(self):
@@ -152,6 +184,24 @@ class Lifecycle(unittest.TestCase):
                 return_value={'ID': 'other', 'VERSION_ID': '44'}), patch.object(m, 'run', return_value=''):
             with self.assertRaisesRegex(RuntimeError, 'Fedora 44'):
                 ENVIRONMENT()
+
+    def test_removal_environment_is_independent_of_fedora_and_selinux_version(self):
+        usb = self.root / 'synthetic-usb'
+        usb.mkdir()
+        with patch.object(m.os, 'geteuid', return_value=0), patch.object(m, 'USB', usb), \
+                patch.object(m.platform, 'freedesktop_os_release',
+                             side_effect=AssertionError('removal must not inspect Fedora release')), \
+                patch.object(m.platform, 'machine',
+                             side_effect=AssertionError('removal must not inspect architecture')), \
+                patch.object(m, 'run', return_value='') as commands:
+            ENVIRONMENT(removal=True)
+            commands.assert_called_once_with('systemd-detect-virt', '--vm', '--quiet')
+            device = usb / '1-1'
+            device.mkdir()
+            (device / 'idVendor').write_text('27c6\n')
+            (device / 'idProduct').write_text('5125\n')
+            with self.assertRaisesRegex(RuntimeError, 'detach Goodix'):
+                ENVIRONMENT(removal=True)
 
     def test_missing_module_with_active_config_can_be_uninstalled(self):
         m.install(self.output)

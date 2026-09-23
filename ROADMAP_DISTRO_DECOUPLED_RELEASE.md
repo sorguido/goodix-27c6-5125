@@ -325,8 +325,8 @@ riportato sopra. La semantica dei tentativi resta invariata.
 
 **Stato: CHIUSA sulla baseline VM provata (23 settembre 2026). KScreenLocker,
 sudo ordinario, PolicyKit e Plasma Login opt-in = SUPPORTED_ON_TESTED_BASELINE.**
-L'handoff `CODEX_CLOSE_R4_PLASMA_LOGIN_PASS_STOP_BEFORE_R5.md` richiede lo stop
-dopo questa closure: **R5 non avviata né da preparare; attesa dell'Utente**.
+Lo stop dell'handoff `CODEX_CLOSE_R4_PLASMA_LOGIN_PASS_STOP_BEFORE_R5.md` è
+storico, superato dalla decisione R5 del 23 settembre riportata sotto.
 
 **Decisione Utente (23 settembre 2026):** il fingerprint al login grafico Plasma
 è una funzione richiesta della release. L'assenza del percorso biometrico stock
@@ -340,9 +340,9 @@ PLASMA_LOGIN_FINGERPRINT_REQUIRED=true
 PLASMA_LOGIN_KNOWN_LIMITATION_ACCEPTABLE=false
 R4_CLOSED=true
 R5_LOGIN_ENTRY_CONDITION=SATISFIED
-R5=NOT_STARTED
-STOP_BEFORE_R5=true
-NEXT_STATE=WAITING_FOR_USER
+R5=AUTHORIZED_CURRENT_PHASE
+STOP_BEFORE_R5=false
+NEXT_STATE=R5_REMOVAL_QUALIFICATION
 ~~~
 Per KScreenLocker, password unlock a lettore assente e fingerprint unlock al primo contatto senza password,
 cleanup drained/closed, servizio inactive/MainPID 0 e lettore scollegato sono
@@ -466,8 +466,9 @@ Resta invariato il requisito di sicurezza della release:
 NORMAL_UPDATE_MAX_FAILURE=FINGERPRINT_ONLY
 ~~~
 
-La verifica empirica attraverso aggiornamenti reali appartiene a R5, non è una
-precondizione circolare per chiudere R4 e non è dichiarata PASS da questa closure.
+La closure R4 non prova compatibilità con aggiornamenti futuri. Il successivo
+replan Utente sotto sostituisce la matrice update R5 con la qualifica di rimozione
+e recovery; non attribuisce PASS empirici agli aggiornamenti.
 Il rischio del contratto/path vendor resta visibile nell'audit: qualunque failure
 A/B da normale update è RELEASE_BLOCKER; non è una limitation accettabile.
 
@@ -522,7 +523,8 @@ Fallback B dopo failure **NOT_EXERCISED**, nessuna nuova live per provocarlo.
 Integrazione, runtime R3/template e inverse mantenuti; nessun rollback, rebuild
 o reinstallazione. Plasma Login **SUPPORTED_ON_TESTED_BASELINE**, R4 formalmente
 chiusa. La guida `deployment/plasma-login-opt-in/R4_PLASMA_LOGIN_VM.md` è ora
-evidenza completata, da non rieseguire. Nessun nuovo gate viene preparato.
+evidenza completata, da non rieseguire. Il nuovo gate R5 riguarda soltanto
+il lifecycle di rimozione/reinstallazione/recovery.
 
 Una volta ottenuti:
 
@@ -588,6 +590,15 @@ Il percorso TTY non diventa recovery ordinaria:
 NORMAL_LIFECYCLE_TTY_REQUIRED=false
 EMERGENCY_TTY_RECOVERY_ALLOWED=true
 ~~~
+
+**Avanzamento offline (23 settembre 2026):** implementati i due comandi standalone
+in `deployment/recovery/`, patch tooling install/inversa e guide
+`docs/UNINSTALL.md`, `docs/R5_INSTALL.md`, `deployment/recovery/R5_VM.md`.
+Rimozione normale indipendente dal vendor, emergency su path statici; 60 test
+sintetici PASS, review Git-native e closure offline nel manuale. **Live non
+eseguita: PM_DECISION=HUMAN_REQUIRED** prima della sequenza R5-E. La VM resta
+alla baseline R4-PASS finché l'Utente applica la patch; R5 non è chiusa e R6
+resta NOT_AUTHORIZED. La matrice update non viene reintrodotta.
 
 ### R5-A — Uninstall normale unificato
 
@@ -983,7 +994,7 @@ Una candidate può avanzare verso public release soltanto se:
 - enrollment/verify funzionano;
 - factory/Windows compatibility resta preservata;
 - nessun componente critico Fedora/KDE viene sostituito;
-- Update Survivability Test R5 è PASS;
+- Removal & Emergency Recovery Qualification R5 è PASS;
 - un normale update può al massimo rompere il fingerprint;
 - la recovery prevista è reinstall/update del driver;
 - password login, desktop, sudo e PolicyKit restano sicuri e indipendenti dal

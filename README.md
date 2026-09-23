@@ -1,23 +1,32 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Goodix 27c6:5125 for Fedora KDE
 
-> **HISTORICAL_ONLY / REJECTED_ARCHITECTURE — 22 September 2026.**
-> The managed candidate, private fprintd/PAM pair, Plasma daemon/greeter,
-> KScreenLocker overrides and custom sudo/PolicyKit integrations described
-> below are preserved as historical evidence. Their installation, build and
-> live instructions are not the active release workflow. Past PASS results
-> do not qualify them for the new release.
->
-> Follow the [distro-decoupled roadmap](ROADMAP_DISTRO_DECOUPLED_RELEASE.md). R0 restored the physical
-> Fedora host to its stock baseline; new build/runtime validation is VM-only.
-> The next runtime must use the Goodix library with Fedora stock fprintd and
-> stock authentication consumers. No replacement candidate is ready yet.
+**Removal and emergency recovery:** [Uninstall Goodix](docs/UNINSTALL.md).
+If the desktop is inaccessible: **Ctrl+Alt+F3 → sign in → `goodix-force-remove`**.
+The command requests sudo itself. Recovery commands must first be installed
+as part of the current candidate; older R4 installations need the R5 bridge below.
 
-R2 VM build is PASS at `c5df717`; R3-A stock load is PASS at install `92311c5`.
-Current handoff: [synthetic retry/attempt tests in the VM, without the reader](production/minimal-runtime/STOCK_ATTEMPTS_VM.md).
-See the [minimal runtime audit](docs/MINIMAL_RUNTIME.md); retain the existing
-R2 output rather than rebuilding.
-The following product and installation description is historical.
+**Current phase: R5 — Removal & Emergency Recovery Qualification.** R3 and R4
+are closed on the tested Fedora VM baseline, including native Plasma fingerprint
+login. Offline removal qualification and the [R5 VM procedure](deployment/recovery/R5_VM.md)
+are the current work; live removal/reinstallation remains pending human execution.
+R6 is not authorized and this is not a public release.
+
+- [Current candidate installation](docs/R5_INSTALL.md)
+- [Normal uninstall and one-command emergency removal](docs/UNINSTALL.md)
+- [VM qualification and initial R4 recovery-tools bridge](deployment/recovery/R5_VM.md)
+- [Canonical roadmap](ROADMAP_DISTRO_DECOUPLED_RELEASE.md)
+
+The physical Fedora host remains the stock safety baseline. Installation and
+runtime validation are VM-only. Device materials and fingerprint templates are
+preserved by removal; current Fedora files are never restored from old copies.
+
+## Historical product description
+
+The following managed-candidate description and its installation links are
+**HISTORICAL_ONLY / REJECTED_ARCHITECTURE**. They remain evidence, not the active
+installation path. Use the current links above. Private fprintd/PAM, Plasma
+binaries/greeter and custom sudo/PolicyKit integrations are excluded from R5.
 
 This project provides a source-built libfprint driver for the Goodix USB
 fingerprint reader `27c6:5125` running firmware `GF_ST411SEC_APP_12509`. It

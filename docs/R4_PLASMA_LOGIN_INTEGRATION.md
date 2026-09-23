@@ -1,7 +1,7 @@
 # R4 — explicit fingerprint choice at Plasma Login
 
-Status: **R4 CLOSED; Plasma Login SUPPORTED_ON_TESTED_BASELINE. R5 NOT_STARTED,
-STOP_BEFORE_R5: wait for the user, with no next gate or update preparation.**
+Status: **R4 CLOSED; Plasma Login SUPPORTED_ON_TESTED_BASELINE. R5 removal
+qualification is active; [current removal/recovery](UNINSTALL.md) awaits VM qualification.**
 Replan baseline: `4997fe47825cb1748bf34650b3b2eaaedb9dba49`; qualified login
 guide/guest checkout: `7d0e2d3bcd33dc1311f70cc26b0a72b6889acfbe`.
 The required fingerprint login is now demonstrated, rather than closed as a
@@ -250,7 +250,7 @@ and failure fallback remain source-reviewed, not live-qualified by that run.
 | Current vendor auth policy changes in any of the three files | Fingerprint disabled; current password/auth policy used | C fixture gate accepted PASS |
 | Current account/session/password-change rules change | New rules read directly | Account/session synthetic cases in accepted gate; password-change not exercised |
 | fprintd/module/device unavailable | Chosen fingerprint series fails; next password submission skips it | Synthetic dispatch; failure fallback B NOT_EXERCISED in the successful live |
-| Content update at the vendor's packaged path | No frozen copy masks it; compatible fingerprint may remain available | R5 empirical qualification not started; user requested STOP |
+| Content update at the vendor's packaged path | No frozen copy masks it; compatible fingerprint may remain available | Future update compatibility unproven; R5 now qualifies removal/recovery |
 | Remove integration | Remove owned override first; current Fedora configuration becomes visible | Accepted synthetic lifecycle; real removal not run on PASS; no stock backup replay |
 
 The absolute path is an explicit packaging dependency. Fedora's observed

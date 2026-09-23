@@ -30,13 +30,14 @@ def run(*args):
     return subprocess.run(args, check=True, capture_output=True, text=True).stdout.strip()
 
 
-def environment():
+def environment(*, removal=False):
     require(os.geteuid() == 0, 'root required; run only at the human installation gate')
     run('systemd-detect-virt', '--vm', '--quiet')
-    release = platform.freedesktop_os_release()
-    require(release.get('ID') == 'fedora' and release.get('VERSION_ID') == '44'
-            and platform.machine() == 'x86_64', 'Fedora 44 x86_64 VM required')
-    require(run('getenforce') == 'Enforcing', 'SELinux Enforcing required')
+    if not removal:
+        release = platform.freedesktop_os_release()
+        require(release.get('ID') == 'fedora' and release.get('VERSION_ID') == '44'
+                and platform.machine() == 'x86_64', 'Fedora 44 x86_64 VM required')
+        require(run('getenforce') == 'Enforcing', 'SELinux Enforcing required')
     require(USB.is_dir(), 'USB presence metadata unavailable')
     for device in USB.iterdir():
         vendor = device / 'idVendor'
@@ -165,7 +166,7 @@ def install(directory):
 
 
 def uninstall():
-    environment()
+    environment(removal=True)
     parents(CONFIG)
     parents(SUPPORT)
     if not present(SUPPORT):
@@ -198,7 +199,8 @@ def uninstall():
     if present(CONFIG):
         trusted(CONFIG, mode=0o644)
         require(digest(read_regular(CONFIG)) == receipt['config_sha256'], 'project PAM configuration drift')
-    vendor_ready()  # Current vendor, not an old copy/hash, becomes effective below.
+    # Removal must remain possible when Fedora changes or removes its vendor PAM.
+    # Only project ownership, receipt and content checks authorize these deletions.
     if present(CONFIG):
         CONFIG.unlink()  # Remove authentication entry point before its dependencies.
     for name in (MODULE, 'manage.py', 'receipt.json'):  # Keep receipt until all payload is removed.

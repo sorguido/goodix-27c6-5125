@@ -283,3 +283,16 @@ hash-pinned compile-time inputs only, extracted without installation. No new
 runtime library is bundled and no protected/private evidence is exported.
 This supersedes the earlier statement that the candidate contains no Plasma
 source: that statement applies to the pre-corrective early-login integration.
+
+## R5 removal and emergency recovery (23 September 2026)
+
+`deployment/recovery/` and its synthetic tests are local GPL-2.0-or-later code,
+using the Python standard library and existing Fedora commands. Static paths,
+receipt schemas and ownership checks derive from this project's GPL-2.0-or-later
+`deployment/minimal-runtime/deploy.py` and
+`deployment/plasma-login-opt-in/manage.py` at
+`75d1495c328bade7c5a0bf267893cb79014c3bad`. Installed standalone copies retain
+the SPDX notice. No third-party import, new runtime library, protected material
+or licensing-boundary change. The login inverse correction retains its license.
+R5 reuses the qualified R3/R4 binaries and original build manifests; it does not
+relicense or rebuild them. No public export or public-repository operation.

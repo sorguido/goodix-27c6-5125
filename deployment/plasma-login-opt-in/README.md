@@ -5,7 +5,9 @@
 Build, installation and [real VM login](R4_PLASMA_LOGIN_VM.md) are completed PASS.
 Password had no forced fingerprint wait; fingerprint reached the desktop with
 one RIGHT-index contact and no password. Plasma Login is SUPPORTED_ON_TESTED_BASELINE.
-**R4 is closed. R5 is not started: stop and wait for the user, with no new gate.**
+**R4 is closed. R5 removal qualification is now authorized:** use the
+[current removal commands](../../docs/UNINSTALL.md) and
+[R5 VM procedure](../recovery/R5_VM.md). The component procedure below is historical.
 Do not repeat the completed tests or provoke a failure to exercise B fallback,
 which remains NOT_EXERCISED. The qualified R3 runtime and
 RIGHT-index template stored as `left-index-finger` stay unchanged.
@@ -195,4 +197,4 @@ The [completed login](R4_PLASMA_LOGIN_VM.md) demonstrated functional authenticat
 and session startup on the installed baseline, with clean safety telemetry.
 Failure fallback and real uninstall were not exercised in that PASS; their
 source/synthetic evidence is separate. Package-update safety remains unqualified;
-no R5 preparation or execution is requested.
+R5 removal/recovery qualification is pending the separate human VM procedure.

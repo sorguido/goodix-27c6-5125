@@ -16,7 +16,143 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente — R4 CHIUSA, attesa Utente prima di R5 (23 settembre 2026)
+### Stato corrente — R5 offline PASS, HUMAN_REQUIRED per lifecycle VM (23 settembre 2026)
+
+**ACTIVE_PHASE=R5; R4=CLOSED; R6=NOT_STARTED / NOT_AUTHORIZED.** La decisione
+Utente nel prompt `CODEX_START_R5_RECOVERY_ORCHESTRATION.md`, eseguito in questa
+sessione, richiede esclusivamente Removal & Emergency Recovery Qualification.
+Bootstrap da `f9dc4e4`, worktree pulito su `development`, fast-forward a
+`75d1495c328bade7c5a0bf267893cb79014c3bad`. Nessun lavoro precedente sovrascritto.
+La roadmap aggiornata sostituisce il vecchio gate empirico della matrice update
+con rimozione normale, reinstallazione e rimozione d'emergenza. Le sezioni
+storiche sotto che parlano di STOP prima di R5 o matrice update obbligatoria
+conservano la decisione dell'epoca, **superata per il task corrente**. Non si
+attribuisce compatibilità universale agli aggiornamenti futuri.
+
+**CURRENT_TASK=R5_A_B_C_D_REMOVAL_AND_EMERGENCY_RECOVERY.** Rimuovere software ed
+effetti Goodix, preservando materiali/template e senza ripristinare Fedora
+storica. Non cambia driver, modulo PAM, policy di autenticazione o protocollo.
+L'ultimo avanzamento live resta R4 PASS, descritto sotto; nessuna live R5 è stata
+eseguita dall'AI. Il prossimo confine è la sequenza umana in
+`deployment/recovery/R5_VM.md`, esclusivamente nella VM.
+
+Implementazione in `deployment/recovery/`: due comandi standalone in PATH,
+`goodix-uninstall` e `goodix-force-remove`, ognuno con il proprio intero codice
+Python standard-library; nessun import da repository, runtime, build o inversa
+salvata. Chiedono direttamente la normale sudo se l'utente non è root. Il
+piccolo `install.sh` aggiunge solo i due comandi e una receipt; `uninstall.sh`
+è la sua inversa **tooling-only**, senza rimuovere R3/R4. L'installazione dei
+tool precede qualsiasi rimozione e la reinstallazione dei componenti.
+
+**Difetto verificato e corretto:** l'inversa login R4 imponeva `vendor_ready()`
+e vincoli Fedora44/Enforcing anche per rimuovere il proprio override. Il manager
+versionato ora separa i gate di installazione da quelli di rimozione. La copia
+R4 già installata resta invariata e legata al suo self-hash: il remover unificato
+legge direttamente i receipt e verifica i file, senza eseguire quel vecchio
+manager o sostituirlo. Supporta la forma effettiva delle receipt R3/R4 consolidate.
+Il normale uninstall controlla solo ownership/tipo/hash/inventario del progetto;
+nessun vendor PAM, RPM, versione Fedora, Git o build è un prerequisito.
+
+Il force-remove ignora receipt/hash e usa esclusivamente i path fissi auditati:
+prima `/etc/pam.d/plasmalogin` e il drop-in
+`/etc/systemd/system/fprintd.service.d/90-goodix-5125-runtime.conf`, poi reload
+systemd e stop fprintd, supporto login, mapping/label e runtime. Non avvia
+fprintd, non riavvia il display manager, non invia comandi al sensore. In caso
+di errore tenta ancora il disinnesco degli altri entrypoint e conserva il tool
+emergency; non stampa PASS completo. Dopo errore label conserva anche la receipt
+runtime. Parent symlink rifiutati, symlink finali rimossi senza attraversarli;
+nessuna cancellazione ricorsiva di directory condivise. Recovery rimossa per
+ultima solo dopo successo; l'idempotenza del remover è sintetica, mentre dopo
+successo reale il secondo comando può essere già assente dal PATH.
+
+**Inventario SELinux:** nessun modulo custom nella baseline qualificata. Esiste
+soltanto il fcontext esatto `/var/lib/goodix-5125-poc(/.*)?` e le label della
+directory e dei cinque file nominati. Il normale uninstall conserva il mapping
+preesistente/unowned secondo receipt; emergency elimina quel mapping specifico
+se presente, anche senza receipt. `restorecon -F` non ricorsivo applica la policy
+Fedora **corrente**, mai le vecchie label salvate. Non legge contenuti protetti;
+rifiuta file non regolari/hardlink prima della relabel. Template e relative
+label restano intatti. Tool SELinux/systemd non disponibili o filesystem non
+scrivibile possono lasciare cleanup incompleto: il tool lo segnala e resta
+recuperabile, senza subordinare la rimozione PAM alla salute di Fedora.
+
+**Procedura utente:** `docs/UNINSTALL.md` è collegata in evidenza dal README;
+inizia con Ctrl+Alt+F3 → login username/password → `goodix-force-remove` → unica
+istruzione finale. `docs/R5_INSTALL.md` compone solo installer esistenti e nuovi
+tool, senza iniziare R6 o ricompilare i binari qualificati: riusa runtime source
+`b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226` e login source
+`6fc6e640710885954d9e6fd603b3bc47b45d2ac6` con manifest originali. L'installazione
+login usa il manager originale verificato, solo per installare. Reinstallare
+non richiede re-enrollment, import, conversione manifest o reset del sensore.
+
+La sequenza live concordata è snapshot R4-PASS, aggiunta dei soli recovery tool,
+uninstall grafico, verifica password/desktop e dati preservati, reinstallazione
+con la stessa guida utente, un login fingerprint nativo bounded per dimostrare
+il ritorno della candidate, TTY e un solo comando force-remove, verifica finale
+password/desktop con software rimosso. Il test non provoca corruzione Fedora.
+Lo stato finale rimosso è richiesto esplicitamente da R5, quindi eccezione
+motivata al mantenimento della baseline dopo PASS. Nessun anticipo R6/R7.
+
+**Limiti:** i test sintetici non provano stop reale del servizio, label SELinux
+reali, PATH della TTY, accessibilità password o reinstallazione/fingerprint in
+VM. Anche una rimozione riuscita non ripara Fedora indipendentemente guasta;
+TTY e sudo password devono ancora funzionare. Processi/helper preesistenti
+possono conservare librerie già caricate: la sola istruzione finale è riavviare
+normalmente, senza restart automatico del display manager. Snapshot non letto
+né ripristinato dal progetto. Nessuna promessa di resilienza a power loss o
+futuri cambi Fedora non osservati.
+
+**Qualifica offline e review:** 35 test sintetici del remover + 11 test del
+lifecycle recovery + 14 test dell'inversa Plasma = **60 PASS**. Filesystem reali
+in directory temporanee, comandi host/root/SELinux simulati: nessuna operazione
+runtime reale. Coperti tutti i casi R5-D, compreso vendor assente con override
+presente, drift normale non mutante, force senza receipt o componenti completi,
+fprintd active/inactive, repository/build assenti, seconda rimozione innocua,
+materiali/template/vendor sentinella intatti. Esecuzione `--help` delle vere
+copie installate nelle fixture da cwd estranea, wrapper da cwd estranea e
+argomenti sudo fissi verificati. Non sono test hardware o PAM runtime.
+
+La review indipendente ha richiesto correttivi locali nello stesso R5:
+receipt JSON non-object con errore leggibile, hardlink/file non regolari esclusi
+dalla relabel, permesso 0755 obbligatorio dei comandi installati e stop di una
+unit fprintd già assente trattato come assenza (altri errori restano visibili).
+Il controllo Bash della guida VM è stato corretto per evitare falso PASS con
+residui: quattro fixture (assenza, file, directory, symlink rotto) PASS. Sintassi
+di dieci blocchi Bash delle quattro guide e link locali PASS. Nessuna modifica
+al live-critical set driver/PAM C/config rispetto alle build qualificate.
+
+Review Git-native sulla baseline
+`75d1495c328bade7c5a0bf267893cb79014c3bad` → commit R5 consegnato, comprendente
+codice, test, guide, roadmap e presente manuale. Nessun nuovo D-number, report
+parallelo, archive, kit, dipendenza o modifica dei file di governance. Il
+coupling distro non aumenta: i due nuovi comandi non fanno parte del percorso
+auth runtime, non congelano né sostituiscono file Fedora. Eventuali errori del
+tooling appartengono al confine recovery (D); i rischi già noti del path vendor
+R4 non sono dichiarati risolti per ogni futuro aggiornamento.
+
+```text
+OUTCOME=R5_OFFLINE_PASS_LIVE_PENDING
+ADVANCEMENT=VENDOR_INDEPENDENT_NORMAL_AND_EMERGENCY_REMOVAL
+EXECUTABLE_CLOSURE=PASS_OFFLINE_SYNTHETIC_VM_EXECUTION_PENDING
+REAL_TARGET_COMPATIBILITY=VM_RUNTIME_PENDING_NO_NEW_BINARY_DEPENDENCY
+ACTIVE_PHASE=R5
+R4=CLOSED
+R6=NOT_STARTED_NOT_AUTHORIZED
+PM_DECISION=HUMAN_REQUIRED
+RESIDUAL_BLOCKER_OR_RISK=VM_REMOVAL_REINSTALL_TTY_PASSWORD_QUALIFICATION_PENDING
+CANONICAL_DOCUMENTATION=MANUAL_AND_ROADMAP_WITH_R5_USER_GUIDES
+REVIEW_SET=GIT_DIFF_FROM_75d1495c328bade7c5a0bf267893cb79014c3bad
+```
+
+**Motivo del gate:** AGENTS §6.1/§6.2 e §8 richiedono che installazione,
+privilegi e live siano eseguiti dall'Utente; roadmap R5-E richiede lo stop al
+prossimo HUMAN_REQUIRED. Patch, inversa e procedura esatta sono pronte; non serve
+una seconda approvazione dello SHA. Il successivo passo è solo esecuzione umana
+di `deployment/recovery/R5_VM.md` e review delle evidenze riportate. L'AI non
+installa, non entra nella VM e non avanza in R6.
+
+### Baseline live precedente — R4 CHIUSA (23 settembre 2026)
+
 
 **R4=CLOSED; Plasma Login=SUPPORTED_ON_TESTED_BASELINE.** La review indipendente
 accetta la live nell'handoff `CODEX_CLOSE_R4_PLASMA_LOGIN_PASS_STOP_BEFORE_R5.md`
@@ -199,7 +335,7 @@ e dal PASS ordinario; login shell/session non provati, nessun SUPPORTED esteso.
 Non serve una live aggiuntiva per il confine biometrico R4 in assenza di nuova
 evidenza. Anche la live PolicyKit è completata e accettata. Il successivo
 passo login opt-in è ora anch'esso completato PASS come descritto sopra.
-L'orchestrazione si ferma prima di R5 per istruzione Utente. Le coppie
+Lo stop storico prima di R5 è superato dal task corrente sopra. Le coppie
 installazione/inversa R3 e login restano disponibili; nessun kit o accesso VM AI.
 Runtime, template e inversa salvata mantenuti; rollback solo dopo FAIL reale,
 instabilità/regressione. Le nuove evidenze non colmano retroattivamente la
@@ -207,8 +343,8 @@ provenance guest mancante del VERIFY R3; anche l'handoff live KScreenLocker
 omette SHA guest e output RPM completi, senza invalidare il risultato osservato.
 
 Le closure R4 KScreenLocker, sudo ordinario, PolicyKit e Plasma Login sono
-completate nello scope osservato. R5, R6 e R7 restano non qualificati, con STOP
-prima di R5. Questi PASS non provano isolamento esaustivo password/desktop, comportamento dopo update,
+completate nello scope osservato. R5 live, R6 e R7 restano non qualificati;
+la preparazione R5 corrente è descritta in apertura. Questi PASS non provano isolamento esaustivo password/desktop, comportamento dopo update,
 serie PAM, false match su altro dito, readback factory o compatibilità Windows esaustiva. Le evidenze
 live sono riportate dall'Utente, corroborate dalla review di codice e telemetria;
 l'AI non ha rieseguito la VM né letto materiale protetto o template biometrici.
@@ -387,7 +523,7 @@ necessità, ownership, update e rollback è in `docs/MINIMAL_RUNTIME.md`.
 
 Questa sezione conserva la preparazione e la closure sintetica precedenti.
 Anche il login grafico opt-in nella VM è ora PASS, dopo PolicyKit, sudo e
-KScreenLocker: R4 chiusa e attesa Utente prima di R5. R3 è chiusa da
+KScreenLocker: R4 chiusa; R5 corrente descritta in apertura. R3 è chiusa da
 enrollment e VERIFY PASS; la closure più avanti conserva evidenze e limiti
 della qualifica.
 
