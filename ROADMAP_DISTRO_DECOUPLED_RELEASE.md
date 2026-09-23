@@ -321,7 +321,10 @@ riportato sopra. La semantica dei tentativi resta invariata.
 
 ## R4 — Consumer di autenticazione: stock-first, login Plasma richiesto
 
-**Stato: ATTIVA / REPLAN_REQUIRED; KScreenLocker, sudo ordinario e PolicyKit SUPPORTED sulla baseline provata (23 settembre 2026). Plasma Login fingerprint è un requisito di release ancora aperto.**
+**Stato: CHIUSA sulla baseline VM provata (23 settembre 2026). KScreenLocker,
+sudo ordinario, PolicyKit e Plasma Login opt-in = SUPPORTED_ON_TESTED_BASELINE.**
+L'handoff `CODEX_CLOSE_R4_PLASMA_LOGIN_PASS_STOP_BEFORE_R5.md` richiede lo stop
+dopo questa closure: **R5 non avviata né da preparare; attesa dell'Utente**.
 
 **Decisione Utente (23 settembre 2026):** il fingerprint al login grafico Plasma
 è una funzione richiesta della release. L'assenza del percorso biometrico stock
@@ -333,8 +336,11 @@ componenti Fedora.
 ~~~text
 PLASMA_LOGIN_FINGERPRINT_REQUIRED=true
 PLASMA_LOGIN_KNOWN_LIMITATION_ACCEPTABLE=false
-R4_CLOSED=false
-R5_BLOCKED_UNTIL_LOGIN_RESOLVED=true
+R4_CLOSED=true
+R5_LOGIN_ENTRY_CONDITION=SATISFIED
+R5=NOT_STARTED
+STOP_BEFORE_R5=true
+NEXT_STATE=WAITING_FOR_USER
 ~~~
 Per KScreenLocker, password unlock a lettore assente e fingerprint unlock al primo contatto senza password,
 cleanup drained/closed, servizio inactive/MainPID 0 e lettore scollegato sono
@@ -434,7 +440,7 @@ Ordine di progettazione obbligatorio:
 4. ricorrere a modifiche più profonde di Plasma Login soltanto dopo esclusione
    documentata delle opzioni precedenti e nuova review.
 
-Exit criteria aggiuntivi di R4 per Plasma Login:
+Exit criteria funzionali/architetturali di R4 per Plasma Login:
 
 ~~~text
 PASSWORD_LOGIN=PASS
@@ -443,10 +449,25 @@ PLASMA_LOGIN_FINGERPRINT=PASS
 MAX_PHYSICAL_CONTACTS_PER_SERIES=3
 FEDORA_VENDOR_PAM_MODIFIED=false
 FEDORA_VENDOR_PAM_FROZEN=false
-NORMAL_UPDATE_MAX_FAILURE=FINGERPRINT_ONLY
 UNINSTALL_RETURNS_TO_STOCK=true
 TTY_RECOVERY_REQUIRED=false
 ~~~
+
+La closure R4 accetta funzionalità sulla baseline osservata, composizione del
+vendor corrente e modello di rimozione verificato nei test sintetici. Il limite
+di tre contatti è imposto dal percorso stock; la live sotto ha usato un contatto,
+non ha esercitato l'esaurimento/fallback né l'uninstall, che non va ripetuto su PASS.
+
+Resta invariato il requisito di sicurezza della release:
+
+~~~text
+NORMAL_UPDATE_MAX_FAILURE=FINGERPRINT_ONLY
+~~~
+
+La verifica empirica attraverso aggiornamenti reali appartiene a R5, non è una
+precondizione circolare per chiudere R4 e non è dichiarata PASS da questa closure.
+Il rischio del contratto/path vendor resta visibile nell'audit: qualunque failure
+A/B da normale update è RELEASE_BLOCKER; non è una limitation accettabile.
 
 **Avanzamento del replan:** composizione supportata Linux-PAM tramite include
 assoluti del vendor corrente, ma nessun selettore stock completo per la UX
@@ -464,7 +485,7 @@ prefisso è necessario anche per gli errori di modulo durante pam_setcred.
 Dettagli e limiti in `docs/R4_PLASMA_LOGIN_INTEGRATION.md`. Il contratto del path
 vendor corrente è una dipendenza di packaging: rimozione/relocation incompatibile
 può rompere password e sarebbe un blocker classe A, mai una qualifica implicita
-fingerprint-only. Nessuna prova R5 anticipata e nessun PASS login dedotto.
+fingerprint-only. Nessuna prova R5 anticipata; il PASS login deriva dalla live sotto.
 
 **Build/test VM PASS accettato** al source commit
 `6fc6e640710885954d9e6fd603b3bc47b45d2ac6`: marker finale riportato
@@ -481,19 +502,25 @@ manifest originali; nessuna rebuild o ripetizione dei test riusciti.
 manifest/source, installazione, bytes/metadata/receipt, cinque default-label
 check, hash vendor invariato e worktree pulito riportati dall'Utente. Desktop
 aperto, sensore assente, nessun logout/reboot/login; R3 runtime/template mantenuti.
-Nessuna rebuild/reinstallazione o rollback su PASS. I default label non provano
-ancora il caricamento del modulo nel dominio SELinux del login helper.
+Nessuna rebuild/reinstallazione o rollback su PASS. I default label da soli non
+provavano il caricamento nel dominio helper; segue ora la prova funzionale reale.
 
-**Prossimo gate HUMAN_REQUIRED:** procedura reviewata
-`deployment/plasma-login-opt-in/R4_PLASMA_LOGIN_VM.md`: normale logout e password
-a lettore assente senza attesa fingerprint; soltanto dopo PASS, una serie
-opt-in Invio vuoto con indice DESTRO, massimo tre contatti e stop al MATCH.
-Il greeter può riabilitare il campo su errori PAM intermedi: nessuna nuova
-submission/contatto su feedback generico ambiguo, detach prima del fallback.
-Telemetria esistente e cleanup minimi, inversa della sola integrazione login
-su FAIL/regressione; nessuna recovery TTY o vendor repair. Se MATCH immediato,
-il fallback dopo failure resta non esercitato. Nessun PASS login/update dedotto;
-R4 aperta e R5 bloccata finché gli exit criteria R4 non sono chiusi.
+**Live Plasma Login PASS accettata** da guida/checkout guest
+`7d0e2d3bcd33dc1311f70cc26b0a72b6889acfbe`, preparazione PASS:
+logout normale, password reale a sensore assente, desktop PASS senza richiesta
+fingerprint o attesa forzata (ritardo circa zero riferito dall'Utente). Poi
+secondo logout, un solo Invio vuoto e un contatto dell'indice DESTRO; desktop
+raggiunto senza password, seconda serie o retry osservato. Una VERIFY/MATCH
+terminale, epoch drained/closed, zero retry/reopen/reset/persistent e outstanding;
+fprintd finale inactive/MainPID 0, sensore detached. release_tail=0/single_terminal=0
+sono compatibili con ritorno PAM anticipato al MATCH, non failure automatico
+né prova di quiescenza device. Telemetria completa nel manuale canonico.
+
+Fallback B dopo failure **NOT_EXERCISED**, nessuna nuova live per provocarlo.
+Integrazione, runtime R3/template e inverse mantenuti; nessun rollback, rebuild
+o reinstallazione. Plasma Login **SUPPORTED_ON_TESTED_BASELINE**, R4 formalmente
+chiusa. La guida `deployment/plasma-login-opt-in/R4_PLASMA_LOGIN_VM.md` è ora
+evidenza completata, da non rieseguire. Nessun nuovo gate viene preparato.
 
 Una volta ottenuti:
 
@@ -530,6 +557,12 @@ aperta finché non esiste una soluzione conforme al failure model.
 ---
 
 ## R5 — Update Survivability Test su VM
+
+**Stato: NOT_STARTED / STOP_BEFORE_R5 per istruzione Utente.** L'entry condition
+funzionale R4 è soddisfatta; ciò non avvia R5. Non preparare guida, query update,
+matrice operativa o nuovo Human Gate finché l'Utente non richiede la ripresa.
+I requisiti già definiti sotto restano invariati e non costituiscono una nuova
+consegna operativa.
 
 **Entry condition:** R4 formalmente chiusa, incluso `PLASMA_LOGIN_FINGERPRINT=PASS`
 e relativo password path sicuro. Finché il login Plasma resta aperto, R5 non

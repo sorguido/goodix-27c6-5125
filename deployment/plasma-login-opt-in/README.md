@@ -2,10 +2,12 @@
 
 **Installation and file/default-label verification accepted PASS at
 `24c3018071e8d120687ff8fbd2f344cde620692d`; keep the installed candidate.**
-The build and installation gates are completed; do not repeat them.
-Next: [reviewed password-first, then opt-in fingerprint login in the VM](R4_PLASMA_LOGIN_VM.md).
-No real login has been performed yet.
-R4 is open and R5 is blocked. The qualified R3 runtime and
+Build, installation and [real VM login](R4_PLASMA_LOGIN_VM.md) are completed PASS.
+Password had no forced fingerprint wait; fingerprint reached the desktop with
+one RIGHT-index contact and no password. Plasma Login is SUPPORTED_ON_TESTED_BASELINE.
+**R4 is closed. R5 is not started: stop and wait for the user, with no new gate.**
+Do not repeat the completed tests or provoke a failure to exercise B fallback,
+which remains NOT_EXERCISED. The qualified R3 runtime and
 RIGHT-index template stored as `left-index-finger` stay unchanged.
 
 [Architecture, alternatives and evidence](../../docs/R4_PLASMA_LOGIN_INTEGRATION.md)
@@ -39,8 +41,8 @@ manifest/source comparisons match the versioned procedure; this is accepted
 human-reported deployment evidence, not an AI inspection of guest files.
 No new fprintd state measurement or runtime SELinux-load result was supplied.
 
-The original instructions below are retained for provenance. Continue with the
-linked login procedure above, using this installation and its existing inverse.
+The original instructions below are retained for provenance. Both installation
+and the linked login procedure are completed; keep this installation and inverse.
 
 Use the existing Fedora 44 KDE VM, with SELinux Enforcing, reader detached,
 and your working desktop session open. Run the block from the ordinary user's
@@ -189,6 +191,8 @@ If removal refuses a foreign/changed file, stop and report the refusal; do not
 delete it manually. Expected final state is the table above after install PASS,
 or its complete absence and current vendor configuration visible after rollback.
 No R3 uninstall, template deletion or restoration of old Fedora files is needed.
-SELinux runtime loading, real login/password fallback, contact telemetry and
-package-update behavior remain untested. The [login handoff](R4_PLASMA_LOGIN_VM.md)
-defines the next workflow, criteria and the STOP if desktop access is unavailable.
+The [completed login](R4_PLASMA_LOGIN_VM.md) demonstrated functional authentication
+and session startup on the installed baseline, with clean safety telemetry.
+Failure fallback and real uninstall were not exercised in that PASS; their
+source/synthetic evidence is separate. Package-update safety remains unqualified;
+no R5 preparation or execution is requested.

@@ -16,85 +16,51 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente — R4 Plasma installazione VM PASS, login reale al gate (23 settembre 2026)
+### Stato corrente — R4 CHIUSA, attesa Utente prima di R5 (23 settembre 2026)
 
-La fonte operativa attiva resta `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`.
-L'handoff `CODEX_SUPERSEDING_R4_PLASMA_LOGIN_REPLAN.md` revoca espressamente
-la proposta login stock assente → limitation → closure R4/R5. Recovery da
-`725b3c1f8bf879b9e56632b4f15da494968cead7`, worktree pulito senza lavoro R5
-da cancellare; letti i due commit Utente e fast-forward su `development` a
-`4997fe47825cb1748bf34650b3b2eaaedb9dba49`. Nessuna riscrittura della storia.
-**Fingerprint al login Plasma richiesto; R4 aperta, R5 bloccata.**
+**R4=CLOSED; Plasma Login=SUPPORTED_ON_TESTED_BASELINE.** La review indipendente
+accetta la live nell'handoff `CODEX_CLOSE_R4_PLASMA_LOGIN_PASS_STOP_BEFORE_R5.md`
+contro la guida/checkout guest `7d0e2d3bcd33dc1311f70cc26b0a72b6889acfbe`.
+Dopo logout normale, password di guido con sensore assente e desktop PASS,
+senza richiesta o attesa fingerprint, ritardo circa zero e nessun messaggio
+insolito riferiti dall'Utente. Poi un solo Invio vuoto, indice fisico DESTRO,
+un contatto e desktop raggiunto senza password. Una VERIFY/MATCH terminale,
+zero retry/reopen/reset/persistent e outstanding, drained=1/context_closed=1;
+fprintd finale inactive/MainPID 0, lettore scollegato. Nessuna seconda serie.
 
-Il preflight login riportato dall'Utente è completato, checkout guest
-`725b3c1f8bf879b9e56632b4f15da494968cead7`, sensore assente. Plasma Login
-Fedora stock usa `password-auth` senza pam_fprintd; authselect with-fingerprint
-è già attivo, ma non crea un percorso alternativo del normale login in questa
-baseline. Review della source reference Fedora 6.7.5 e dei patchset: nessun
-selettore nativo di servizio biometrico. Non richiedere una live stock destinata
-a non acquisire. Questa diagnosi resta evidenza, non una limitation accettabile.
+release_tail=0/single_terminal=0 sono compatibili con il ritorno anticipato
+stock PAM al MATCH, come nei consumer già qualificati; non invalidano questo
+cleanup e non provano quiescenza completa device. Il ramo fallback B dopo
+failure resta **NOT_EXERCISED**, senza nuova live per provocarlo. La preparazione
+PASS include il prerequisito Enforcing; nessun output getenforce post-live o
+nuovo evento AVC è allegato. Non si inventano misure o una qualifica SELinux
+universale. La telemetria completa e i limiti sono nella closure R4 sotto.
 
-**CURRENT_TASK: prima qualifica login reale VM della candidata PAM opt-in
-installata: password a sensore assente, poi fingerprint soltanto dopo PASS.**
-La decisione UX esplicita successiva accetta Invio a campo vuoto come scelta
-fingerprint: password non vuota inviata subito al vendor senza attesa biometrica;
-campo temporaneamente disabilitato durante la serie scelta e disponibile dopo
-failure. Massimo tre contatti, stop al primo MATCH, nessun retry nascosto.
-Il disegno e le alternative sono in `docs/R4_PLASMA_LOGIN_INTEGRATION.md`;
-codice e consegna in `deployment/plasma-login-opt-in/README.md`.
-Include PAM assoluti delegano al file Fedora **corrente**, senza copiarlo.
-Un piccolo modulo project-owned seleziona soltanto token esplicitamente vuoto
-e auth policy corrente compatibile in plasmalogin/password-auth/postlogin.
-Drift della policy disabilita fingerprint; password, account e session passano
-al vendor. Il reset prima del vendor tratta anche gli errori di modulo durante
-`pam_setcred`; non cancella un rifiuto vendor. Nessun daemon/greeter privato.
+La candidata login resta installata: source
+`6fc6e640710885954d9e6fd603b3bc47b45d2ac6`, installazione verificata al checkout
+`24c3018071e8d120687ff8fbd2f344cde620692d`. Copia VM preservata in
+`development/build-artifacts/plasma-login-opt-in/goodix-login-build.OeCmF8Ja`,
+esclusa soltanto tramite `.git/info/exclude`; modulo/inversa/manifest invariati.
+Nessuna rebuild, reinstallazione o rollback su PASS. Runtime R3 e template
+indice DESTRO/slot left-index-finger mantenuti. R3, KScreenLocker, sudo ordinario
+e PolicyKit restano chiusi nello scope provato e non vanno ripetuti.
 
-L'handoff `CODEX_MINI_RESUME_R4_PLASMA_BUILD_PASS.md` riporta
-`PLASMA_LOGIN_VM_BUILD_TESTS=PASS`, `Ran 11 tests / OK`,
-`INSTALLATION=NOT_PERFORMED`, source
-`6fc6e640710885954d9e6fd603b3bc47b45d2ac6`. **ACCEPT_AND_CONTINUE sul gate
-build/test sintetici VM.** Il marker finale nello script versionato segue
-necessariamente compilazione, unità C, dispatcher vero libpam con fixture e
-11 lifecycle test: completamento accettato come evidenza riportata, non run AI.
-Non sono allegati i log completi dei singoli casi C né gli hash binari stampati;
-non si inventano misure. Il primo STOP per pam-devel assente era pre-build;
-l'Utente ha installato quella sola dipendenza di build e completato la prova.
+L'integrazione project-owned delega al PAM Fedora corrente senza congelarlo;
+nessuna build privata di Plasma/greeter né modifica vendor. La prova dimostra
+il normale accesso password e fingerprint, con sessione desktop funzionante,
+sulla baseline testata. Uninstall resta qualificato da review/test sintetici,
+non eseguito live su questo PASS. Il contratto del path vendor rimane un rischio
+di packaging: rimozione/relocation incompatibile può produrre classe A.
+**Il requisito di release fingerprint-only resta invariato.** La sua verifica
+empirica attraverso update appartiene a R5; non è una condizione circolare per
+chiudere la funzionalità R4. Qualunque failure A/B resta RELEASE_BLOCKER.
 
-Output originario `/tmp/goodix-login-build.OeCmF8Ja`, conservato integralmente
-nella VM in `development/build-artifacts/plasma-login-opt-in/goodix-login-build.OeCmF8Ja`
-relativo alla Git root. Esclusione solo locale `.git/info/exclude`, worktree
-riportato pulito; nessuna modifica `.gitignore` o tracking dei binari.
-Il nuovo handoff riutilizza modulo production, manifest e inversa invariati;
-la variante test gate-test.so ha path fixture temporanei e non va installata
-o rieseguita dalla copia spostata. Nessuna rebuild o ripetizione dei PASS.
-
-L'handoff `CODEX_MINI_RESUME_R4_PLASMA_INSTALL_PASS.md`, checkout guida
-`24c3018071e8d120687ff8fbd2f344cde620692d`, riporta tutti i marker installativi
-PASS, cinque default-label check, hash PAM vendor invariato e worktree pulito.
-**ACCEPT_AND_CONTINUE sull'installazione:** bytes/metadata/receipt verificati
-secondo il blocco versionato, stesso output/source 6fc6e64. Desktop aperto,
-lettore assente, nessun logout/reboot/login; runtime R3/template mantenuti.
-Nessuna rebuild, reinstallazione o rollback su questo PASS. Non è una misura
-nuova dello stato fprintd né un'ispezione diretta AI dei file guest.
-
-**HUMAN_REQUIRED per logout/login password e successiva serie opt-in nella VM**
-(roadmap §4 e AGENTS §6.1/§6.2), procedura reviewata in
-`deployment/plasma-login-opt-in/R4_PLASMA_LOGIN_VM.md`. Prima password non vuota
-senza sensore/attesa fingerprint; soltanto dopo PASS, una scelta Invio vuoto e
-indice DESTRO, fino a tre contatti, stop al MATCH o feedback ambiguo. Review
-sorgente: il greeter può mostrare Login Failed e riabilitare il campo anche
-su errore PAM intermedio; non è prova di fine serie. Nessun nuovo Invio durante
-la serie, detach prima del ritorno password. Telemetria minima e cleanup dopo
-logout usano un timestamp UTC annotato, non una variabile persa con la sessione.
-Installazione/default label non provano ancora caricamento nel dominio SELinux
-del login helper, autenticazione reale o update safety. Il fallback dopo failure
-non viene dichiarato esercitato se la serie passa subito al MATCH.
-Il modello fingerprint-only è proposto entro il contratto corrente del path
-vendor `/usr/lib/pam.d/plasmalogin`, non una qualifica R5: rimozione/relocation
-incompatibile del vendor può bloccare il login e resta rischio classe A da
-risolvere se introdotto da un update normale, mai outcome accettabile di release.
-L'unico delta installato è l'integrazione login project-owned inventariata;
-nessun file package-owned, runtime R3, template o policy SELinux modificato.
+**CURRENT_TASK completato: closure documentale R4 e STOP esplicito prima di R5.**
+R5 **NOT_STARTED**, non preparata; nessuna guida, query update, matrice operativa,
+nuovo Human Gate o anticipo R6. Stato successivo **WAITING_FOR_USER**. Questa
+pausa dell'orchestrazione è richiesta dall'handoff corrente, non una nuova
+richiesta di autorizzazione live. Roadmap e requisiti di release restano attivi;
+la chiusura R4 non equivale a release pronta o update safety già dimostrata.
 
 **Precedente ACCEPT_AND_CONTINUE sulla live stock
 PolicyKit; SUPPORTED_ON_TESTED_BASELINE.** Password reale di guido con lettore
@@ -232,17 +198,17 @@ non ripeterla né ampliare la ricerca. Anche preflight e live sudo sono completa
 e dal PASS ordinario; login shell/session non provati, nessun SUPPORTED esteso.
 Non serve una live aggiuntiva per il confine biometrico R4 in assenza di nuova
 evidenza. Anche la live PolicyKit è completata e accettata. Il successivo
-`CURRENT_TASK` è la candidata opt-in login sopra, fondata sulla query login
-ora completata. La guida mantiene la coppia installazione/inversa R3 esistente;
-nessun kit o accesso VM autonomo AI.
+passo login opt-in è ora anch'esso completato PASS come descritto sopra.
+L'orchestrazione si ferma prima di R5 per istruzione Utente. Le coppie
+installazione/inversa R3 e login restano disponibili; nessun kit o accesso VM AI.
 Runtime, template e inversa salvata mantenuti; rollback solo dopo FAIL reale,
 instabilità/regressione. Le nuove evidenze non colmano retroattivamente la
 provenance guest mancante del VERIFY R3; anche l'handoff live KScreenLocker
 omette SHA guest e output RPM completi, senza invalidare il risultato osservato.
 
-Le closure R4 KScreenLocker, sudo ordinario e PolicyKit sono completate nello
-scope osservato; login e R5, R6, R7 restano aperti. Questi PASS
-non provano login, isolamento esaustivo password/desktop, comportamento dopo update,
+Le closure R4 KScreenLocker, sudo ordinario, PolicyKit e Plasma Login sono
+completate nello scope osservato. R5, R6 e R7 restano non qualificati, con STOP
+prima di R5. Questi PASS non provano isolamento esaustivo password/desktop, comportamento dopo update,
 serie PAM, false match su altro dito, readback factory o compatibilità Windows esaustiva. Le evidenze
 live sono riportate dall'Utente, corroborate dalla review di codice e telemetria;
 l'AI non ha rieseguito la VM né letto materiale protetto o template biometrici.
@@ -420,8 +386,8 @@ necessità, ownership, update e rollback è in `docs/MINIMAL_RUNTIME.md`.
 ### R3 — tentativi espliciti stock e regressione sintetica prima della live
 
 Questa sezione conserva la preparazione e la closure sintetica precedenti.
-Il `CURRENT_TASK` attuale è la candidata opt-in del login grafico nella VM, dopo
-le closure PASS PolicyKit, sudo e KScreenLocker. R3 è chiusa da
+Anche il login grafico opt-in nella VM è ora PASS, dopo PolicyKit, sudo e
+KScreenLocker: R4 chiusa e attesa Utente prima di R5. R3 è chiusa da
 enrollment e VERIFY PASS; la closure più avanti conserva evidenze e limiti
 della qualifica.
 
@@ -1215,7 +1181,11 @@ in prova del checkout/versioni al momento del VERIFY. Evidenza sufficiente
 per la closure operativa riferita a questa baseline di laboratorio, non per
 una release/export pubblico. Nessuna ripetizione di conferma della live.
 
-### R4 — KScreenLocker, sudo e PolicyKit SUPPORTED; Plasma Login opt-in in verifica
+### R4 — CHIUSA: consumer e Plasma Login opt-in SUPPORTED sulla baseline provata
+
+Le sezioni seguenti conservano le review dei checkpoint e gli stati intermedi.
+La closure corrente è l'ultima sottosezione Plasma Login LIVE PASS, coerente
+con lo stato alto del manuale; i gate precedenti non sono azioni da ripetere.
 
 **Review PM del preflight KScreenLocker:** ACCEPT_AND_CONTINUE per la query prevista in
 `deployment/minimal-runtime/R4_KSCREENLOCKER_PREFLIGHT_VM.md`, eseguita
@@ -2183,10 +2153,79 @@ dei gate, password prima dell'attach, feedback non necessariamente terminale,
 limite stock, timestamp tra sessioni, cleanup e rollback. Login/password/fallback
 e SELinux runtime restano da osservare; R4 aperta e R5 bloccata.
 
+#### Plasma Login — LIVE PASS, closure R4 e STOP prima di R5
+
+Recovery da `7d0e2d3bcd33dc1311f70cc26b0a72b6889acfbe`, development pulito,
+coincidente con GUIDE_CHECKOUT riportato. Review dell'handoff
+`CODEX_CLOSE_R4_PLASMA_LOGIN_PASS_STOP_BEFORE_R5.md` contro la procedura
+`deployment/plasma-login-opt-in/R4_PLASMA_LOGIN_VM.md`, PAM e codice invariati
+rispetto al source 6fc6e64. Build/installazione già accettate; la nuova evidenza
+è una vera autenticazione/sessione grafica VM riportata dall'Utente, non una
+run AI o una semplice deduzione dal driver MATCH.
+
+| Criterio R4 / guida | Evidenza riportata e review |
+| --- | --- |
+| Password prima, lettore assente | Logout normale al vero greeter, password reale, desktop PASS; nessuna richiesta/attesa fingerprint, ritardo circa zero e messaggio insolito none: PASS |
+| Opt-in esplicito e login biometrico | Stop preparatorio fprintd inactive/MainPID 0, logout, attach al greeter di guido; un Invio vuoto, indice DESTRO, un contatto, desktop senza password: PASS |
+| Limite e assenza di serie ulteriori | Una VERIFY/capture/action/epoch, MATCH terminale; nessuna seconda serie o hidden retry osservato. Cap stock max-tries=3 preservato, contatto 1 soltanto esercitato: PASS nello scope della run |
+| Cleanup | Outstanding=0, drained=1/context_closed=1, fprintd finale inactive/MainPID 0 e USB detached: PASS |
+| Baseline e architettura | Integrazione minima installata con vendor invariato/delega corrente, runtime R3/template mantenuti, niente TTY/rollback richiesto: PASS sulla baseline provata |
+| Rami non esercitati | Fallback B dopo failure, NO_MATCH/contatti 2–3 e uninstall live non testati; non trasformati in PASS e non richiesti come nuove live |
+
+Timestamp salvato per l'inizio della selezione telemetria:
+`2026-09-23 13:49:51.183201 UTC`; non è il timestamp preciso del MATCH.
+Output completo fornito, senza riordinamento o aggiunta di misure:
+
 ```text
-OUTCOME=HUMAN_REQUIRED
-ACTIVE_PHASE=R4
-ADVANCEMENT=PLASMA_VM_INSTALL_PASS_ACCEPTED_NATIVE_LOGIN_PROCEDURE_REVIEWED
+ActiveState=inactive
+MainPID=0
+GOODIX_STOCK_CAPTURE_BEGIN attempt=1 action=VERIFY
+GOODIX_STOCK_CAPTURE_RESULT attempt=1 outcome=MATCH terminal=1
+GOODIX_PRODUCTION_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 logical_actions=1 transport_epochs=1 capture_attempts=1 capture_terminal=1 identify_enroll_handoffs=0 identify_enroll_armed=0 consumed=1 tls=1 first_image=1 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 enroll_contacts=0 enroll_retry_scans=0 secure_retry=0 post_retry=0 reopen=0 explicit_verify_reopen=0 explicit_identify_reopen=0 reset=0 clear_halt=0 persistent=0 sigfm_baseline_pinned=1 sigfm_baseline_reused=0 real_submit=75 outstanding=0 drained=1 context_closed=1
+```
+
+Il risultato e l'audit concordano: capture_terminal=1, attempts/logical_actions/
+transport_epochs/capture_attempts=1, consumed/tls/first_image=1; nessun rejected,
+enrollment/rearm, retry/reopen/reset/clear_halt/persistent o outstanding.
+real_submit=75 è il contatore di submission, non di contatti o retry. Il pattern
+release_tail=0/single_terminal=0 è coerente con i PASS KScreenLocker/sudo/PolicyKit
+consolidati e con `pam_fprintd.c`: il ramo MATCH ritorna PAM_SUCCESS e disconnette
+prima del normale VerifyStop. Compatibilità causale, non trace temporale completo
+né prova di quiescenza device. Nessun motivo per un corrective o una ripetizione.
+
+La preparazione PASS include Enforcing; l'handoff non fornisce un nuovo output
+post-live getenforce, inventario RPM, hash binario o evento AVC. La provenance
+resta source/install/guida dichiarati e controlli precedenti accettati, non una
+nuova ispezione diretta dei file guest. La funzionalità login/helper/sessione è
+ora dimostrata sulla baseline; non si deduce assenza universale di denial SELinux.
+Nessuna password è stata inserita in B, nessun messaggio a schermo, desktop
+raggiunto al primo contatto. B_FAILURE_PASSWORD_FALLBACK=NOT_EXERCISED: preservare
+questa distinzione, senza failure artificiale, nuovo MATCH o password test.
+
+**Decisione PM: PASS, Plasma Login SUPPORTED_ON_TESTED_BASELINE; R4=CLOSED.**
+I consumer richiesti sono qualificati. R4 chiude funzionalità/architettura sulla
+baseline corrente, con uninstall source-reviewed e 11 lifecycle test accettati;
+non impone un rollback live dopo successo. R5 conserva l'obbligo di verifica
+empirica degli update e il failure model fingerprint-only. Spostare quel claim
+empirico al suo confine R5 elimina la dipendenza circolare R4→R5→R4 senza
+indebolire password safety: il rischio vendor path e qualsiasi failure classe
+A/B restano blocker di release, mai qualificati implicitamente da questo MATCH.
+
+L'istruzione corrente richiede **STOP dopo commit/push di closure**:
+R5 NOT_STARTED/NOT_PREPARED, nessuna guida/query/matrice operativa o nuovo Human
+Gate, niente anticipo R6; NEXT_STATE=WAITING_FOR_USER. Integrazione, runtime e
+template restano installati e le inverse preservate. Nessuna mutazione runtime,
+USB, root, build, reinstallazione o rollback dell'AI. Questa closure è solo
+documentale: EXECUTABLE_CLOSURE=NOT_APPLICABLE per il delta, perché tutti i
+percorsi eseguibili e i blocchi operativi storici rimangono invariati. Verifiche
+pertinenti PASS: diff/source invariati, trascrizione telemetria, coerenza degli
+stati, 22 riferimenti locali e assenza di nuovi artefatti R5. I sette file
+modificati sono documentali, blocchi Bash invariati; nessuna suite già PASS rieseguita.
+
+```text
+OUTCOME=R4_CLOSED_WAITING_FOR_USER
+ACTIVE_PHASE=NONE_WAITING_FOR_USER_AFTER_R4
+ADVANCEMENT=PLASMA_NATIVE_LOGIN_PASS_AND_FORMAL_R4_CLOSURE
 R3=CLOSED_BIOMETRIC_BOUNDARY
 R4_PREFLIGHT=PASS_QUERY_ONLY_HUMAN_REPORTED
 R4_PREFLIGHT_GUEST_COMMIT=90a3c46beeead6b50e13426870e3d30f496c67f9
@@ -2262,13 +2301,17 @@ R4_POLKIT_HOST_CLEANUP=PASS_DRAINED_CLOSED_INACTIVE_PID0_SENSOR_DETACHED
 R4_POLKIT_CLASSIFICATION=SUPPORTED_ON_TESTED_BASELINE
 R4_POLKIT_NATIVE_GATE=CLOSED_PASS
 R4_POLKIT_LIVE_SELINUX_RECURRENCE=NOT_CONFIRMED_BY_HANDOFF
-R4_LOGIN_GUEST_ROUTE=STOCK_PLASMALOGIN_PASSWORD_AUTH_NO_FPRINTD
+R4_LOGIN_PREFLIGHT_ROUTE=STOCK_PLASMALOGIN_PASSWORD_AUTH_NO_FPRINTD
+R4_LOGIN_EFFECTIVE_ROUTE=PROJECT_OPT_IN_PREFIX_AND_CURRENT_VENDOR_PAM
 R4_LOGIN_QUERY=PASS_QUERY_ONLY_HUMAN_REPORTED
 R4_LOGIN_QUERY_GUEST_COMMIT=725b3c1f8bf879b9e56632b4f15da494968cead7
 PLASMA_LOGIN_FINGERPRINT_REQUIRED=true
 PLASMA_LOGIN_KNOWN_LIMITATION_ACCEPTABLE=false
-R4_CLOSED=false
-R5_BLOCKED_UNTIL_LOGIN_RESOLVED=true
+R4_CLOSED=true
+R5_LOGIN_ENTRY_CONDITION=SATISFIED
+R5=NOT_STARTED
+R5_PREPARED=false
+STOP_BEFORE_R5=true
 R4_LOGIN_UX=NONEMPTY_PASSWORD_OR_EXPLICIT_EMPTY_FINGERPRINT
 R4_LOGIN_CANDIDATE=PROJECT_OWNED_OPT_IN_GATE_AND_CURRENT_VENDOR_INCLUDES
 R4_LOGIN_C_PAM_TESTS=PASS_HUMAN_REPORTED_FINAL_BUILD_MARKER
@@ -2280,29 +2323,41 @@ R4_LOGIN_INSTALL_GUIDE_CHECKOUT=24c3018071e8d120687ff8fbd2f344cde620692d
 R4_LOGIN_INSTALLED_BYTES_METADATA_RECEIPT=PASS_HUMAN_REPORTED
 R4_LOGIN_DEFAULT_FILE_LABELS=PASS_HUMAN_REPORTED
 R4_LOGIN_INSTALL_VENDOR_PAM_HASH_UNCHANGED=true
-R4_LOGIN_LIVE=PROCEDURE_REVIEWED_PENDING_HUMAN_VM
-PASSWORD_LOGIN=NOT_PERFORMED
-PASSWORD_LOGIN_NO_FORCED_FINGERPRINT_WAIT=NOT_OBSERVED
-PLASMA_LOGIN_FINGERPRINT=NOT_PERFORMED
-R4_LOGIN_FAILURE_FALLBACK=SOURCE_REVIEWED_NOT_LIVE_OBSERVED
+R4_LOGIN_LIVE=PASS_HUMAN_REPORTED_ACCEPTED
+R4_LOGIN_LIVE_GUIDE_GUEST_CHECKOUT=7d0e2d3bcd33dc1311f70cc26b0a72b6889acfbe
+R4_LOGIN_TELEMETRY_SINCE=2026-09-23_13:49:51.183201_UTC
+PASSWORD_LOGIN=PASS
+PASSWORD_LOGIN_NO_FORCED_FINGERPRINT_WAIT=true
+PLASMA_LOGIN_FINGERPRINT=PASS
+R4_LOGIN_CLASSIFICATION=SUPPORTED_ON_TESTED_BASELINE
+R4_LOGIN_MATCH_CONTACT=1
+R4_LOGIN_PASSWORD_DURING_B=false
+R4_LOGIN_EMPTY_ENTER_SUBMISSIONS=1
+R4_LOGIN_SECOND_SERIES=false
+R4_LOGIN_CLEANUP=PASS_DRAINED_CLOSED_INACTIVE_PID0_SENSOR_DETACHED
+R4_LOGIN_DESKTOP=PASS
+R4_LOGIN_TTY_RECOVERY_REQUIRED=false
+R4_LOGIN_FAILURE_FALLBACK=NOT_EXERCISED
 R4_LOGIN_UI_ERROR_MAY_PRECEDE_PAM_COMPLETION=true
 ENROLLMENT_STORED_LABEL=left-index-finger
 ENROLLMENT_PHYSICAL_FINGER=right-index-finger
 ENROLLMENT_LABEL_MISMATCH=KNOWN_LAB_STATE_PRESERVED_FOR_R4_BY_USER_DECISION
 RUNTIME_TEMPLATE_RETAINED=true
 ROLLBACK_REQUIRED_ON_THIS_PASS=false
-EXECUTABLE_CLOSURE=VM_INSTALL_REPORTED_PASS_NATIVE_LOGIN_GUIDE_OFFLINE_REVIEWED
+EXECUTABLE_CLOSURE=NOT_APPLICABLE_DOCUMENTATION_ONLY_DELTA
+R4_LOGIN_RUNTIME_CLOSURE=HUMAN_VM_PASSWORD_AND_FINGERPRINT_PASS
+R4_CLOSURE_DOCUMENTATION_CHECKS=PASS
 OFFLINE_SOURCE_AND_LIFECYCLE_CHECKS=PASS_11_SYNTHETIC_LIFECYCLE_TESTS
 R4_LOGIN_INSTALL_HANDOFF_OFFLINE_CHECKS=PASS_RELOCATED_FIXTURE_INTEGRITY_SYNTAX_CWD
-PM_REVIEW=ACCEPT_INSTALL_PASS_HUMAN_NATIVE_LOGIN_GATE
-RESIDUAL_BLOCKER_OR_RISK=LOGIN_UNQUALIFIED_VENDOR_PATH_CONTRACT_UPDATE_VALIDATION_PENDING
+PM_REVIEW=ACCEPT_R4_CLOSURE_STOP_BY_USER_INSTRUCTION
+RESIDUAL_BLOCKER_OR_RISK=UPDATE_SAFETY_UNQUALIFIED_VENDOR_PATH_CONTRACT_AND_FAILURE_FALLBACK_NOT_LIVE_TESTED
 CANONICAL_DOCUMENTATION=THIS_MANUAL
-REVIEW_SET=GIT_DIFF_FROM_24c3018071e8d120687ff8fbd2f344cde620692d
+REVIEW_SET=GIT_DIFF_FROM_7d0e2d3bcd33dc1311f70cc26b0a72b6889acfbe
 PRODUCTION_DRIVER_CHANGED=false
 PAM_AUTHSELECT_RUNTIME_DELTA=LOGIN_PROJECT_OWNED_ENTRY_AND_SUPPORT_INSTALLED_AUTHSELECT_UNCHANGED
-ROADMAP_CHANGE=R4_INSTALL_PASS_AND_NEXT_REVIEWED_LOGIN_GATE_RECORDED
+ROADMAP_CHANGE=R4_CLOSED_EMPIRICAL_UPDATE_QUALIFICATION_STAYS_R5_USER_STOP
 AI_PHYSICAL_RUNTIME_MUTATION=false
-NEXT_BOUNDARY=HUMAN_VM_PASSWORD_LOGIN_SENSOR_ABSENT_THEN_CONDITIONAL_FINGERPRINT
+NEXT_STATE=WAITING_FOR_USER
 ```
 
 ### Governance corrente

@@ -25,11 +25,13 @@ the tested baseline. Ordinary stock sudo also passed password and first-contact
 fingerprint authentication. Stock PolicyKit is now also SUPPORTED after password
 and first-contact fingerprint PASS. The [VM login configuration query](R4_LOGIN_PREFLIGHT_VM.md)
 is complete: normal stock Plasma Login uses password-auth without fingerprint.
-Plasma fingerprint login is required; R4 remains open and R5 is blocked.
+The required Plasma fingerprint login has now also passed.
 The opt-in selector's VM build/tests passed at `6fc6e64`; installation and
 file/default-label checks passed at `24c3018`. Keep the installed candidate.
-Next human gate: [password login first, then opt-in fingerprint](../plasma-login-opt-in/R4_PLASMA_LOGIN_VM.md),
-in the VM, with USB absent until password PASS.**
+[Real login at `7d0e2d3`](../plasma-login-opt-in/R4_PLASMA_LOGIN_VM.md) passed
+password without forced fingerprint wait and first-contact RIGHT-index MATCH
+without a password, with usable desktop and clean cleanup. R4 is closed;
+R5 is not started. Stop and wait for the user; do not prepare another gate.**
 The audit query identified three nr_hugepages read denials, non-fatal for the
 tested KScreenLocker path; its [SELinux review](R4_KSCREENLOCKER_VM.md#completed-selinux-review) is closed. Keep
 the runtime/template and known label mismatch; no rollback or repeated KScreenLocker live.
@@ -46,8 +48,9 @@ This supersedes historical preflight PID 8053. Guide commit `8ed5218` resolves
 locally to `8ed52181897c4078dfb2be26fe67481e7a7b6961`; the handoff does not print
 the guest checkout SHA. No new PolicyKit SELinux recurrence is confirmed.
 No repeat or rollback of these PASSes. The separate opt-in candidate preserves
-this R3 runtime and delegates login to current vendor PAM. It is installed;
-the real-login procedure is reviewed, but login remains unqualified.
+this R3 runtime and delegates login to current vendor PAM. It remains installed
+and login-qualified on the tested baseline. Failure fallback B was not exercised;
+no artificial failure or repeat of a PASS is required. Update safety is unqualified.
 
 The user reports PM-accepted normal **44/44** and ASan/UBSan **44/44** synthetic
 results, and a clean, reviewed normal runtime build from

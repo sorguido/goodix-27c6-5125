@@ -1,7 +1,22 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # R4: password first, then explicit fingerprint at Plasma Login
 
-**HUMAN_REQUIRED — reviewed procedure for the existing Fedora 44 KDE VM.**
+**COMPLETED — password login without forced fingerprint wait and first-contact
+fingerprint login PASS, human-reported at checkout
+`7d0e2d3bcd33dc1311f70cc26b0a72b6889acfbe`. Do not repeat this procedure.**
+One empty Enter, RIGHT index, one VERIFY/MATCH, no password during B or second
+series; usable desktop, drained/closed cleanup, fprintd inactive/MainPID 0 and
+reader detached. Plasma Login = **SUPPORTED_ON_TESTED_BASELINE**. R4 is closed;
+**R5 is not started and must not be prepared: wait for the user.**
+
+Failure fallback B was **NOT_EXERCISED** on this first-contact MATCH. Do not
+create a failure or rerun password/fingerprint to fill that untested branch.
+Keep the integration, R3 runtime/template and saved inverse; no rollback on PASS.
+Full evidence and review are in the [canonical manual](../../Goodix%2027c6%205125%20manuale%20tecnico.md#plasma-login--live-pass-closure-r4-e-stop-prima-di-r5).
+
+## Completed procedure and original criteria
+
+**Historical human gate — the instructions below record the completed test.**
 Installation and file/default-label verification passed at guide checkout
 `24c3018071e8d120687ff8fbd2f344cde620692d`. Keep that installation. This gate
 qualifies real login through the stock greeter and helper; it does not repeat

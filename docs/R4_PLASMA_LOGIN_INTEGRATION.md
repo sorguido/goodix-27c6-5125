@@ -1,13 +1,13 @@
 # R4 — explicit fingerprint choice at Plasma Login
 
-Status: **VM build/tests and installation accepted PASS; real password/fingerprint
-login procedure reviewed and at HUMAN_REQUIRED. Login remains unqualified**.
-Baseline for this review: `4997fe47825cb1748bf34650b3b2eaaedb9dba49`.
-The user superseded the proposed login-limitation/R5 transition. R4 stays open,
-Plasma fingerprint login is required, and R5 stays blocked. No obsolete R5 files
-or commits existed in the clean checkout when this replan started.
+Status: **R4 CLOSED; Plasma Login SUPPORTED_ON_TESTED_BASELINE. R5 NOT_STARTED,
+STOP_BEFORE_R5: wait for the user, with no next gate or update preparation.**
+Replan baseline: `4997fe47825cb1748bf34650b3b2eaaedb9dba49`; qualified login
+guide/guest checkout: `7d0e2d3bcd33dc1311f70cc26b0a72b6889acfbe`.
+The required fingerprint login is now demonstrated, rather than closed as a
+stock limitation. No R5 files or operational matrix have been prepared.
 
-## VM gate review and next boundary
+## VM gate review and closure
 
 The human's `CODEX_MINI_RESUME_R4_PLASMA_BUILD_PASS.md` reports source
 `6fc6e640710885954d9e6fd603b3bc47b45d2ac6`, the final
@@ -43,13 +43,36 @@ module, PAM and tests have no delta from the tested source. This accepts the
 human's deployment evidence; it does not claim direct guest inspection or
 invent binary hashes, label strings or a fresh fprintd state.
 
-Desktop remained open, reader detached, no logout/reboot/login, R3 runtime and
+At the installation checkpoint the desktop remained open, reader detached,
+no logout/reboot/login, R3 runtime and
 template preserved. Keep the installation without rebuild/reinstall/rollback.
 Default file labels do not prove SELinux permission in the real login helper.
-The next [human VM gate](../deployment/plasma-login-opt-in/R4_PLASMA_LOGIN_VM.md)
-uses normal logout/password login while detached, then only on password PASS a
-single explicit fingerprint series. Real login and update safety are not yet
-qualified. No R5 work is authorized by this installation PASS.
+
+**Live review: PASS / R4 CLOSED.** The human's
+`CODEX_CLOSE_R4_PLASMA_LOGIN_PASS_STOP_BEFORE_R5.md` reports execution of the
+[reviewed procedure](../deployment/plasma-login-opt-in/R4_PLASMA_LOGIN_VM.md)
+at the complete checkout above. Password login after normal logout, reader absent,
+reached a working desktop with no fingerprint request/wait, approximately zero
+delay and no unusual message. Then one empty Enter at the real greeter and one
+RIGHT-index contact reached the desktop without a password, second series or
+observed hidden retry. The labelled left-index-finger template was preserved.
+One terminal VERIFY/MATCH and closed/drained audit corroborate the human result;
+final fprintd inactive/MainPID 0 and USB detached. Complete telemetry appears
+once in the [canonical manual](../Goodix%2027c6%205125%20manuale%20tecnico.md#plasma-login--live-pass-closure-r4-e-stop-prima-di-r5).
+
+`release_tail=0` and `single_terminal=0` are consistent with early stock PAM
+return after MATCH, alongside terminal capture, zero outstanding work and
+closed/drained cleanup; they do not prove full device quiescence. The successful
+real login establishes functional helper authentication/session startup on this
+baseline, not universal SELinux permission or future update safety. No new AVC
+observation or audit event is supplied. Preparation PASS includes the reviewed
+Enforcing prerequisite; no separate post-live getenforce output is invented.
+
+Failure fallback B, later NO_MATCH contacts and live uninstall were not exercised.
+Do not create another live to exercise them. Password A, source review, bounded
+stock PAM, accepted synthetic lifecycle and successful B suffice for this R4
+qualification. Keep the installed integration, R3 runtime/template and inverse.
+No rebuild/reinstall/rollback; stop here as requested by the user.
 
 ## Evidence and the supported option A
 
@@ -214,20 +237,21 @@ requires an unambiguous native NO_MATCH/new request. After a STOP, detach before
 password recovery and allow the outstanding call to end; a conservative wait
 around the 30-second per-attempt timeout is an operator margin, not a guarantee
 against a hung helper. A failed password return is a blocker. A successful
-first MATCH does not exercise failure fallback, which remains explicitly
-unobserved in that run. Source review/synthetic tests do not substitute for
-real session startup, contact/cleanup evidence or measured password access.
+first MATCH does not exercise failure fallback: that is the actual outcome of
+the completed run, recorded as NOT_EXERCISED. Real session startup, one-contact
+MATCH/cleanup and password A are now observed; intermediate-error UI behavior
+and failure fallback remain source-reviewed, not live-qualified by that run.
 
 ## Update and uninstall model
 
 | Change/failure | Intended result | Qualification |
 | --- | --- | --- |
-| Gate missing/unloadable, token/config check fails | Current vendor password path; no fingerprint | Synthetic PAM gate accepted PASS; real login pending |
+| Gate missing/unloadable, token/config check fails | Current vendor password path; no fingerprint | Synthetic PAM gate accepted PASS; these fault cases were not live-tested |
 | Current vendor auth policy changes in any of the three files | Fingerprint disabled; current password/auth policy used | C fixture gate accepted PASS |
 | Current account/session/password-change rules change | New rules read directly | Account/session synthetic cases in accepted gate; password-change not exercised |
-| fprintd/module/device unavailable | Chosen fingerprint series fails; next password submission skips it | Synthetic dispatch plus later live required |
-| Content update at the vendor's packaged path | No frozen copy masks it; compatible fingerprint may remain available | R5 update validation still blocked |
-| Remove integration | Remove owned override first; current Fedora configuration becomes visible | Synthetic lifecycle checks; no stock backup replay |
+| fprintd/module/device unavailable | Chosen fingerprint series fails; next password submission skips it | Synthetic dispatch; failure fallback B NOT_EXERCISED in the successful live |
+| Content update at the vendor's packaged path | No frozen copy masks it; compatible fingerprint may remain available | R5 empirical qualification not started; user requested STOP |
+| Remove integration | Remove owned override first; current Fedora configuration becomes visible | Accepted synthetic lifecycle; real removal not run on PASS; no stock backup replay |
 
 The absolute path is an explicit packaging dependency. Fedora's observed
 package owns `/usr/lib/pam.d/plasmalogin`; its spec and CMake install location
@@ -247,6 +271,13 @@ Password safety under normal package updates remains a required qualification.
 Updating/removing only the project integration must suffice; otherwise reject
 the architecture before release.
 
+**Phase boundary:** R4 closes functional login and the reviewed architecture on
+the tested baseline. Empirical package-update survivability remains mandatory
+in R5 before release; it is not also required as an R4 entry to that later phase.
+The safety goal is unchanged: any update-induced class A/B failure is a release
+blocker. Removing that circular dependency does not assert an update PASS or
+erase the vendor-path risk. R5 is not prepared or started by this closure.
+
 ## D295/02 comparison and option D
 
 The manual's D295/02 section and
@@ -261,9 +292,8 @@ is not attributed to the D295/02 run without provenance.
 
 Option B has not been excluded, so option D (private Plasma/greeter or VT work)
 is neither selected nor implemented. R3 and the other three consumer PASSes
-remain preserved. The installation checkpoint is accepted; the next boundary
-is human VM password login, then conditional opt-in fingerprint, with cleanup
-and the saved inverse only on FAIL/regression. No source corrective or rebuild
-is required to enter that reviewed gate. If password/desktop access is lost,
-the inverse cannot be presumed executable from that desktop: stop and report
-instead of inventing a TTY, snapshot or alternate privileged recovery path.
+remain preserved. Normal password and opt-in fingerprint login have now passed
+with stock Plasma and project-owned PAM composition. No source corrective or
+deeper integration is required by these results. R4 is formally closed; the
+explicit user instruction ends orchestration here, before preparing or starting
+R5 or anticipating R6. The installed inverse remains available without execution.

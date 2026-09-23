@@ -3,9 +3,9 @@
 
 **COMPLETED — configuration query reported PASS at guest checkout
 `725b3c1f8bf879b9e56632b4f15da494968cead7`. Do not repeat this procedure.**
-Stock Plasma Login uses password-auth without fingerprint. R4 remains open:
-the opt-in selector's VM build/tests and installation passed. The next gate is
-[password-first login, then opt-in fingerprint](../plasma-login-opt-in/R4_PLASMA_LOGIN_VM.md).
+Stock Plasma Login uses password-auth without fingerprint. The opt-in selector's
+VM build/tests, installation and [real password/fingerprint login](../plasma-login-opt-in/R4_PLASMA_LOGIN_VM.md)
+have since passed. **R4 is closed; R5 is not started. Wait for the user; no new gate.**
 The original query below is retained as evidence.
 
 **Original HUMAN_REQUIRED — one reader-absent configuration query in the existing VM.**
