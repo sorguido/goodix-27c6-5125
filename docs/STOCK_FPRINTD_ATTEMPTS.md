@@ -29,7 +29,7 @@ Runtime and template are retained, sensor detached, fprintd inactive. No second
 verify, no relabeling or rollback. **R3 is closed at the biometric boundary.**
 This single MATCH does not qualify a real NO_MATCH series inside one Claim or
 impose a cumulative driver cap. The current gate is
-[R4 PolicyKit configuration query](../deployment/minimal-runtime/R4_POLKIT_PREFLIGHT_VM.md), reader detached.
+[R4 PolicyKit targeted action query](../deployment/minimal-runtime/R4_POLKIT_PREFLIGHT_VM.md#current-targeted-read-only-query), reader detached.
 Stock KScreenLocker subsequently passed password unlock with the reader absent
 and fingerprint unlock at contact 1 without a password. MATCH was terminal and
 resources closed/drained; release_tail/single_terminal were zero, consistent
@@ -354,7 +354,8 @@ SUDO_I_AUTH=CONFIGURATION_COVERED_NOT_LIVE_TESTED
 SUDO_I_LOGIN_SHELL_SESSION=UNTESTED
 R4_POLKIT_CONFIG_QUERY=PASS_HUMAN_REPORTED_POLICY_CLOSURE_INCOMPLETE
 R4_POLKIT_AUTHENTICATION=NOT_YET_TESTED
-CURRENT_GATE=HUMAN_REQUIRED_VM_POLKIT_POLICY_INPUT_COMPLETION_SENSOR_ABSENT
+R4_POLKIT_POLICY_SUPPLEMENT=COMPLETED_HUMAN_REPORTED_NO_PKLA_OVERRIDES_OBSERVED
+CURRENT_GATE=HUMAN_REQUIRED_VM_POLKIT_TRUE_ACTION_QUERY_SENSOR_ABSENT
 NEXT_SENSOR_LIVE_HANDOFF_READY=false
 CURRENT_INSTALLED_RUNTIME=QUALIFIED_R3_BUILD_RETAINED
 ```
@@ -364,7 +365,7 @@ not current failures. The qualified build already exists at
 `/home/guido/goodix-r3-20260922-111144`; do not rerun the synthetic gate or build.
 The [clean replacement procedure](../deployment/minimal-runtime/README.md) and
 native enrollment/verify are completed evidence; do not repeat them. Proceed
-to the supplemental R4 PolicyKit policy-input query, retaining the qualified runtime,
+to the targeted R4 PolicyKit action query, retaining the qualified runtime,
 template, reconciled receipt and saved inverse. Sudo configuration and native authentication
 have passed; do not repeat them. The KScreenLocker SELinux review is closed.
 
@@ -374,10 +375,14 @@ driver still has the intended class-C failure boundary; R5 must establish
 survivability empirically. This repository preparation changes no installed
 file. PolicyKit configuration has passed: stock polkit-1 includes system-auth
 with pam_fprintd sufficient and pam_unix fallback, KDE agent active, stock helper
-and clean polkit/polkit-kde verification. The handoff summarizes the rule bodies;
-PKLA inputs and action-selection annotations remain missing. Wheel membership
-and default exec auth_admin alone do not prove the effective identity or absence
-of automatic/cached authorization. The next step is the human-only policy-input
-query, without a sensor or PolicyKit authentication. The repeated nr_hugepages read denial was also non-fatal
+and clean polkit/polkit-kde verification. The supplement completed at reported
+checkout `d5e890b`, with zero files in all three PKLA locations and pkla-compat
+RPM verification exit 0. Rule bodies were collected according to the user;
+the handoff supplies a summary. The action-catalog copy loses its beginning:
+no execution failure, but path/annotation evidence is still needed. Wheel is
+corroborated without observed PKLA overrides; actual dialog identity and fresh
+authentication remain unproved. The next step is the targeted human-only action
+query, without sudo, sensor or PolicyKit authentication. Do not repeat the full
+supplement/catalog. The repeated nr_hugepages read denial was also non-fatal
 during the completed sudo query and, as reported, the successful sudo live;
 no policy change is prepared. PolicyKit, login and R5 remain unqualified.

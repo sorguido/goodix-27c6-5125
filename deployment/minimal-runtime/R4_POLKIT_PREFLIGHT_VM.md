@@ -1,6 +1,112 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # R4: inspect the VM's stock PolicyKit authentication configuration
 
+**Current HUMAN_REQUIRED — resolve the candidate's action, reader detached.**
+The supplemental query completed once at reported checkout `d5e890b`, resolving
+locally to `d5e890ba479ed35134742a7466ed4c13d2747ca3`. All three legacy policy
+locations returned POLICY_FILES=0 and pkla-compat RPM verification returned 0.
+The user reports collection of the rule bodies; this handoff contains their
+summary, not all bodies for direct review. The stock wheel administrator rule
+is corroborated without observed PKLA overrides. Actual dialog identity and
+fresh authentication remain untested.
+
+The available action-catalog copy loses its beginning. This is **incomplete
+returned evidence, not a failed query**, and does not establish the absence of
+program annotations. Do not repeat either completed block below. Final fprintd
+active/running/PID 8053 is compatible with reader-absent sudo activation;
+no retrospective stop or polling is required. Runtime/template remain retained.
+
+## Current targeted read-only query
+
+In an ordinary-user Bash terminal in the existing Fedora 44 KDE VM checkout,
+as `guido`, keep the reader detached and authentication dialogs closed. Run
+only this block once. No sudo is needed. It resolves `/usr/bin/true` without
+executing it and reads registered action metadata through EnumerateActions.
+The catalog is held in memory only; output is restricted to the default action
+and path annotations relevant to the requested/resolved program. It does not
+request authorization, invoke pkexec/helpers, clear cache or change services,
+policy, PAM, SELinux, runtime or templates.
+
+```bash
+(
+  set -euo pipefail
+  trap 'printf "R4_POLKIT_TRUE_ACTION_STOP line=%s exit=%s\n" "$LINENO" "$?" >&2' ERR
+  export LC_ALL=C
+  cd "$(git rev-parse --show-toplevel)"
+  test "$(git branch --show-current)" = development
+  test -z "$(git status --porcelain)"
+  git pull --ff-only origin development
+  git rev-parse HEAD
+  test "$(id -un)" = guido
+  systemd-detect-virt --vm --quiet
+  test "$(getenforce)" = Enforcing
+  test -x /usr/bin/true
+  python3 -B - <<'PY_ACTION'
+import json, subprocess, sys
+from pathlib import Path
+sys.path.insert(0, 'deployment/minimal-runtime')
+import deploy as d
+d.no_sensor()
+requested = '/usr/bin/true'
+resolved = str(Path(requested).resolve(strict=True))
+print('CANDIDATE_PROGRAM=' + requested, 'RESOLVED_PROGRAM=' + resolved, sep='\n', flush=True)
+reply = json.loads(subprocess.check_output([
+    'busctl', '--system', '--json=short', '--no-pager',
+    '--allow-interactive-authorization=no', '--timeout=25s', 'call',
+    'org.freedesktop.PolicyKit1', '/org/freedesktop/PolicyKit1/Authority',
+    'org.freedesktop.PolicyKit1.Authority', 'EnumerateActions', 's', ''
+], text=True))
+if reply.get('type') != 'a(ssssssuuua{ss})' or len(reply.get('data', [])) != 1:
+    raise RuntimeError('Unexpected EnumerateActions response shape')
+rows = reply['data'][0]
+default = 'org.freedesktop.policykit.exec'
+prefix = default + '.'
+defaults = ['no', 'auth_self', 'auth_admin', 'auth_self_keep', 'auth_admin_keep', 'yes']
+if not any(row[0] == default for row in rows):
+    raise RuntimeError('Default exec action missing; no selection inferred')
+eligible = []
+for row in rows:
+    action, annotations = row[0], row[9]
+    path = annotations.get(prefix + 'path')
+    if action != default and path not in (requested, resolved):
+        continue
+    no_args_match = path == resolved and prefix + 'argv1' not in annotations
+    if no_args_match:
+        eligible.append(action)
+    print(json.dumps({'action': action,
+        'defaults_any_inactive_active': [defaults[n] for n in row[6:9]],
+        'exec_annotations': {k: v for k, v in annotations.items() if k.startswith(prefix)},
+        'matches_resolved_path_with_no_arguments': no_args_match}, sort_keys=True))
+print('ACTION_FOR_NO_ARGUMENTS=' + (eligible[0] if len(eligible) == 1 else
+      default if not eligible else 'AMBIGUOUS:' + ','.join(eligible)))
+d.no_sensor()
+print('R4_POLKIT_TRUE_ACTION_COMPLETE SENSOR_CONNECTED=false')
+PY_ACTION
+)
+```
+
+Return this **short output in full**, including checkout SHA and final marker.
+An absent `exec.argv1` matches a no-argument invocation; an annotation present
+with an empty value does not. Path comparison uses the resolved program path
+literally, as in [pkexec 127](https://raw.githubusercontent.com/polkit-org/polkit/127/src/programs/pkexec.c).
+Multiple eligible actions are reported as ambiguous for review, not permission
+to run any of them. Defaults are metadata, not a live authorization decision.
+
+**PASS_IF (collection only):** the block completes with the reader absent and
+returns the candidate path, relevant records and action-selection result.
+**STOP_IF:** an error, sensor connection, password/PolicyKit dialog or ambiguous
+selection; return output without retry or authentication. No installation or
+rollback is needed. Keep the saved inverse
+`/usr/local/lib64/goodix-27c6-5125/uninstall.sh` and RIGHT-index template labeled
+left-index-finger. PolicyKit live remains **NOT READY** pending review, with
+password first while detached, then at most three contacts in the first PAM
+series, stop at MATCH and detach before fallback/restart. Do not run that live now.
+
+## Completed supplemental query and original criteria
+
+**Historical human gate — do not execute the block below again.**
+The following records the completed request and its original rationale.
+
 **Initial query COMPLETED — configuration PASS, human-reported at
 `b674dd8842cf336e6d74ec81070498879b856330`. PolicyKit authentication is untested.**
 The guest confirms stock polkit-1 → system-auth, pam_fprintd sufficient followed
@@ -10,7 +116,7 @@ fprintd active/running/PID 6749 followed a real reader-absent sudo password prom
 it is compatible with stock activation, not a failed biometric cleanup.
 Do not repeat that full query or stop the daemon just to change this snapshot.
 
-**Current HUMAN_REQUIRED — complete the policy evidence, reader detached.**
+**Previous HUMAN_REQUIRED — complete the policy evidence, reader detached.**
 The handoff contains a summary, not the complete 18 rule bodies requested by
 the initial query. Package ownership alone does not establish their decisions.
 In particular, `49-polkit-pkla-compat.rules` delegates to PKLA configuration:
@@ -29,7 +135,7 @@ resolves the program path and consults registered `exec.path`/`exec.argv1`
 annotations before falling back to `org.freedesktop.policykit.exec`. Reading
 only that default action does not prove which action will be selected.
 
-## Current supplemental read-only query
+### Completed supplemental read-only query
 
 In an ordinary-user Bash terminal in the existing Fedora 44 KDE VM checkout,
 as `guido`, keep the reader detached and all authentication dialogs closed.

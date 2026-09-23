@@ -45,7 +45,7 @@ label, with clean release/drain/close and no retries or persistent families
 reported. **R3 is closed at the biometric boundary.** The canonical manual
 records full evidence, missing guest SHA/RPM/preflight output and limits of the
 qualification. The current human gate is
-[R4 PolicyKit configuration query](../deployment/minimal-runtime/R4_POLKIT_PREFLIGHT_VM.md), reader detached.
+[R4 PolicyKit targeted action query](../deployment/minimal-runtime/R4_POLKIT_PREFLIGHT_VM.md#current-targeted-read-only-query), reader detached.
 Stock KScreenLocker is SUPPORTED on the tested baseline: password unlock and
 first-contact fingerprint unlock passed, with closed/drained host cleanup.
 The audit query reports three nr_hugepages read denials, non-fatal for the
@@ -58,10 +58,13 @@ non-fatal during success; no new event metadata was supplied. sudo-i auth is
 configuration-covered; its login shell/session is untested. PolicyKit configuration
 has passed at `b674dd8842cf336e6d74ec81070498879b856330`: stock PAM through
 system-auth, active KDE agent, stock helper and clean polkit/polkit-kde verification.
-The current supplemental query supplies missing PKLA inputs, complete rule bodies
-and action-selection annotations. PolicyKit authentication is still untested;
-no effective administrator identity or absence of automatic/cached authorization
-is inferred from wheel membership and the default action alone.
+The supplement completed at reported checkout `d5e890b`: zero files in all three
+PKLA locations, pkla-compat verification exit 0 and rule body collection confirmed
+by the user. Its action-catalog copy loses the beginning, not evidence of a failed
+query or absent annotations. The current targeted query prints only metadata
+relevant to `/usr/bin/true`, without sudo; do not repeat the supplement/catalog.
+PolicyKit authentication is untested. Wheel is corroborated without observed PKLA
+overrides; actual dialog identity and fresh authentication remain unproved.
 The user retains the anatomical label mismatch through this R4 phase; present
 the RIGHT index. No template mutation, rebuild/reinstall or repeat CLI biometric test.
 A cold VM snapshot is only an external lab fallback, not a product dependency.
@@ -275,7 +278,7 @@ also refuses this physical host from an unrelated cwd before mutation. Both
 shell wrappers pass syntax checks; the driver-only source audit remains PASS.
 
 The current **HUMAN_REQUIRED** is
-[R4 PolicyKit configuration query](../deployment/minimal-runtime/R4_POLKIT_PREFLIGHT_VM.md), reader detached.
+[R4 PolicyKit targeted action query](../deployment/minimal-runtime/R4_POLKIT_PREFLIGHT_VM.md#current-targeted-read-only-query), reader detached.
 Stock KScreenLocker is SUPPORTED on the tested baseline: password unlock and
 first-contact fingerprint unlock passed, with closed/drained host cleanup.
 The audit query reports three nr_hugepages read denials, non-fatal for the
@@ -288,10 +291,13 @@ non-fatal during success; no new event metadata was supplied. sudo-i auth is
 configuration-covered; its login shell/session is untested. PolicyKit configuration
 has passed at `b674dd8842cf336e6d74ec81070498879b856330`: stock PAM through
 system-auth, active KDE agent, stock helper and clean polkit/polkit-kde verification.
-The current supplemental query supplies missing PKLA inputs, complete rule bodies
-and action-selection annotations. PolicyKit authentication is still untested;
-no effective administrator identity or absence of automatic/cached authorization
-is inferred from wheel membership and the default action alone.
+The supplement completed at reported checkout `d5e890b`: zero files in all three
+PKLA locations, pkla-compat verification exit 0 and rule body collection confirmed
+by the user. Its action-catalog copy loses the beginning, not evidence of a failed
+query or absent annotations. The current targeted query prints only metadata
+relevant to `/usr/bin/true`, without sudo; do not repeat the supplement/catalog.
+PolicyKit authentication is untested. Wheel is corroborated without observed PKLA
+overrides; actual dialog identity and fresh authentication remain unproved.
 The accepted R3 build/load/material/Claim/enrollment/verify and functional
 KScreenLocker and ordinary sudo gates are not repeated. The review finds
 no increased coupling to critical distro components, no expected update failure

@@ -16,23 +16,26 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente — R4 preflight PolicyKit PASS, closure policy al gate (23 settembre 2026)
+### Stato corrente — R4 supplemento PolicyKit completato, lookup azione al gate (23 settembre 2026)
 
 La fonte operativa attiva resta `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`.
-Ripresa da `b674dd8842cf336e6d74ec81070498879b856330`, `development`
+Ripresa da `d5e890ba479ed35134742a7466ed4c13d2747ca3`, `development`
 pulito e allineato a origin, sull'handoff Utente
-`CODEX_HANDOFF_R4_POLKIT_PREFLIGHT_PASS.md`. **ACCEPT_AND_CONTINUE sul preflight
-di configurazione**, eseguito nella VM a quello SHA: polkit-1 include system-auth,
-pam_fprintd sufficient precede pam_unix, agente KDE attivo, authority/helper stock,
-RPM polkit/polkit-kde verificati exit 0. Nessuna autenticazione PolicyKit,
-biometria o modifica runtime/template/configurazione. **La policy effettiva
-della candidata exec resta da chiudere:** il riepilogo non contiene i 18 corpi
-integrali delle regole e la regola pkla-compat consulta configurazioni legacy
-non incluse nella query. Wheel è un fatto osservato, non ancora la prova
-dell'identità amministrativa effettiva; auth_admin è il default dell'azione,
-non la decisione finale per guido. Correttivo locale della stessa guida per
-questi input e per le annotazioni che possono cambiare l'azione scelta da pkexec.
-Nessuna live PolicyKit pronta e nessun problema runtime dimostrato.
+`CODEX_HANDOFF_R4_POLKIT_SUPPLEMENTAL_COMPLETE.md`. **ACCEPT_AND_CONTINUE sulla
+query supplementare completata**, con POLICY_FILES=0 nelle tre sedi legacy e
+verifica RPM pkla-compat exit 0. Il checkout guest riportato `d5e890b` risolve
+localmente allo SHA completo sopra; non è una stampa guest dello SHA lungo.
+Raccolta dei corpi delle regole confermata dall'Utente, ma l'handoff ne fornisce
+il riepilogo, non tutti i corpi per review diretta. Nessun override PKLA emerso;
+default amministrativo wheel corroborato, identità nel dialogo ancora non provata.
+Il preflight precedente di PAM/agente/helper stock resta PASS. Nessuna
+autenticazione PolicyKit, biometria o modifica runtime/template/configurazione.
+**Resta il lookup dell'azione candidata:** la copia del catalogo perde l'inizio,
+quindi non documenta il path risolto di /usr/bin/true né esclude annotazioni
+exec.path/exec.argv1 pertinenti. È una lacuna della copia, non un failure della
+query. Non ripetere il supplemento completo: preparata nella stessa guida una
+sola lettura mirata senza sudo, con output filtrato. Nessuna live PolicyKit
+pronta; default auth_admin e wheel non provano autenticazione fresca effettiva.
 
 **Precedente live sudo ordinaria accettata;
 SUPPORTED sulla baseline provata.** Preparation PASS a sensore assente, password
@@ -95,8 +98,8 @@ Usare l'indice DESTRO anche se il prompt indica sinistro. Non cancellare,
 rinominare, modificare o riacquisire il template; il MATCH riguarda il dito
 realmente acquisito e non qualifica la correttezza anatomica dell'etichetta.
 
-Ultimo stato riportato dopo il preflight PolicyKit: fprintd **active/running,
-MainPID 6749**, a fronte dell'iniziale inactive/dead/MainPID 0. Il vero prompt
+Ultimo stato riportato dopo il supplemento PolicyKit: fprintd **active/running,
+MainPID 8053**; PID 6749 resta lo snapshot finale del preflight iniziale. Il prompt
 sudo per leggere le regole, con lettore assente, è compatibile con attivazione
 stock via pam_fprintd; l'uscita successiva non è stata misurata. Non è una
 closure biometrica fallita e non richiede stop/cleanup retroattivo. Restano
@@ -142,14 +145,14 @@ non ripeterla né ampliare la ricerca. Anche preflight e live sudo sono completa
 **Decisione sudo -i:** auth configurationally covered dall'include sudo osservato
 e dal PASS ordinario; login shell/session non provati, nessun SUPPORTED esteso.
 Non serve una live aggiuntiva per il confine biometrico R4 in assenza di nuova
-evidenza. Prossimo `CURRENT_TASK`: **completare gli input policy PolicyKit nella
-VM**, nella sezione corrente di `deployment/minimal-runtime/R4_POLKIT_PREFLIGHT_VM.md`.
-La query iniziale è completata: non ripetere PAM, agente/helper o test già chiusi.
-Servono i corpi delle regole, configurazioni PKLA e annotazioni delle azioni;
-nessuna regola privata o modifica PAM. `HUMAN_REQUIRED` per la lettura guest
-privilegiata, a sensore assente (roadmap §4, AGENTS §6.2 e START_PROMPT §3.3).
-Si ferma la preparazione live dipendente da questi dati, non si presume un
-override né si dichiara già escluso. Nessun accesso VM autonomo dell'AI.
+evidenza. Prossimo `CURRENT_TASK`: **leggere soltanto i metadata di selezione
+azione per /usr/bin/true nella VM**, nella sezione corrente di
+`deployment/minimal-runtime/R4_POLKIT_PREFLIGHT_VM.md`. Query iniziale e
+supplemento completati: non ripetere PAM, agente/helper, regole, PKLA o catalogo.
+`HUMAN_REQUIRED` per l'esecuzione guest da parte dell'Utente, a sensore assente
+(roadmap §4 e START_PROMPT §3.3); la nuova query non usa sudo né chiede
+autorizzazione PolicyKit. La preparazione live resta subordinata alla review
+dei metadata e ai limiti già fissati. Nessun accesso VM autonomo dell'AI.
 Runtime, template e inversa salvata mantenuti; rollback solo dopo FAIL reale,
 instabilità/regressione. Le nuove evidenze non colmano retroattivamente la
 provenance guest mancante del VERIFY R3; anche l'handoff live KScreenLocker
@@ -335,8 +338,8 @@ necessità, ownership, update e rollback è in `docs/MINIMAL_RUNTIME.md`.
 ### R3 — tentativi espliciti stock e regressione sintetica prima della live
 
 Questa sezione conserva la preparazione e la closure sintetica precedenti.
-Il `CURRENT_TASK` attuale è completare la review della policy PolicyKit nella VM,
-dopo preflight di configurazione PASS e closure sudo/KScreenLocker. R3 è chiusa da
+Il `CURRENT_TASK` attuale è il lookup mirato dell'azione PolicyKit nella VM,
+dopo preflight PASS, supplemento completato e closure sudo/KScreenLocker. R3 è chiusa da
 enrollment e VERIFY PASS; la closure più avanti conserva evidenze e limiti
 della qualifica.
 
@@ -1130,7 +1133,7 @@ in prova del checkout/versioni al momento del VERIFY. Evidenza sufficiente
 per la closure operativa riferita a questa baseline di laboratorio, non per
 una release/export pubblico. Nessuna ripetizione di conferma della live.
 
-### R4 — KScreenLocker e sudo SUPPORTED; preflight PolicyKit PASS, policy aperta
+### R4 — KScreenLocker e sudo SUPPORTED; supplemento PolicyKit completato, lookup aperto
 
 **Review PM del preflight KScreenLocker:** ACCEPT_AND_CONTINUE per la query prevista in
 `deployment/minimal-runtime/R4_KSCREENLOCKER_PREFLIGHT_VM.md`, eseguita
@@ -1564,6 +1567,10 @@ servizi, USB, build o test runtime sul fisico; nessuna VM raggiunta dall'AI.
 
 #### Review del preflight PolicyKit e corrective della copertura policy
 
+Review iniziale: la lacuna PKLA descritta sotto è stata colmata dal supplemento
+riportato nella sezione successiva. Conserva il motivo del corrective, non un
+invito a ripetere la raccolta completa.
+
 Handoff `CODEX_HANDOFF_R4_POLKIT_PREFLIGHT_PASS.md`, checkout guest completo
 `b674dd8842cf336e6d74ec81070498879b856330`. **Preflight configurazione PASS**:
 il blocco arriva a POLKIT_RPM_VERIFY_EXIT=0 e QUERY_COMPLETE, senza STOP,
@@ -1642,7 +1649,7 @@ password e MATCH consumer-side, exit 0 senza password durante biometria, epoch
 drenati/chiusi e stato finale sicuro. Runtime/template restano mantenuti salvo
 reale failure/instabilità; il dato policy mancante non giustifica rollback.
 
-**Prossimo gate concreto:** il blocco integrativo in testa alla stessa
+**Gate integrativo precedente, ora completato:** il blocco della stessa
 `R4_POLKIT_PREFLIGHT_VM.md` legge le regole complete, input PKLA e metadata di
 tutte le azioni per non omettere un'annotazione alternativa. Nessuna esecuzione
 pkexec, helper PKLA, autenticazione PolicyKit, cache clear o servizio modificato.
@@ -1661,10 +1668,60 @@ PolicyKit. Diff e riferimenti controllati; sei soli file documentali, driver e
 deployment/governance invariati. Nessuna esecuzione reale della query, sudo,
 helper, servizi, autenticazione, USB, build o test runtime da parte dell'AI.
 
+#### Review del supplemento PolicyKit e lookup mirato dell'azione
+
+L'handoff `CODEX_HANDOFF_R4_POLKIT_SUPPLEMENTAL_COMPLETE.md` riporta una sola
+esecuzione a checkout `d5e890b`, risolto localmente a
+`d5e890ba479ed35134742a7466ed4c13d2747ca3`. Il marker
+R4_POLKIT_POLICY_COMPLETE SENSOR_CONNECTED=false prova il completamento
+riportato, distinto dalla disponibilità dell'intera copia. **Query accettata**:
+POLICY_FILES=0 in `/etc/polkit-1/localauthority.conf.d`,
+`/etc/polkit-1/localauthority` e `/var/lib/polkit-1/localauthority`;
+non significa directory inesistenti. `polkit-pkla-compat-0.1-32.fc44.x86_64`
+verificato exit 0. Non emergono override legacy di identità/autorizzazione.
+La regola stock wheel e l'appartenenza di guido sono corroborate. L'Utente
+conferma raccolta dei corpi completi; l'handoff riassume eccezioni specifiche
+KDE clock, FirewallD, Flatpak, NetworkManager, fwupd e PackageKit, non presenta
+tutti i corpi per una nuova review diretta. Nessun claim di audit esaustivo
+delle regole JavaScript o di identità GUI già osservata.
+
+La copia del catalogo inizia nelle azioni UDisks: mancano il path risolto del
+programma e gli eventuali metadata precedenti. **Non è un failure di esecuzione
+né prova che non esistano annotazioni**. Non ripetere supplemento o catalogo
+completo. Lo snapshot finale active/running/PID 8053 è compatibile con il sudo
+reader-absent; nessuno stop retroattivo, polling o diagnosi SELinux aggiuntiva.
+Runtime/template invariati, nessuna autenticazione PolicyKit o biometria.
+
+**Corrective minimo nella guida esistente:** query senza sudo, solo metadata
+registrati e path di `/usr/bin/true`, nessuna esecuzione del programma. L'API
+[EnumerateActions di polkit 127](https://raw.githubusercontent.com/polkit-org/polkit/127/data/org.freedesktop.PolicyKit1.Authority.xml)
+restituisce azioni/default/annotazioni, non esegue CheckAuthorization.
+Il filtro in memoria stampa solo il fallback exec e le annotazioni con path
+uguale al programma richiesto o risolto. Il confronto pkexec è letterale con
+il path risolto: per un comando senza argomenti exec.argv1 deve essere assente,
+non una stringa vuota. Nessuna azione annotata idonea implica il fallback;
+più azioni idonee sono dichiarate ambigue per review, senza scegliere una live.
+Il formato JSON di busctl è verificato sul sorgente
+[systemd bus-dump-json](https://raw.githubusercontent.com/systemd/systemd/v258/src/libsystemd/sd-bus/bus-dump-json.c).
+Nessun nuovo kit o script permanente; solo il blocco mirato della stessa guida.
+Identità effettiva, assenza di bypass/cache e limiti della prima serie PAM
+restano requisiti della successiva preparazione live, non risultati di metadata.
+
+**Executable closure offline:** sintassi Bash e parse Python PASS; import del
+deployment e cwd dalla sottodirectory risolti senza chiamare funzioni host.
+Il codice esatto del filtro è stato eseguito con risposta bus/path/no_sensor
+sostituiti da dati sintetici: fallback, azione annotata, argv1 vuoto/non vuoto,
+path letterale diverso dal risolto, match sul risolto, più azioni idonee,
+signature inattesa e default mancante. Nove casi PASS, record estranei esclusi
+dall'output e nessun marker COMPLETE sugli errori. Non è un test di policy o
+autorizzazione della VM. Nessuna query reale del bus, servizio, sudo, USB o
+runtime eseguita dall'AI. Modifiche solo documentali; sorgente, installer,
+inversa e governance invariati rispetto alla recovery.
+
 ```text
 OUTCOME=HUMAN_REQUIRED
 ACTIVE_PHASE=R4
-ADVANCEMENT=POLKIT_CONFIG_PREFLIGHT_PASS_PKLA_AND_ACTION_SELECTION_GAPS_IDENTIFIED
+ADVANCEMENT=POLKIT_SUPPLEMENT_COMPLETED_NO_PKLA_OVERRIDES_ACTION_COPY_INCOMPLETE
 R3=CLOSED_BIOMETRIC_BOUNDARY
 R4_PREFLIGHT=PASS_QUERY_ONLY_HUMAN_REPORTED
 R4_PREFLIGHT_GUEST_COMMIT=90a3c46beeead6b50e13426870e3d30f496c67f9
@@ -1714,9 +1771,18 @@ R4_POLKIT_PAM_ROUTE=STOCK_POLKIT_1_SYSTEM_AUTH_FPRINTD_SUFFICIENT_THEN_UNIX_FALL
 R4_POLKIT_KDE_AGENT=ACTIVE_RUNNING_PID1629_HUMAN_REPORTED
 R4_POLKIT_RPM_VERIFY=PASS_POLKIT_AND_POLKIT_KDE_ONLY
 R4_POLKIT_PREFLIGHT_FINAL_SERVICE=ACTIVE_RUNNING_PID6749_SENSOR_ABSENT
-R4_POLKIT_EFFECTIVE_ADMIN_IDENTITY=NOT_YET_ESTABLISHED_PKLA_INPUTS_MISSING
+R4_POLKIT_ADMIN_DEFAULT=WHEEL_CORROBORATED_NO_PKLA_OVERRIDE_OBSERVED
+R4_POLKIT_EFFECTIVE_GUI_IDENTITY=NOT_YET_OBSERVED
 R4_POLKIT_EXEC_ACTION_SELECTION_AND_NO_AUTO_AUTH=NOT_YET_ESTABLISHED
-R4_POLKIT_POLICY_SUPPLEMENT=PREPARED_NOT_EXECUTED
+R4_POLKIT_POLICY_SUPPLEMENT=COMPLETED_HUMAN_REPORTED
+R4_POLKIT_SUPPLEMENT_GUEST_CHECKOUT_SHORT=d5e890b
+R4_POLKIT_SUPPLEMENT_CHECKOUT_RESOLVED_LOCALLY=d5e890ba479ed35134742a7466ed4c13d2747ca3
+R4_POLKIT_LEGACY_INPUT_FILES=ZERO_IN_ALL_THREE_QUERIED_LOCATIONS
+R4_POLKIT_PKLA_COMPAT_RPM_VERIFY=PASS_EXIT0_HUMAN_REPORTED
+R4_POLKIT_RULE_BODIES=COLLECTED_HUMAN_REPORTED_SUMMARY_SUPPLIED
+R4_POLKIT_CATALOG_COPY=PREFIX_TRUNCATED_NOT_QUERY_FAILURE
+R4_POLKIT_SUPPLEMENT_FINAL_SERVICE=ACTIVE_RUNNING_PID8053_SENSOR_ABSENT
+R4_POLKIT_TRUE_ACTION_QUERY=PREPARED_NOT_EXECUTED
 R4_POLKIT_AUTHENTICATION=NOT_YET_TESTED
 R4_POLKIT_LIVE_READY=false
 ENROLLMENT_STORED_LABEL=left-index-finger
@@ -1724,15 +1790,15 @@ ENROLLMENT_PHYSICAL_FINGER=right-index-finger
 ENROLLMENT_LABEL_MISMATCH=KNOWN_LAB_STATE_PRESERVED_FOR_R4_BY_USER_DECISION
 RUNTIME_TEMPLATE_RETAINED=true
 ROLLBACK_REQUIRED_ON_THIS_PASS=false
-EXECUTABLE_CLOSURE=POLKIT_CONFIG_PASS_HUMAN_REPORTED_POLICY_SUPPLEMENT_OFFLINE_CHECKS_PASS
-RESIDUAL_BLOCKER_OR_RISK=POLKIT_POLICY_INPUTS_MISSING_AUTH_LIVE_LOGIN_R5_R6_R7_OPEN
+EXECUTABLE_CLOSURE=POLKIT_TRUE_ACTION_QUERY_OFFLINE_CHECKS_PASS_GUEST_NOT_EXECUTED
+RESIDUAL_BLOCKER_OR_RISK=POLKIT_ACTION_METADATA_MISSING_AUTH_LIVE_LOGIN_R5_R6_R7_OPEN
 CANONICAL_DOCUMENTATION=THIS_MANUAL
-REVIEW_SET=GIT_DIFF_FROM_b674dd8842cf336e6d74ec81070498879b856330
+REVIEW_SET=GIT_DIFF_FROM_d5e890ba479ed35134742a7466ed4c13d2747ca3
 PRODUCTION_DRIVER_CHANGED=false
 PAM_AUTHSELECT_RUNTIME_DELTA=NONE
 ROADMAP_CHANGE=PHASE_STATUS_ONLY
 AI_PHYSICAL_RUNTIME_MUTATION=false
-NEXT_BOUNDARY=HUMAN_VM_POLKIT_POLICY_INPUT_COMPLETION_SENSOR_ABSENT
+NEXT_BOUNDARY=HUMAN_VM_POLKIT_TRUE_ACTION_QUERY_SENSOR_ABSENT
 ```
 
 ### Governance corrente

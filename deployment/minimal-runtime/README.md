@@ -23,7 +23,7 @@ at the biometric boundary. R4 KScreenLocker password unlock and first-contact
 fingerprint unlock also passed, with closed/drained host cleanup: SUPPORTED on
 the tested baseline. Ordinary stock sudo also passed password and first-contact
 fingerprint authentication. Next human gate:
-[PolicyKit configuration query](R4_POLKIT_PREFLIGHT_VM.md), reader detached.**
+[PolicyKit targeted action query](R4_POLKIT_PREFLIGHT_VM.md#current-targeted-read-only-query), reader detached.**
 The audit query identified three nr_hugepages read denials, non-fatal for the
 tested KScreenLocker path; its [SELinux review](R4_KSCREENLOCKER_VM.md#completed-selinux-review) is closed. Keep
 the runtime/template and known label mismatch; no rollback or repeated KScreenLocker live.
@@ -32,9 +32,12 @@ cleanup and fprintd inactive/MainPID 0. It is SUPPORTED on the tested baseline;
 do not repeat it. sudo-i auth is configuration-covered, its login shell/session
 untested. PolicyKit's initial configuration query has since passed: stock PAM
 through system-auth, active KDE agent, stock helper and clean polkit/polkit-kde
-RPM verification. Its final reader-absent fprintd PID 6749 is compatible with
-sudo activation. The current supplemental query closes missing PKLA inputs,
-complete rule bodies and action-selection annotations before any PolicyKit test.
+RPM verification. The supplement completed at reported checkout `d5e890b`:
+zero files in all three PKLA locations, pkla-compat verification exit 0 and rule
+body collection confirmed by the user. Final reader-absent fprintd PID 8053 is
+compatible with sudo activation. The action-catalog copy loses its beginning;
+the current query prints only metadata relevant to `/usr/bin/true`, without
+sudo or authentication. Do not repeat the supplement or the complete catalog.
 
 The user reports PM-accepted normal **44/44** and ASan/UBSan **44/44** synthetic
 results, and a clean, reviewed normal runtime build from
