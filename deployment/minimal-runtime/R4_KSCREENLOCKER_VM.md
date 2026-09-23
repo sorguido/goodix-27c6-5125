@@ -1,7 +1,67 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # R4: native stock KScreenLocker unlock in the VM
 
-**HUMAN_REQUIRED — VM authentication, service operations and real USB are human-only.**
+**COMPLETED — password unlock and first-contact fingerprint unlock PASS,
+human-reported; cleanup closed/drained, sensor detached, fprintd inactive/MainPID 0.**
+The physical RIGHT index matched the stored left-index-finger template, without
+entering a password in the fingerprint session. Preserve runtime/template and
+do not repeat the test. A visible SELinux alert still needs identification;
+final `SUPPORTED` classification is pending that review. The successful unlock
+does not explain the alert or establish its harmlessness.
+
+## Current gate: read the existing SELinux alert
+
+**HUMAN_REQUIRED — read the alert in the VM, with the sensor detached.**
+The smallest useful evidence is the detail of the alert already shown. There
+is no new fingerprint attempt, lock/unlock, installation or rollback in this
+gate. Keep SELinux Enforcing and the qualified runtime/template in place.
+
+Open the existing SELinux notification's details, or select that same alert
+in the VM's SELinux alert viewer. Copy its report, especially:
+
+- alert ID and first/last-seen timestamps, including the displayed timezone;
+- denied operation, process/executable and target path;
+- the raw AVC/audit records, with event ID, source/target contexts and class.
+
+Also give the approximate time of the successful fingerprint unlock, to tell
+a contemporaneous denial from an older or delayed notification. An alert can
+aggregate repeated events: preserve its occurrence count and timestamps.
+Read only; do not apply suggested fixes, ignore/delete the alert, change labels
+or policy, enable permissive mode, or run commands proposed in the report.
+
+If the viewer exposes the alert's **exact local ID**, a text lookup is an
+alternative to copying the report from the GUI. Replace the placeholder with
+that one ID; do not use `*` or a log-scanning option. Run as the ordinary user
+in the VM, without sudo; the lookup does not require a repository cwd.
+
+```bash
+sealert -l 'EXACT_ALERT_ID'
+```
+
+This is the documented single-alert lookup, not a policy generator. If the
+viewer/command is unavailable, access is denied, or the ID/report cannot be
+found, return the exact error and the notification text/time still available.
+Do not install tools, escalate, dump all alerts or repeat the live to recreate
+the notification. A missing record is not proof that SELinux denied nothing;
+any further audit query will be scoped to the resulting evidence.
+
+Return the report/error, unlock time, and confirmation that the reader remains
+detached and runtime/template/policy are unchanged. If still present in the
+original test terminal, include the checkout SHA and package output already
+printed by the completed preparation; do not rerun it to recreate provenance.
+
+**PASS_IF (evidence only):** the report identifies the recorded event and allows
+comparison with the successful unlock; it does not itself declare the denial
+benign. **STOP_IF:** details are missing/inaccessible or retrieval asks for a
+configuration change. No new installer/inverse is needed for reading a report.
+The retained installation and saved inverse remain documented below, but no
+rollback is called for on this functional PASS without evidence of instability.
+After alert review, close the classification and inspect the next stock
+consumer's actual guest PAM route before preparing its live test.
+
+## Completed live procedure and original criteria
+
+**Historical human gate — do not rerun the procedure below.**
 The [configuration query](R4_KSCREENLOCKER_PREFLIGHT_VM.md) passed at
 `90a3c46beeead6b50e13426870e3d30f496c67f9`: Fedora 44 KDE/Wayland, Enforcing,
 stock `kde` → password-auth without pam_fprintd; `kde-fingerprint` →
@@ -120,7 +180,7 @@ authenticator does not restart PAM solely on fingerprint failure. A password
 failure or a new authentication session can restart it, which is why neither
 belongs to this fingerprint series. The driver permits only a clean NO_MATCH
 reopen and fences processing-error resubmission before new sensor work. See
-[the canonical review](../../Goodix%2027c6%205125%20manuale%20tecnico.md#r4--preflight-stock-pass-prossimo-gate-kscreenlocker-nativo).
+[the canonical review](../../Goodix%2027c6%205125%20manuale%20tecnico.md#r4--kscreenlocker-pass-funzionale-avviso-selinux-da-qualificare).
 
 On success, lift the finger, confirm the desktop returned **without entering a
 password**, and detach USB. On failure/STOP, lift and detach USB via the VM

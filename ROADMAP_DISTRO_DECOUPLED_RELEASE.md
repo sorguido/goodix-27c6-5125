@@ -314,14 +314,17 @@ riportato sopra. La semantica dei tentativi resta invariata.
 
 ## R4 — Consumer di autenticazione: solo percorso stock
 
-**Stato: ATTIVA; preflight KScreenLocker PASS come query (23 settembre 2026).**
-La VM riporta authselect local valido con with-fingerprint già attivo, percorso
-kde/password-auth senza pam_fprintd e kde-fingerprint/fingerprint-auth con
-pam_fprintd. Nessuna modifica PAM/authselect è necessaria. Prossimo gate:
-`deployment/minimal-runtime/R4_KSCREENLOCKER_VM.md`, password unlock a lettore
-assente seguito da una sessione fingerprint nativa bounded. Nessun consumer
-è ancora SUPPORTED. Prima dei successivi consumer si ricostruisce la loro
-catena PAM effettiva guest; system-auth non è assunto come percorso universale.
+**Stato: ATTIVA; KScreenLocker PASS funzionale (23 settembre 2026).** Password
+unlock a lettore assente e fingerprint unlock al primo contatto senza password,
+cleanup drained/closed, servizio inactive/MainPID 0 e lettore scollegato sono
+riportati dall'Utente e accettati. Nessuna modifica PAM/authselect necessaria;
+runtime/template mantenuti e test completato da non ripetere.
+Un avviso SELinux osservato durante il successo resta da qualificare: nessun
+AVC/cause attribution disponibile, classificazione finale SUPPORTED pending.
+Prossimo gate read-only in `deployment/minimal-runtime/R4_KSCREENLOCKER_VM.md`:
+leggere il report del singolo avviso già registrato, senza nuova live, policy
+o rollback. Dopo la closure, prima dei successivi consumer si ricostruisce la
+loro catena PAM effettiva guest; system-auth non è assunto come percorso universale.
 
 Una volta ottenuti:
 

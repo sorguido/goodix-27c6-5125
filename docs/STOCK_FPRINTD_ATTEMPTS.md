@@ -29,9 +29,13 @@ Runtime and template are retained, sensor detached, fprintd inactive. No second
 verify, no relabeling or rollback. **R3 is closed at the biometric boundary.**
 This single MATCH does not qualify a real NO_MATCH series inside one Claim or
 impose a cumulative driver cap. The current gate is
-[R4 native stock KScreenLocker unlock](../deployment/minimal-runtime/R4_KSCREENLOCKER_VM.md).
-The configuration query passed: the guest enables fingerprint with the default
-PAM attempt options, but no native consumer unlock is qualified yet.
+[R4 SELinux alert review](../deployment/minimal-runtime/R4_KSCREENLOCKER_VM.md#current-gate-read-the-existing-selinux-alert).
+Stock KScreenLocker subsequently passed password unlock with the reader absent
+and fingerprint unlock at contact 1 without a password. MATCH was terminal and
+resources closed/drained; release_tail/single_terminal were zero, consistent
+with the early-MATCH cancellation case below, not proof of device quiescence.
+The visible SELinux alert has no supplied AVC and still needs classification;
+no new live or rollback is called for on this functional PASS.
 
 ## Source findings
 
@@ -41,7 +45,7 @@ PAM attempt options, but no native consumer unlock is qualified yet.
 | Daemon retry | Same file, `verify_cb`, `identify_cb`, `report_verify_status` | `FP_DEVICE_RETRY` reports `done=false` and immediately calls the same libfprint API again. A clean MATCH/NO_MATCH is `done=true` and does not trigger that branch. |
 | Enrollment duplicate check | Same file, `enroll_identify_cb` | Also resubmits IDENTIFY on `FP_DEVICE_RETRY`; a clean duplicate MATCH ends enrollment. The same driver failure fence applies before a retry can reacquire resources. |
 | Stock CLI | `source/utils/verify.c`, `do_verify`, `main` | One Claim, one VerifyStart, VerifyStop and Release. There is no three-attempt option/loop. Do not describe three separate CLI invocations as one driver-enforced series. |
-| Stock PAM | `source/pam/pam_fprintd.c`, `do_verify`, `do_auth` | Default max-tries is 3; one Claim spans explicit VerifyStart calls after NO_MATCH. This is consumer policy, not a driver limit. MATCH returns success and closes the bus; timeout/error terminates. The later R4 query confirms this module without options in guest fingerprint-auth; consumer unlock remains untested. |
+| Stock PAM | `source/pam/pam_fprintd.c`, `do_verify`, `do_auth` | Default max-tries is 3; one Claim spans explicit VerifyStart calls after NO_MATCH. This is consumer policy, not a driver limit. MATCH returns success and closes the bus; timeout/error terminates. The later R4 query confirms this module without options in guest fingerprint-auth; native KScreenLocker later passed at contact 1; an actual multi-attempt PAM series remains untested. |
 | Client disappearance | `src/device.c`, `_fprint_device_client_vanished`, `fprint_device_release` | Cancel the current action, wait for its completion, then close the libfprint device. No new capture is scheduled for cleanup. |
 | Host result ordering | Canonical `reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image-device.c`, `fpi_image_device_minutiae_detected`, `fp_image_device_maybe_complete_action` | Outcome callbacks reach the driver before the early match report to fprintd; the final API completion waits for deactivation and processing. The early report can precede finger-off/STOP. |
 | Driver cleanup/reopen | `libfprint-driver/goodix_fpimage_device.c`, `complete_deactivation`, `finish_deactivation`, `close_completed_capture_epoch` | Clean outcomes wait for STOP/drain and asynchronous matcher completion, release claim/material/TLS, then permit a later explicit action. Processing failure/cancel/transport error poison the logical open. |
@@ -331,8 +335,10 @@ SYNTHETIC_PHASE_NEXT_GATE=COMPLETED_VM_CLEAN_REPLACEMENT
 R3_VERIFY=PASS_FIRST_ATTEMPT_MATCH_HUMAN_REPORTED
 R3=CLOSED_BIOMETRIC_BOUNDARY
 R4_PREFLIGHT=PASS_QUERY_ONLY_HUMAN_REPORTED
-CURRENT_GATE=HUMAN_REQUIRED_VM_NATIVE_KSCREENLOCKER
-NEXT_SENSOR_LIVE_HANDOFF_READY=true
+R4_KSCREENLOCKER_FUNCTIONAL=PASS_CONTACT_1_HOST_CLEANUP_PASS_HUMAN_REPORTED
+R4_KSCREENLOCKER_CLASSIFICATION=PENDING_SELINUX_ALERT_REVIEW
+CURRENT_GATE=HUMAN_REQUIRED_VM_READ_EXISTING_SELINUX_ALERT
+NEXT_SENSOR_LIVE_HANDOFF_READY=false
 CURRENT_INSTALLED_RUNTIME=QUALIFIED_R3_BUILD_RETAINED
 ```
 
@@ -341,12 +347,12 @@ not current failures. The qualified build already exists at
 `/home/guido/goodix-r3-20260922-111144`; do not rerun the synthetic gate or build.
 The [clean replacement procedure](../deployment/minimal-runtime/README.md) and
 native enrollment/verify are completed evidence; do not repeat them. Proceed
-through the native R4 KScreenLocker handoff after the accepted configuration
-query, retaining the qualified runtime,
-template, reconciled receipt and saved inverse.
+through the R4 single-alert read-only review after the successful native unlock,
+retaining the qualified runtime, template, reconciled receipt and saved inverse.
 
 Architectural review: no increased distro coupling, no Fedora-owned auth
 component changed, and no new password/desktop dependency. An incompatible
 driver still has the intended class-C failure boundary; R5 must establish
 survivability empirically. This repository preparation changes no installed
-file; the next password/fingerprint unlock is human-executed in the VM.
+file; the next step reads an existing alert in the VM and does not authenticate
+or reach the sensor.

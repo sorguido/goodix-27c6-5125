@@ -45,9 +45,11 @@ label, with clean release/drain/close and no retries or persistent families
 reported. **R3 is closed at the biometric boundary.** The canonical manual
 records full evidence, missing guest SHA/RPM/preflight output and limits of the
 qualification. The current human gate is
-[R4 native stock KScreenLocker unlock](../deployment/minimal-runtime/R4_KSCREENLOCKER_VM.md);
-the guest configuration query is PASS, with fingerprint already enabled and a
-separate password stack. No PAM/authselect/runtime delta is needed.
+[R4 SELinux alert review](../deployment/minimal-runtime/R4_KSCREENLOCKER_VM.md#current-gate-read-the-existing-selinux-alert).
+Stock KScreenLocker password unlock and first-contact fingerprint unlock passed,
+with closed/drained host cleanup. A visible SELinux alert remains unidentified;
+final SUPPORTED classification awaits its review. No PAM/authselect/runtime
+change, rollback or repeated unlock is required on this functional PASS.
 The user retains the anatomical label mismatch through this R4 phase; present
 the RIGHT index. No template mutation, rebuild/reinstall or repeat CLI biometric test.
 A cold VM snapshot is only an external lab fallback, not a product dependency.
@@ -261,10 +263,13 @@ also refuses this physical host from an unrelated cwd before mutation. Both
 shell wrappers pass syntax checks; the driver-only source audit remains PASS.
 
 The current **HUMAN_REQUIRED** is
-[R4 native stock KScreenLocker unlock](../deployment/minimal-runtime/R4_KSCREENLOCKER_VM.md);
-the guest configuration query is PASS, with fingerprint already enabled and a
-separate password stack. No PAM/authselect/runtime delta is needed.
-The accepted R3 build/load/material/Claim/enrollment/verify gates are not repeated. The review finds
+[R4 SELinux alert review](../deployment/minimal-runtime/R4_KSCREENLOCKER_VM.md#current-gate-read-the-existing-selinux-alert).
+Stock KScreenLocker password unlock and first-contact fingerprint unlock passed,
+with closed/drained host cleanup. A visible SELinux alert remains unidentified;
+final SUPPORTED classification awaits its review. No PAM/authselect/runtime
+change, rollback or repeated unlock is required on this functional PASS.
+The accepted R3 build/load/material/Claim/enrollment/verify and functional
+KScreenLocker gates are not repeated. The review finds
 no increased coupling to critical distro components, no expected update failure
 beyond fingerprint and no replacement of Fedora-owned authentication files.
 Recovery remains removal/reinstall/update of Goodix integration. R5 remains

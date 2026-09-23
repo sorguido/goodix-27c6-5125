@@ -16,13 +16,22 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente — R3 chiusa, R4 preflight PASS: gate KScreenLocker nativo VM (23 settembre 2026)
+### Stato corrente — R4 KScreenLocker PASS funzionale, review avviso SELinux (23 settembre 2026)
 
 La fonte operativa attiva resta `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`.
-Recovery da `90a3c46beeead6b50e13426870e3d30f496c67f9`, `development`
+Recovery da `9eb72cc6698b5727f6fb9754a73a6e9e36f231cf`, `development`
 pulito e allineato a origin, su handoff Utente
-`CODEX_HANDOFF_R4_KSCREENLOCKER_PREFLIGHT_PASS.md`.
-**VERIFY stock PASS al primo tentativo:** `verify-match (done)`, CLI exit 0,
+`CODEX_HANDOFF_R4_KSCREENLOCKER_PASS.md`.
+**KScreenLocker stock PASS funzionale:** password unlock con lettore assente,
+poi fingerprint unlock al primo contatto dell'indice DESTRO, campo password
+vuoto e ritorno al desktop. Una VERIFY/epoch, MATCH terminale, nessun retry,
+reopen, reset o famiglia persistente rilevata; outstanding=0, drained=1,
+context_closed=1. Sensore scollegato e fprintd finale inactive/MainPID 0.
+L'avviso SELinux apparso durante B resta **non qualificato**: il successo non
+ne prova l'innocuità. La classificazione finale SUPPORTED attende questa review,
+senza negare il PASS osservato o attribuire prematuramente un bug al driver/KDE.
+
+**Precedente VERIFY CLI R3 PASS al primo tentativo:** `verify-match (done)`, CLI exit 0,
 una capture e un epoch, MATCH terminale, release_tail=1/single_terminal=1,
 outstanding=0, drained=1, context_closed=1. Nessun secondo verify, retry,
 reopen, reset, clear_halt o famiglia persistente rilevata. Le righe complete
@@ -58,8 +67,9 @@ non si inventano misure guest né si presenta HEAD locale come SHA live misurato
 La provenance è quella della baseline mantenuta e della procedura corretta,
 con questo limite esplicito; non giustifica una ripetizione del MATCH.
 
-`ACCEPT_AND_CONTINUE` sul **preflight R4 riportato PASS** allo SHA completo
-di recovery: VM Fedora 44 KDE Wayland x86_64, Enforcing, authselect local valido
+`ACCEPT_AND_CONTINUE` sul **preflight R4 riportato PASS** al checkout
+`90a3c46beeead6b50e13426870e3d30f496c67f9`: VM Fedora 44 KDE Wayland x86_64,
+Enforcing, authselect local valido
 con with-silent-lastlog/with-mdns4/**with-fingerprint già abilitato**.
 I file guest osservati separano `kde` → password-auth, senza pam_fprintd,
 da `kde-fingerprint` → fingerprint-auth, con pam_fprintd. Anche system-auth
@@ -67,19 +77,26 @@ contiene pam_fprintd. Nessuna shadow copy privata è emersa nei path interrogati
 Le due righe RPM `..?......` indicano digest non verificati, non mismatch
 dimostrati; limiti e pertinenza sono nella review R4 sotto.
 
-Non serve una patch PAM/authselect/runtime. Il prossimo passo minimo è
-`deployment/minimal-runtime/R4_KSCREENLOCKER_VM.md`: password unlock nativo con
-lettore assente, poi una sessione fingerprint stock con fino a tre contatti,
-stop al primo MATCH e sensore scollegato prima dell'eventuale fallback password.
-Il budget è quello tecnico di pam_fprintd in una chiamata PAM; non si aggiunge
-un cap cumulativo al driver né un harness. È preparato offline, **non eseguito**.
-`HUMAN_REQUIRED` prima di autenticazione VM, USB e operazioni di servizio;
-restano l'installazione R3 e la sua inversa salvata. Query e inventory nuove
-non colmano retroattivamente la provenance guest mancante del precedente VERIFY.
+La live descritta in `deployment/minimal-runtime/R4_KSCREENLOCKER_VM.md` è
+ora completata con PASS funzionale, senza patch PAM/authselect/runtime. Sul
+MATCH sono osservati release_tail=0/single_terminal=0: compatibili con il
+percorso PAM che può disconnettersi prima della coda di rilascio, non prova di
+quiescenza device né, da soli, un failure. L'ordine causale non è ricostruibile
+dal solo estratto; non si forza un altro contatto per completare quei contatori.
 
-R4 consumer non ancora qualificati; R5, R6 e R7 aperte. Il PASS biometrico non
-prova login/password/desktop, comportamento dopo update, serie PAM, false match
-su altro dito, readback factory o compatibilità Windows esaustiva. Le evidenze
+Il prossimo passo minimo è la **lettura dei dettagli dell'avviso SELinux già
+registrato nella VM**, dalla notifica o tramite lookup del suo singolo ID.
+Il README R4 contiene questo gate read-only: nessuna nuova live, modifica
+policy/label, permissive, installazione o rollback. `HUMAN_REQUIRED` per
+l'evidenza guest mancante, secondo roadmap §4. Runtime, template e inversa
+salvata sono mantenuti. La query precedente non colma retroattivamente la
+provenance guest mancante del VERIFY R3; anche l'handoff live KScreenLocker
+omette SHA guest e output RPM completi, senza invalidare il risultato osservato.
+
+La closure R4 KScreenLocker resta aperta sulla qualificazione dell'avviso;
+gli altri consumer e R5, R6, R7 restano aperti. Questi PASS non provano
+login, isolamento esaustivo password/desktop, comportamento dopo update,
+serie PAM, false match su altro dito, readback factory o compatibilità Windows esaustiva. Le evidenze
 live sono riportate dall'Utente, corroborate dalla review di codice e telemetria;
 l'AI non ha rieseguito la VM né letto materiale protetto o template biometrici.
 
@@ -256,8 +273,8 @@ necessità, ownership, update e rollback è in `docs/MINIMAL_RUNTIME.md`.
 ### R3 — tentativi espliciti stock e regressione sintetica prima della live
 
 Questa sezione conserva la preparazione e la closure sintetica precedenti.
-Il `CURRENT_TASK` attuale è il gate R4 KScreenLocker nativo VM dopo il
-preflight di configurazione PASS. R3 è chiusa da enrollment e VERIFY PASS; la closure
+Il `CURRENT_TASK` attuale è la review dell'avviso SELinux dopo il PASS
+funzionale KScreenLocker VM. R3 è chiusa da enrollment e VERIFY PASS; la closure
 più avanti conserva evidenze e limiti della qualifica.
 
 La decisione esplicita dell'Utente prevale sulla precedente interpretazione
@@ -1050,14 +1067,15 @@ in prova del checkout/versioni al momento del VERIFY. Evidenza sufficiente
 per la closure operativa riferita a questa baseline di laboratorio, non per
 una release/export pubblico. Nessuna ripetizione di conferma della live.
 
-### R4 — preflight stock PASS, prossimo gate KScreenLocker nativo
+### R4 — KScreenLocker: PASS funzionale, avviso SELinux da qualificare
 
 **Review PM del nuovo handoff:** ACCEPT_AND_CONTINUE per la query prevista in
 `deployment/minimal-runtime/R4_KSCREENLOCKER_PREFLIGHT_VM.md`, eseguita
 manualmente in VM dal checkout `90a3c46beeead6b50e13426870e3d30f496c67f9`.
 I marker iniziale/finale confermano sensore assente e fprintd inactive/MainPID 0;
 l'Utente dichiara nessun sudo, autenticazione, modifica template/runtime o rollback.
-Non è ancora una prova password/fingerprint unlock o di isolamento dei failure.
+Quella query non provava password/fingerprint unlock o isolamento dei failure;
+il successivo risultato nativo è riesaminato più sotto.
 I precedenti test con overlay PAM D289/D297 restano HISTORICAL_ONLY /
 REJECTED_ARCHITECTURE e non qualificano questo consumer stock.
 
@@ -1094,7 +1112,8 @@ La query copriva anche /usr/lib/pam.d: non è emerso un omonimo in quella sede
 né una shadow copy privata nei path esaminati. L'ownership è quella riportata
 per i path /etc/pam.d; i quattro target sotto /etc/authselect hanno l'header
 di generazione authselect. Il percorso
-password è separato nello stack osservato, non ancora provato con unlock reale.
+password è separato nello stack osservato; il successivo unlock A ne dimostra
+il funzionamento con lettore assente, non l'isolamento in ogni failure possibile.
 La presenza di pam_fprintd in system-auth non prova che sudo, PolicyKit o login
 lo attraversino: prima di quei consumer servirà la loro catena PAM reale guest.
 
@@ -1144,14 +1163,14 @@ versione/integrità guest non era nella query, quindi il README la controlla
 prima dell'autenticazione. Non si presenta il sorgente upstream o il QML del
 fisico come esecuzione della VM. Nessuna nuova dipendenza runtime da tali fonti.
 
-**CURRENT_TASK eseguito offline:** consolidare il preflight e consegnare
+**Consegna precedente, con live ora completata dall'Utente:**
 `deployment/minimal-runtime/R4_KSCREENLOCKER_VM.md`. Nessuna configurazione
 reversibile aggiuntiva è tecnicamente necessaria: delta PAM/authselect/KDE = 0;
 nessun nuovo installer o wrapper. Restano install.sh e l'inversa salvata della
 baseline R3, con rollback su live FAIL/instabilità, conservazione su PASS e
 preservazione dei template/materiali. Nessun nuovo Dxxx, kit o test greeter.
 
-Il minimo workflow è A) lock/unlock password con sensore assente, obbligatorio
+Il workflow consegnato prevedeva A) lock/unlock password con sensore assente, obbligatorio
 prima di B) un lock nativo con sensore, campo password vuoto, fino a tre
 contatti indipendenti e stop al primo MATCH. La composizione stock limita
 questa singola sessione; una password errata o un nuovo lock non fanno parte
@@ -1164,50 +1183,138 @@ corroborato dalle righe safety già emesse dal driver; logging aggiuntivo solo
 su un failure reale. MATCH e owner-loss PAM possono anticipare il release tail:
 cleanup drenato/chiuso non equivale a quiescenza device dimostrata in quel caso.
 
-**Ancora da provare:** unlock password A, unlock fingerprint B, numero effettivo
-di tentativi e cleanup nel consumer; eventuale fallback dopo failure. Un PASS
-permette SUPPORTED sulla baseline testata. Un failure consumer con driver/fprintd
-corretti e password/desktop sicuri va valutato come KNOWN_LIMITATION /
-UPSTREAM_BUG, senza patch private. Tre NO_MATCH o sola assenza di unlock non
-localizzano da soli un bug KDE. Password/desktop compromessi restano blocker,
-mai limite biometrico accettabile. Il test minimo non esaurisce R4 o R5.
+#### Review della live KScreenLocker riportata PASS
 
-Verifica offline del delta: 10 controlli sintattici Bash/Python PASS nei due
-README R4 (incluso il Bash interno di cleanup), nomi/import dei
-helper, path/link, correlazione dei criteri con sorgenti PAM/driver/KDE,
-provenance della baseline e live-critical set invariato. Nessuna build,
-installazione, autenticazione o USB eseguita dall'AI. Le suite 77 offline e
-44/44 per profilo VM restano evidenze precedenti, non test rieseguiti qui.
-Review PM: nessun aumento di coupling, nessun file Fedora auth modificato,
-nessuna nuova dipendenza password/desktop dal driver; inversa recuperabile.
-Il failure da update previsto resta fingerprint-only, da dimostrare in R5.
+Handoff `CODEX_HANDOFF_R4_KSCREENLOCKER_PASS.md`, recovery locale da
+`9eb72cc6698b5727f6fb9754a73a6e9e36f231cf`. L'Utente dichiara esecuzione della
+procedura stock sopra, senza modifiche PAM/authselect, con SELinux Enforcing.
+`R4_NATIVE_READY SENSOR_CONNECTED=false` è riportato; SHA checkout guest e
+output RPM della preparazione non sono allegati. Il riferimento della consegna
+è noto, ma non viene sostituito alla misura guest mancante. La baseline software
+R3 è dichiarata mantenuta; non si richiede una ripetizione per integrare metadata.
+
+| Criterio previsto | Evidenza Utente e decisione di review |
+| --- | --- |
+| A: lock reale e password con sensore assente | PASSWORD_UNLOCK=PASS, autentica guido e ritorna al desktop; PASS |
+| B: sblocco senza password, entro tre contatti | Indice DESTRO, slot left-index-finger, primo contatto, campo password vuoto, nessun secondo contatto/sessione fingerprint; PASS |
+| MATCH terminale e budget | Una VERIFY, logical_actions=1, transport_epochs=1, capture_attempts=1, MATCH terminal=1, rejected=0; PASS |
+| Safety/cleanup | retry/reopen/reset/clear_halt/persistent=0, outstanding=0, drained=1, context_closed=1, servizio inactive/MainPID 0, sensore scollegato; PASS nei limiti della telemetria |
+| Anomalia SELinux | Avviso visibile durante B; nessun AVC/report disponibile, causa e correlazione temporale ignote; review aperta |
+
+Output integrale ricevuto (ordine incollato, senza timestamp; non ricostruisce
+l'ordine temporale del journal):
+
+```text
+ActiveState=inactive
+MainPID=0
+GOODIX_PRODUCTION_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 logical_actions=1 transport_epochs=1 capture_attempts=1 capture_terminal=1 identify_enroll_handoffs=0 identify_enroll_armed=0 consumed=1 tls=1 first_image=1 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 enroll_contacts=0 enroll_retry_scans=0 secure_retry=0 post_retry=0 reopen=0 explicit_verify_reopen=0 explicit_identify_reopen=0 reset=0 clear_halt=0 persistent=0 sigfm_baseline_pinned=1 sigfm_baseline_reused=0 real_submit=76 outstanding=0 drained=1 context_closed=1
+GOODIX_STOCK_CAPTURE_RESULT attempt=1 outcome=MATCH terminal=1
+GOODIX_STOCK_CAPTURE_BEGIN attempt=1 action=VERIFY
+```
+
+**release_tail=0 / single_terminal=0:** la procedura consegnata ammetteva
+esplicitamente questo caso sul MATCH, richiedendo comunque drain/close. Review
+diretta di `reference/fprintd-fedora44-1.94.5/source/pam/pam_fprintd.c`,
+`do_verify`: verify-match ritorna PAM_SUCCESS prima del ramo VerifyStop;
+il client può chiudere il bus. In `source/src/device.c`,
+`_fprint_device_client_vanished` cancella l'azione, attende la sua fine e chiude
+il device. Il caso sintetico `test_r3_match_then_client_cancel` in
+`development/private-root/libfprint-driver/tests/test_goodix_d278_secure_session.c`
+modella quel ritorno anticipato per VERIFY/IDENTIFY e verifica drain, rilascio
+risorse e close. È parte della suite già qualificata, non rieseguita qui.
+
+La nuova evidenza è coerente con quel percorso: MATCH terminale seguito da
+cleanup host chiuso/drained. Non dimostra il completamento del tail device;
+non identifica da sola se la cancellazione precisa sia dovuta all'owner-loss,
+al distacco USB successivo o al cleanup. Neppure real_submit=76, contro 82 nel
+VERIFY CLI, è da solo prova di regressione o spiegazione causale. Nessuna
+nuova live serve a portare i due contatori a 1. Non si promuovono i contatori
+persistent=0 a readback factory o prova esaustiva Windows.
+
+**Decisione:** ACCEPT_AND_CONTINUE sul risultato funzionale password/fingerprint
+e cleanup. Runtime e template mantenuti, nessun rollback su questo PASS.
+L'indice DESTRO resta nello slot left-index-finger per la fase R4. Il fallback
+password dopo errore biometrico, una serie reale NO_MATCH, gli altri consumer
+e R5 non sono stati provati da questo singolo successo. I due unlock A/B
+sono distinti: il resoconto "nessuna seconda sessione" riguarda la serie B,
+non nega il precedente lock per la password.
+
+#### Avviso SELinux: evidenza mancante e prossimo gate
+
+L'Utente osserva l'avviso in Enforcing durante B e dichiara nessun ausearch,
+permissive, allow rule, cambio policy, replay o rollback. Mancano evento AVC,
+processo/path, contesti, permesso negato e timestamp. Il PASS non rende benigno
+il diniego; l'avviso non dimostra da solo un failure del driver o un blocker
+password/desktop. I precedenti AVC sul manifest e su nr_hugepages, documentati
+nel manuale, sono episodi distinti e non identificano il nuovo avviso.
+
+**CURRENT_TASK:** consolidare la live e ottenere il minimo dettaglio dell'evento
+esistente. Il gate in testa a `deployment/minimal-runtime/R4_KSCREENLOCKER_VM.md`
+richiede lettura del singolo report dalla notifica/viewer già disponibile nella
+VM, con ID, first/last seen, occurrence count, raw AVC e orario approssimativo
+dell'unlock. Se il suo ID locale è disponibile, `sealert -l 'ID_ESATTO'` è
+l'alternativa testuale non privilegiata. `sealert(8)` installato documenta il
+lookup di un ID nel database delle notifiche; wildcard e scansione log non
+sono richieste. Il report può proporre rimedi: leggerli non ne autorizza
+l'esecuzione. Non ignorare/cancellare l'avviso per far sparire l'anomalia.
+
+Non serve partire con ausearch privilegiato su tutto il boot o riprodurre
+l'evento. Se report/ID sono inaccessibili, si riporta l'errore e il testo/orario
+ancora disponibili; solo allora si sceglierà una query audit circoscritta.
+Nessun installer nuovo, accesso sensore, modifica service/PAM/authselect/label,
+policy custom o lettura materiali/template. L'installazione e l'inversa R3
+restano recuperabili; nessuna rimozione viene preparata per il solo avviso.
+
+**Classificazione finale SUPPORTED sospesa sulla qualificazione dell'avviso**,
+non sul funzionamento già dimostrato. Se risulta irrilevante per il failure
+model, si documenta e si chiude senza lavoro artificiale; se pertinente, si
+valuta il confine reale senza patch private al consumer. Password/desktop
+compromessi restano blocker, non una KNOWN_LIMITATION accettabile. Dopo questa
+closure, il successivo consumer R4 richiederà la propria catena PAM guest:
+la presenza di pam_fprintd in system-auth non prova l'inclusione da parte di
+sudo, PolicyKit o login. Non si anticipa una nuova live su questi consumer.
+
+Verifica offline del delta: confronto completo della telemetria con l'handoff,
+correlazione della review con sorgenti PAM/daemon e test esistente, sintassi
+lookup e sua semantica read-only da manpage, link locali, live-critical set e
+install/inversa invariati. Nessun servizio/consumer/query SELinux eseguito
+dall'AI, nessuna build o suite runtime ripetuta. Le 10 verifiche sintattiche del
+precedente handoff e le suite VM restano evidenze storiche. Review PM: coupling
+aggiuntivo NO, file auth Fedora modificati NO, nessuna nuova dipendenza di
+password/desktop dal driver. Il failure model da update resta da provare in R5.
 
 ```text
 OUTCOME=HUMAN_REQUIRED
 ACTIVE_PHASE=R4
-ADVANCEMENT=GUEST_STOCK_PAM_CONFIG_ESTABLISHED_NATIVE_KSCREENLOCKER_TEST_PREPARED
+ADVANCEMENT=NATIVE_STOCK_KSCREENLOCKER_FIRST_CONTACT_UNLOCK_AND_HOST_CLEANUP_OBSERVED
 R3=CLOSED_BIOMETRIC_BOUNDARY
 R4_PREFLIGHT=PASS_QUERY_ONLY_HUMAN_REPORTED
 R4_PREFLIGHT_GUEST_COMMIT=90a3c46beeead6b50e13426870e3d30f496c67f9
-GUEST_AUTHSELECT=local_with-silent-lastlog_with-mdns4_with-fingerprint_VALID
-KSCREENLOCKER_PASSWORD_STACK=password-auth_WITHOUT_pam_fprintd
-KSCREENLOCKER_FINGERPRINT_STACK=fingerprint-auth_WITH_pam_fprintd_DEFAULTS
-SYSTEM_AUTH_HAS_FINGERPRINT=true
-RPM_TWO_DIGEST_CHECKS=NOT_PERFORMED_CAUSE_NOT_PROVEN
-R4_PASSWORD_UNLOCK=NOT_YET_EXECUTED
-R4_FINGERPRINT_UNLOCK=NOT_YET_EXECUTED
+R4_LIVE_PROCEDURE_COMMIT=9eb72cc6698b5727f6fb9754a73a6e9e36f231cf
+R4_LIVE_GUEST_CHECKOUT_SHA=NOT_REPORTED
+R4_LIVE_GUEST_RPM_OUTPUT=NOT_REPORTED
+R4_PASSWORD_UNLOCK=PASS_SENSOR_ABSENT_HUMAN_REPORTED
+R4_FINGERPRINT_UNLOCK=PASS_CONTACT_1_NO_PASSWORD_HUMAN_REPORTED
+R4_HOST_CLEANUP=PASS_DRAINED_CLOSED_INACTIVE_PID0
+R4_DEVICE_RELEASE_TAIL=COMPLETION_NOT_OBSERVED
+R4_KSCREENLOCKER_CLASSIFICATION=PENDING_SELINUX_ALERT_REVIEW
+SELINUX=ENFORCING_HUMAN_REPORTED
+SELINUX_ALERT_VISIBLE=true
+SELINUX_ALERT_CAUSE=UNKNOWN_NO_AVC_SUPPLIED
 ENROLLMENT_STORED_LABEL=left-index-finger
 ENROLLMENT_PHYSICAL_FINGER=right-index-finger
 ENROLLMENT_LABEL_MISMATCH=KNOWN_LAB_STATE_PRESERVED_FOR_R4_BY_USER_DECISION
-EXECUTABLE_CLOSURE=OFFLINE_REVIEW_PASS_NATIVE_VM_AUTHENTICATION_REQUIRES_HUMAN
-RESIDUAL_BLOCKER_OR_RISK=CONSUMER_LIVE_R4_R5_R6_R7_NOT_QUALIFIED
+RUNTIME_TEMPLATE_RETAINED=true
+ROLLBACK_REQUIRED_ON_THIS_PASS=false
+EXECUTABLE_CLOSURE=OFFLINE_READ_ONLY_LOOKUP_REVIEW_PASS_VM_REPORT_REQUIRES_HUMAN
+RESIDUAL_BLOCKER_OR_RISK=SELINUX_EVENT_UNQUALIFIED_OTHER_CONSUMERS_R5_R6_R7_OPEN
 CANONICAL_DOCUMENTATION=THIS_MANUAL
-REVIEW_SET=GIT_DIFF_FROM_90a3c46beeead6b50e13426870e3d30f496c67f9
+REVIEW_SET=GIT_DIFF_FROM_9eb72cc6698b5727f6fb9754a73a6e9e36f231cf
 PRODUCTION_DRIVER_CHANGED=false
 PAM_AUTHSELECT_RUNTIME_DELTA=NONE
 ROADMAP_CHANGE=PHASE_STATUS_ONLY
 AI_PHYSICAL_RUNTIME_MUTATION=false
-NEXT_BOUNDARY=HUMAN_VM_NATIVE_KSCREENLOCKER_PASSWORD_THEN_FINGERPRINT
+NEXT_BOUNDARY=HUMAN_VM_READ_EXISTING_SELINUX_ALERT
 ```
 
 ### Governance corrente
