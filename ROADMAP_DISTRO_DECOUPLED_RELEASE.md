@@ -519,9 +519,26 @@ POLKIT_PASSWORD=PASS
 È consentito:
 
 ~~~text
-FINGERPRINT=FAIL
+FINGERPRINT=FAIL_TEMPORARY
 RECOVERY=REINSTALL_OR_UPDATE_DRIVER
 ~~~
+
+Se uno step rompe il fingerprint, la prova non termina al semplice fatto che la
+password resti sicura: deve essere dimostrato che il recovery supportato
+(reinstall/update del driver e della propria eventuale integrazione login)
+ripristini il percorso biometrico richiesto senza riparare Fedora.
+
+~~~text
+AFTER_FINGERPRINT_FAILURE:
+PASSWORD_LOGIN=PASS
+DESKTOP=PASS
+REINSTALL_OR_UPDATE_DRIVER=PASS
+PLASMA_LOGIN_FINGERPRINT=PASS
+~~~
+
+Se il recovery richiede modifiche manuali a PAM/Fedora o non ripristina il
+fingerprint login richiesto, lo step è **RELEASE_BLOCKER** fino a nuovo update
+del progetto compatibile con la baseline Fedora aggiornata.
 
 È vietato:
 
@@ -561,6 +578,7 @@ Uninstall ideale:
 ~~~text
 remove runtime
 remove own drop-in
+remove own login-integration artifact if present
 systemctl daemon-reload
 ~~~
 
