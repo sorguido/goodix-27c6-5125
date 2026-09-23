@@ -5,7 +5,7 @@
 `b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`, reported by the user as accepted
 by PM/review.** The qualified normal runtime build is also complete. Do not
 repeat these tests or rebuild for the current task. The next gate is the
-[clean replacement](../../deployment/minimal-runtime/README.md), using the
+[clean replacement](../../../../deployment-history/public-release-transition/deployment/minimal-runtime/README.md), using the
 old saved inverse first and ending with fprintd stopped before load-check.
 
 The D282 expectation correction in `b8cdd17` restricts the expected warning

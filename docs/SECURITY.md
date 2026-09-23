@@ -18,11 +18,13 @@ or synthetic test does not by itself establish every real-system failure path.
 
 ## Protected input and biometric data
 
-Device material is root-owned and validated before use according to
+Stage your five protected files in `$HOME/goodix-5125-materials/`, outside the
+clone. The installer imports them into a root-only runtime directory without
+printing their contents. Installed device material is validated before use according to
 [the material contract](DEVICE_MATERIALS.md). The transport record contains an
 existing secret; the project neither generates nor distributes it. The OEM DLL
-is parsed for validated data, not loaded as executable code. Sensitive buffers
-are cleansed by the material/session implementation.
+is parsed for validated data, not loaded as executable code. The C runtime material loader and
+secure-session implementation cleanse their sensitive buffers.
 
 Fingerprint images are processed in memory. Fedora fprintd stores enrolled
 templates in `/var/lib/fprint/`. Removal preserves templates and device material;
@@ -33,7 +35,7 @@ does not install an account-deletion hook or promise automatic template deletion
 ## Host authentication boundary
 
 Fedora owns fprintd, Plasma, PAM, sudo and PolicyKit. The project adds a private
-library directory, a narrow service environment drop-in and a minimal optional
+library directory, a narrow service environment drop-in and a minimal
 Plasma Login selector. It does not ship a replacement daemon/greeter or freeze
 Fedora's vendor authentication files. SELinux uses a narrow material label
 mapping, without a custom permission-granting policy module.
@@ -51,7 +53,4 @@ observed behavior and non-secret error text. Share only relevant redacted logs
 when needed. Never attach device-material directories, firmware, OEM binaries,
 raw USB captures, fingerprint images or templates.
 
-Only the audited source surface in the [publication manifest](../PUBLICATION_MANIFEST.md)
-may be distributed. That list is not a claim that every file in a maintainer's
-workspace is suitable for publication. The [validation page](VALIDATION.md)
-describes the current support limits.
+The [validation page](VALIDATION.md) describes the current support limits.

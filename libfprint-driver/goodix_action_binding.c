@@ -9,7 +9,7 @@
  * PE, protected-store, USB and orchestration concerns deliberately remain
  * outside this LGPL unit.
  */
-#include "goodix_d190_binder.h"
+#include "goodix_action_binding.h"
 
 #include <openssl/core_names.h>
 #include <openssl/crypto.h>

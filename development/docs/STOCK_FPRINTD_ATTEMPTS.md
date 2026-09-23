@@ -29,7 +29,7 @@ Runtime and template are retained, sensor detached, fprintd inactive. No second
 verify, no relabeling or rollback. **R3 is closed at the biometric boundary.**
 This single MATCH does not qualify a real NO_MATCH series inside one Claim or
 impose a cumulative driver cap. The current gate is
-[R4 read-only VM login configuration query](../deployment/minimal-runtime/R4_LOGIN_PREFLIGHT_VM.md), reader detached and desktop open.
+[R4 read-only VM login configuration query](../deployment-history/public-release-transition/deployment/minimal-runtime/R4_LOGIN_PREFLIGHT_VM.md), reader detached and desktop open.
 Stock KScreenLocker subsequently passed password unlock with the reader absent
 and fingerprint unlock at contact 1 without a password. MATCH was terminal and
 resources closed/drained; release_tail/single_terminal were zero, consistent
@@ -366,7 +366,7 @@ CURRENT_INSTALLED_RUNTIME=QUALIFIED_R3_BUILD_RETAINED
 The previous compiler/lifecycle/audit/expectation failures above are historical,
 not current failures. The qualified build already exists at
 `/home/guido/goodix-r3-20260922-111144`; do not rerun the synthetic gate or build.
-The [clean replacement procedure](../deployment/minimal-runtime/README.md) and
+The [clean replacement procedure](../deployment-history/public-release-transition/deployment/minimal-runtime/README.md) and
 native enrollment/verify are completed evidence; do not repeat them. Proceed
 to the read-only R4 login configuration query, retaining the qualified runtime,
 template, reconciled receipt and saved inverse. Sudo configuration and native authentication

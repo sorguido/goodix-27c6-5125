@@ -16,7 +16,161 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente — correttivo R5 reader-present, qualifica VM pendente (23 settembre 2026)
+### Stato corrente — R6/R7 preparazione pubblica e installer unico (23 settembre 2026)
+
+**ACTIVE_PHASE=R6_R7; autorizzazione esplicita Utente ricevuta.** Il prompt
+`CODEX_R6_R7_FINAL_PUBLIC_RELEASE.md` supera lo stop prima di R6 e autorizza
+implementazione, ristrutturazione, verifiche offline, commit e normale push su
+`development`. La baseline dichiarata è
+`39dd81ee43ae200e74bcbb1f70a57815113eff84`. Non autorizza modifiche di `main`,
+pubblicazione/push pubblico, riscrittura della history o esecuzione fisica da
+parte dell'AI. Le vecchie istruzioni VM-only hanno ora la sola deroga esplicita
+per la prova finale dell'installer pubblico sul Fedora fisico **eseguita
+dall'Utente**, dopo il gate. Nessun nuovo giro VM è il default del task.
+
+**Evidenza aggiornata, distinta dall'implementazione corrente:**
+
+- R4 funzionale resta PASS sulla baseline provata: enrollment/verify e consumer
+  già documentati non devono essere riqualificati retroattivamente.
+- Normal uninstall e reinstallazione dopo uninstall sono PASS riportati
+  dall'Utente. I metadata dei materiali/template preservati restano una prova
+  di metadata, non un confronto crittografico o readback factory.
+- La reinstallazione corretta con sensore **UP/presente** è ora riferita PASS
+  dall'Utente. Supera il precedente STOP sul gate USB del tooling; non è una
+  misura indipendente dell'AI né una prova del nuovo installer combinato.
+- `goodix-force-remove` da TTY con lettore presente è riferito funzionante.
+  Output finale esatto e inventario completo conclusivo non sono stati forniti;
+  tale limite resta esplicito, senza inventare ulteriori PASS.
+
+**Modello di pubblicazione strutturale.** Tutti i file versionati esterni alla
+directory top-level `development/` devono essere pubblicabili. Governance,
+roadmap e questo manuale canonico sono ora sotto `development/`; la root offre
+il manuale tecnico inglese del prodotto. Architetture respinte, guide milestone,
+vecchi build e reference non richieste sono preservati nell'area interna.
+L'allowlist di pubblicazione precedente è eliminata, senza sostituto pubblico.
+L'audit di relocation è [PUBLIC_TREE_AUDIT.md](PUBLIC_TREE_AUDIT.md).
+Il ledger completo storico resta preservato; i file pubblici mantengono le
+rispettive licenze e attribution. La history privata non è mai un input di
+pubblicazione e non viene riscritta.
+
+**Installer pubblico implementato.** La root `install.sh` risolve la propria
+posizione e invoca `deployment/install.py`. Il percorso documentato è
+`$HOME/goodix-27c6-5125`, ma un clone alternativo è ammesso senza dipendenza da
+cwd, branch, SHA privati o build preesistenti. `production/build-public.py`
+compila da sorgenti correnti la libfprint Goodix e il selector Plasma come utente
+ordinario, usa le dipendenze Fedora dichiarate, raccoglie le notice OpenCV dai
+pacchetti installati e produce provenance basata sui contenuti. Le librerie
+OpenCV necessarie sono quattro; fprintd, Plasma, PAM, sudo e PolicyKit restano
+Fedora stock. Il build verifica ABI/dipendenze, invoca test PAM sintetici e la
+suite materiali con checker C nativo; non installa software né avvia fprintd. La procedura pubblica include i pacchetti
+necessari in un solo blocco clone/install; l'installer chiede sudo per la
+transazione host. Nessuna modifica automatica di authselect o PAM globale.
+
+**Contratto materiali generalizzato.** L'Utente prepara esattamente
+`target-material-manifest.json`, `transport-material.bin`, `target-config-90.bin`,
+`gfusb.dll`, `fdt-cache.bin` in `$HOME/goodix-5125-materials/`, esterna al clone.
+È ammesso `--materials` per un'altra cartella. L'installer valida metadata,
+assenza di link/hardlink, schema esatto, identità supportata, SHA del bundle
+fornito, layout/finalizer/CRC e binding verificabili offline. Il checker C usa
+il loader production senza USB per la verifica crittografica E4. Il pin OEM
+DLL resta un'identità globale qualificata; i digest del lettore di sviluppo
+non sono criteri di accettazione. I binding alle risposte del lettore restano
+anche controlli runtime. Nessuna estrazione, provisioning o generazione dei
+materiali. Importazione atomica nella directory root `0700`
+`/var/lib/goodix-5125-poc/`, file root `0600`, label dedicate; nessuna copia
+manuale root richiesta, nessun contenuto protetto stampato. Un set installato
+valido è conservato e non viene sostituito implicitamente da un bundle diverso.
+
+**Lifecycle e rollback.** Il lettore resta continuamente presente. La
+transazione serializza le operazioni, inibisce temporaneamente l'attivazione di
+fprintd, lo ferma e verifica inactive/MainPID 0/LoadState masked prima delle
+mutazioni. Preserva un mask preesistente, rimuove soltanto quello proprio e non
+avvia fprintd come test. Installa strumenti di rimozione standalone, runtime,
+label e selector, pubblicando l'ingresso PAM solo dopo modulo e label.
+Un errore tenta il ripristino dello stato software progetto precedente; rollback
+incompleto è diagnosticato e conserva recovery disponibile quando possibile.
+Materiali pubblicati e template sono preservati. `goodix-uninstall` e
+`goodix-force-remove` sotto `/usr/local/bin` non dipendono dal clone, dalla
+build o da file/vendor Fedora salvati. Emergency usa solo path statici del
+progetto; l'inversa normale valida ownership/receipt. Nessuna riparazione
+silenziosa dello stack Fedora o sostituzione dei suoi componenti.
+
+**Closure offline consolidata (24 settembre 2026).** Review indipendente dei
+percorsi installazione/materiali/rimozione completata; il builder è stato
+riesaminato separatamente dal suo autore. Una copia esatta dei **338 file
+versionati pubblici**, senza `development/` né `.git`, ha superato **112 test**:
+12 builder, 40 materiali, 14 transazione installer e 46 rimozione. L'entrypoint
+root reale `install.sh --help` passa da clone con spazi e cwd estranea; le
+invocazioni operative privilegiate sono sostituite dai test sintetici, non
+eseguite sull'host. I comandi standalone sono stati provati dopo eliminazione
+del clone fixture. I 62 digest del ledger sorgenti sono coerenti; il riferimento
+Rocky del preprocessing è riallineato alla provenance già canonica
+`227eba219fa9e3fbac5bd59aca79f624f67cd11b`, senza cambio di licenza o algoritmo.
+Due bundle sintetici distinti hanno superato il vero loader C
+production con i soli seam di UID/GID e identità della DLL sintetica; controlli
+layout e E4 restano attivi. Non sono stati letti materiali reali o aperto USB.
+La compilazione nativa **completa** della libfprint/payload non è stata eseguita
+in questo ambiente per dipendenze Fedora mancanti: non confonderla con i test C
+mirati già passati. Checker production e checker fixture sono stati compilati
+con warning-as-error usando header GLib dell'SDK già presente e librerie host;
+questo è soltanto il metodo locale di verifica, non una dipendenza pubblica.
+La prova comprende rollback dopo errore, rifiuto del binding nativo, lock
+concorrente, mask preso in prestito dopo preflight e failure del reload finale.
+Se la quiescenza del rollback fallisce, conserva software/recovery; se fallisce
+la pulizia finale dopo installazione, segnala esplicitamente software installato
+e cleanup incompleto senza stampare successo. Non sono stati installati pacchetti.
+Un test verde non equivale a qualifica del Fedora fisico, SELinux reale o PAM.
+
+**Limite di disponibilità pubblica.** L'URL canonico è
+`https://github.com/sorguido/goodix-27c6-5125.git`, ma la copia pubblica corrente
+non contiene ancora questo installer. L'AI non lo pubblica. L'Utente deve prima
+trasferire l'albero pubblico corrente, escludendo `development/`, nel proprio
+repository pubblico. Solo dopo tale pubblicazione il blocco canonico può
+scaricare la nuova implementazione. Non sostituire questo prerequisito con un
+clone privato, branch di sviluppo o path di build storico; non dichiarare il
+blocco attualmente eseguibile dall'URL se l'entrypoint non è ancora disponibile.
+
+**Prossimo gate dopo closure offline:** l'Utente esegue esattamente il blocco di
+[installazione pubblico](../docs/INSTALLATION.md) sul Fedora fisico supportato,
+con sensore presente, password/sudo funzionanti e i cinque file preparati. La
+release non è pienamente qualificata prima della review di quella installazione
+e dei controlli lifecycle minimi. Le istruzioni TTY pubbliche spiegano la normale
+attesa fingerprint-first di circa 30 secondi e lo STOP/supporto se password non
+compare o fallisce; nessun selettore immediato o bypass della password è promesso.
+L'AI resta esclusa da installazione, sudo/root, accesso USB e live.
+
+```text
+ACTIVE_PHASE=R6_R7
+R6_R7_AUTHORIZATION=EXPLICIT_USER_PROMPT
+PUBLIC_TREE=EVERYTHING_EXCEPT_TOP_LEVEL_DEVELOPMENT
+PUBLIC_INSTALLER=./install.sh
+DEFAULT_MATERIAL_STAGING=$HOME/goodix-5125-materials
+INSTALLED_MATERIAL_PATH=/var/lib/goodix-5125-poc
+DEVELOPMENT_READER_HASH_PIN=false
+READER_DETACH_REQUIREMENT=false
+NATIVE_MATERIAL_DISTINCT_FIXTURES=2_PASS
+FULL_NATIVE_PAYLOAD_BUILD=NOT_EXECUTED_MISSING_BUILD_DEPENDENCIES
+R6_PUBLIC_INSTALLER_OFFLINE=PASS
+R6_PUBLIC_TREE_STRUCTURE=PASS
+R6_DOCUMENTATION=PASS
+R7_PUBLICABILITY_OFFLINE=PASS
+OFFLINE_RELEASE_CLOSURE=PASS
+PUBLIC_TREE_FILES=338
+PUBLIC_TREE_TESTS=112_PASS
+PUBLIC_URL_NEW_INSTALLER_AVAILABLE=false
+PUBLICATION_ACTION=USER_ONLY
+R7_PHYSICAL_INSTALL_PENDING=true
+NEXT_LIVE_GATE=PHYSICAL_FEDORA_PUBLIC_INSTALL_BY_USER
+AI_SUDO_USB_LIVE=false
+PM_DECISION=HUMAN_REQUIRED
+```
+
+### Stato storico precedente — correttivo R5 reader-present (23 settembre 2026)
+
+Questa sezione conserva la provenance della precedente ripartenza; i suoi stop,
+claim di fase corrente, pin degli output e istruzioni VM sono superati dalla
+autorizzazione R6/R7 e dallo stato corrente sopra. Non è la procedura pubblica.
+
 
 **ACTIVE_PHASE=R5; R4=CLOSED; R6=NOT_STARTED / NOT_AUTHORIZED.** Il prompt
 `CODEX_CORRECTIVE_SENSOR_PRESENT_AND_PUBLIC_DOCS.md` corregge il lifecycle e la
@@ -2725,8 +2879,8 @@ attivazione, password/login-check, logout, **un solo login fingerprint** con
 massimo tre contatti/stop al MATCH, **recovery anche dopo PASS**, password finale.
 
 Review set Git-native: diff dalla baseline 86d9, source/provenance Plasma,
-managed/migration e test, [review](development/migration/patched-host-to-combined/PLASMA-VT-RACE-REVIEW.md),
-[README operativo](development/migration/patched-host-to-combined/README.md) e
+managed/migration e test, [review](migration/patched-host-to-combined/PLASMA-VT-RACE-REVIEW.md),
+[README operativo](migration/patched-host-to-combined/README.md) e
 questo stato canonico. Gate: **HUMAN_REQUIRED / LIVE_RETEST**. Nessun nuovo D-number.
 
 ### Correttivo precedente — Polkit recovery e console tty12
@@ -5130,7 +5284,7 @@ CANDIDATE_FULL_LIVE_MIGRATION_TEST=DEFERRED_UNTIL_USER_MIGRATION
 PM_DECISION=ACCEPT_AND_CONTINUE
 ```
 
-### Stato corrente documentazione e pubblicazione — D298/01 decisione history privata
+### Stato storico documentazione e pubblicazione — D298/01 decisione history privata
 
 L'inventario iniziale della superficie ha confermato materiale protetto,
 privato o non redistribuibile sia nel tree corrente sia nella history Git
@@ -5141,7 +5295,9 @@ binario APP12509 sotto `analysis/D230/work/app/`, capture target sotto
 classifica inoltre i byte firmware embedded in `Rockytkg/include/goodix_fw.h`
 fuori dal grant GPL/LGPL.
 
-L'Utente ha deciso che il repository privato e la sua history completa restano
+La decisione seguente è storica: il nome `red_tag/` e la selezione di file sono
+stati poi sostituiti dalla regola strutturale corrente `development/`. Resta
+valido che il repository privato e la sua history completa rimangono
 privati, intatti e fuori dalla superficie di pubblicazione. Non devono essere
 sanitizzati, riscritti o trasferiti. L'agente non crea una nuova root history e
 non tocca il repository pubblico. Phase F prosegue separando soltanto il tree
@@ -14746,32 +14902,26 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 
 ## Fonti e confini di pubblicazione
 
-Il repository privato è il workspace canonico di sviluppo. Il repository
-pubblico è una superficie di pubblicazione congelata: non viene sincronizzato
-da D247 e potrà ricevere soltanto un export futuro, separato, sanitizzato e
-auditato. Un working tree pulito/equivalente non rende pubblicabile la history
-privata; capture, DLL, firmware, secret o dati biometrici transitati nella
-storia richiedono clean export, nuova storia o filtro dedicato.
+Il repository privato e la sua history restano il workspace canonico interno:
+non vengono trasferiti, sanitizzati mediante history rewrite o pubblicati.
+Il confine corrente, esplicitamente autorizzato in R6/R7, è strutturale:
+**tutto il tree versionato eccetto `development/` deve essere pubblico**.
+Non esistono eccezioni tramite manifest, `.gitignore` o disclaimer. Governance,
+manuale interno, capture, evidenze, materiale OEM e artefatti non redistribuibili
+sono confinati nell'area interna, con le esclusioni dal versionamento pertinenti.
 
-Le evidenze autentiche private hanno sede canonica in `<git-root>/captures/` e
-possono essere versionate nel repository privato per renderle disponibili agli
-strumenti autorizzati sul remoto privato. Bundle ed export pubblici escludono il
-raw; la futura pubblicazione richiede sanitizzazione esplicita di contenuto e
-history. Non esiste sincronizzazione automatica privato→pubblico.
+Prima di qualsiasi copia pubblica si verifica l'autonomia di build, test,
+installazione e documentazione senza `development/` e senza storia Git privata.
+L'Utente curerà il trasferimento nel repository pubblico. L'AI non esegue questa
+pubblicazione; una closure offline non prova la disponibilità della nuova
+versione all'URL pubblico. Non esiste sincronizzazione automatica privato→pubblico.
 
-La root contiene soltanto fonti canoniche, licenze e directory di
-progetto. Gli output Dxxx sono step-local e non cumulativi in
-`analysis/Dxxx/`, inclusi bundle e checksum; `analysis/README.md` è il solo
-indice sintetico e non sostituisce questo manuale. Il manifest
-`analysis/D248/D248_binary_relocation_manifest.json` fissa blob Git, SHA-256,
-dimensione, destinazione e riferimenti dei bundle storici in root. Le undici
-coppie D230–D238 possono essere spostate insieme in una fase meccanica
-byte-preserving. La coppia D239 resta invece intenzionalmente in root perché il
-controllo offline D245 apre quel path per verificare i launcher storici: la
-riproducibilità prevale su una root solo esteticamente perfetta. Rimuovere
-l'eccezione richiede uno step futuro che migri esplicitamente la dipendenza
-D245 e ne verifichi nuovamente l'executable closure. La relocation di layout
-non cambia stato tecnico né autorizzazioni live.
+I percorsi nelle evidenze storiche seguenti descrivono i vecchi checkout.
+Le relocation correnti sono registrate in `development/PUBLIC_TREE_AUDIT.md`.
+Nessuna dipendenza storica può obbligare a lasciare materiale non pubblico nella
+root. Questo manuale è `development/Goodix 27c6 5125 manuale tecnico.md`; il
+manuale tecnico pubblico è `TECHNICAL_MANUAL.md`. La provenance/licenza per-file
+corrente è in `docs/LICENSING_AND_PROVENANCE.md`.
 
 Le categorie restano distinte:
 
@@ -14807,8 +14957,8 @@ autorizza automaticamente alcuna futura operazione live.
 ### Rockytkg — snapshot locale implementativo canonico
 
 Il riferimento operativo unico è lo snapshot versionato
-`<git-root>/Rockytkg/`; la sua scheda canonica è
-`Rockytkg/PROVENANCE.md`. Il repository online
+`<git-root>/development/Rockytkg/snapshot/`; la sua scheda canonica è
+`development/Rockytkg/snapshot/PROVENANCE.md`. Il repository online
 `Rockytkg/goodix-linux-27c6-5125` registra l'origine ma non è una dipendenza del
 workflow ordinario. La Issue #1 resta una fonte esterna distinta e non è
 incorporata da un normale snapshot Git.

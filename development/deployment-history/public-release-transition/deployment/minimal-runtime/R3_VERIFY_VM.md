@@ -50,7 +50,7 @@ the sensor again. Each CLI invocation starts a fresh Claim and its telemetry
 starts at `attempt=1`. The three-invocation scope is the human test boundary,
 not a driver-enforced cumulative series. The user's stock-consumer policy and
 the absence of a driver cap after clean NO_MATCH remain unchanged. See
-[the source audit](../../docs/STOCK_FPRINTD_ATTEMPTS.md).
+[the source audit](../../../../docs/STOCK_FPRINTD_ATTEMPTS.md).
 
 ## Retained installation and preflight
 

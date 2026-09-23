@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""R5 filesystem tests: synthetic data only; every host operation is mocked."""
+"""Removal filesystem tests: synthetic data only; every host operation is mocked."""
 import contextlib
 import importlib.util
 from importlib.machinery import SourceFileLoader
@@ -29,7 +29,7 @@ def load(source=SOURCE):
 
 class RecoveryTests(unittest.TestCase):
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory(prefix='goodix-r5-synthetic-')
+        self.temporary = tempfile.TemporaryDirectory(prefix='goodix-removal-synthetic-')
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         self.m = load()
@@ -86,7 +86,7 @@ class RecoveryTests(unittest.TestCase):
         login_files = {m.MODULE: b'SYNTHETIC LOGIN MODULE', 'manage.py': b'SYNTHETIC OLD INVERSE'}
         for name, data in login_files.items():
             self.write(m.SUPPORT / name, data)
-        login_receipt = {'schema': 1, 'source_commit': '6fc6e640710885954d9e6fd603b3bc47b45d2ac6',
+        login_receipt = {'schema': 1, 'source_commit': 'a' * 40,
                          'files': {name: m.digest(data) for name, data in login_files.items()},
                          'config_sha256': m.digest(m.CONFIG.read_bytes())}
         self.write(m.SUPPORT / 'receipt.json', json.dumps(login_receipt).encode())
@@ -100,10 +100,10 @@ class RecoveryTests(unittest.TestCase):
                     'metadata': [[1, 2, 0, 0, 0o100600, 16, 1234]] * 6,
                     'before_contexts': ['unconfined_u:object_r:var_lib_t:s0'] +
                                        ['system_u:object_r:var_lib_t:s0'] * 5,
-                    'manifest_sha256': '1b98bf54925cf9608ee8bf4e7d2f811f535c3c9395ea2eaf38fe18fb017aacc8'}
-        runtime_receipt = {'schema': 1, 'build_commit': 'b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226',
-                           'install_commit': '264cd7ff1ba77857e1985502f299e4375f9a0516',
-                           'material_label_commit': '7f5a896' + '0' * 33,
+                    'manifest_sha256': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'}
+        runtime_receipt = {'schema': 1, 'build_commit': 'a' * 40,
+                           'install_commit': 'a' * 40,
+                           'material_label_commit': 'b' * 40,
                            'previous_service': 'active', 'created_dropin_directory': True,
                            'material_selinux': material, 'material_manifest_reconciled': True,
                            'files': {name: m.digest(data) for name, data in runtime_files.items()}}
@@ -214,8 +214,8 @@ class RecoveryTests(unittest.TestCase):
         self.assertFalse(any(args[0] in ('semanage', 'restorecon') for args, *_rest in self.events))
 
     def test_normal_bad_receipt_refuses_before_mutation(self):
-        self.change_runtime_receipt(lambda value: value.update(build_commit='0' * 40))
-        with self.assertRaisesRegex(RuntimeError, 'unknown runtime receipt'):
+        self.change_runtime_receipt(lambda value: value.update(build_commit='not-a-source-identity'))
+        with self.assertRaisesRegex(RuntimeError, 'invalid legacy source identity'):
             self.m.remove()
         self.assertEqual(self.events, [])
         self.assertTrue(self.m.CONFIG.exists())

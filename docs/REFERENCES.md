@@ -31,7 +31,6 @@ See [Licensing and provenance](LICENSING_AND_PROVENANCE.md).
 - [RFC 5487: PSK cipher suites](https://www.rfc-editor.org/rfc/rfc5487)
 - [RFC 5288: AES-GCM cipher suites](https://www.rfc-editor.org/rfc/rfc5288)
 - [OpenCV](https://opencv.org/): image-processing dependency.
-- [Pinned OpenCV package digests](../production/build-support/opencv-rpms.sha256)
 - [Fedora libfprint source provenance](../reference/libfprint-fedora44-1.94.100/PROVENANCE.md)
 
 Source versions identify tested/build inputs. They are not runtime version pins

@@ -1,6 +1,13 @@
+# Historical public-document classification
+
+The earlier document-by-document selection below is superseded by the current
+structural rule: every tracked path outside top-level `development/` is public.
+The old publication allowlist has been removed. This classification is preserved
+only as historical evidence; it grants no exception to the current rule.
+
 # Documentation classification after public cleanup
 
-The active public allowlist is `PUBLICATION_MANIFEST.md`; there is no whole-directory
+The former public selection used a separate document allowlist; it did not allow whole-directory
 export of docs, production, deployment or libfprint-driver. This internal record is
 excluded from publication. Existing internal files remain in place, preserving links
 and historical reconstruction; no public operation or R6 packaging is performed.

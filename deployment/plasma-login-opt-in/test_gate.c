@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
-/* VM-only unit test: fake tokens and temporary PAM-text fixtures; no PAM login. */
+/* Unit test: fake tokens and temporary PAM-text fixtures; no PAM login. */
 #define _POSIX_C_SOURCE 200809L
 #include <security/pam_modules.h>
 #include <security/pam_ext.h>

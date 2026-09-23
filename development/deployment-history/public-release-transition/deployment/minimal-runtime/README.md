@@ -2,7 +2,7 @@
 
 > **Internal historical component guide.** Earlier detached-reader procedures
 > below document completed tests and must not be reused for lifecycle operations.
-> The active [reader-present corrective procedure](../recovery/R5_VM.md) uses the
+> The active [reader-present corrective procedure](../../../../deployment/recovery/R5_VM.md) uses the
 > current installers. The integrated reader stays connected; saved old inverses
 > are provenance, not the current removal entrypoint (`goodix-uninstall`).
 
@@ -35,7 +35,7 @@ is complete: normal stock Plasma Login uses password-auth without fingerprint.
 The required Plasma fingerprint login has now also passed.
 The opt-in selector's VM build/tests passed at `6fc6e64`; installation and
 file/default-label checks passed at `24c3018`. Keep the installed candidate.
-[Real login at `7d0e2d3`](../plasma-login-opt-in/R4_PLASMA_LOGIN_VM.md) passed
+[Real login at `7d0e2d3`](../../../../deployment/plasma-login-opt-in/R4_PLASMA_LOGIN_VM.md) passed
 password without forced fingerprint wait and first-contact RIGHT-index MATCH
 without a password, with usable desktop and clean cleanup. R4 is closed;
 R5 is not started. Stop and wait for the user; do not prepare another gate.**

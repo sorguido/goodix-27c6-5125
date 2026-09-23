@@ -4,7 +4,7 @@
 #endif
 #include "goodix_target_material.h"
 
-#include "goodix_d190_binder.h"
+#include "goodix_action_binding.h"
 
 #include <errno.h>
 #include <fcntl.h>

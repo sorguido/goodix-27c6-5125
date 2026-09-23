@@ -13,6 +13,45 @@
 
 ---
 
+## Stato corrente — R6/R7 autorizzata (23 settembre 2026)
+
+Il prompt Utente `CODEX_R6_R7_FINAL_PUBLIC_RELEASE.md` autorizza esplicitamente
+la preparazione finale R6/R7 su `development`. R4 resta funzionalmente PASS;
+normal uninstall e reinstallazione sono PASS riferiti. L'Utente riferisce ora
+anche reinstallazione corretta con lettore UP/presente. Il force-remove TTY è
+riferito funzionante; output e inventario finale completi restano incompleti.
+Non si inventano altre osservazioni e non si ripete la precedente procedura VM.
+
+Il deliverable corrente è un albero interamente pubblico eccetto la directory
+`development/`, con un solo installer root `install.sh`. Governance, evidenze,
+manuale interno e materiale non pubblico sono sotto `development/`. La precedente
+allowlist è eliminata. La history privata resta intatta, non pubblicata e non
+necessaria a build, test o installazione. Nessuna operazione su `main` o pubblico
+è autorizzata all'AI.
+
+Il nuovo percorso compila da sorgente pubblica, importa i cinque materiali da
+`$HOME/goodix-5125-materials` e installa runtime, selector Plasma e comandi
+standalone di rimozione. Il sensore resta presente. L'AI completa implementazione,
+test sintetici e simulazione senza directory interna/history, poi si ferma prima
+della **installazione fisica eseguita dall'Utente** con la procedura pubblica.
+Questa è la deroga circoscritta alla precedente regola VM-only; non autorizza
+sudo, accesso USB, materiali reali protetti o live autonomi dell'AI.
+
+Lo stato implementativo e le evidenze correnti sono nel
+[manuale canonico](<Goodix 27c6 5125 manuale tecnico.md>). Il loader C ha accettato
+due bundle sintetici distinti; la compilazione nativa completa libfprint/payload
+non è stata eseguita nell'ambiente corrente per dipendenze Fedora mancanti.
+Closure offline consolidata il 24 settembre: 338 file pubblici, 112 test PASS,
+18 documenti/59 link verificati e review indipendente accettata. Il dettaglio
+è in [PUBLIC_TREE_AUDIT.md](PUBLIC_TREE_AUDIT.md).
+La qualifica fisica del nuovo percorso è pendente, non implicita nei test.
+
+L'URL pubblico corrente non contiene ancora il nuovo installer. L'Utente deve
+pubblicare la copia dell'albero pronto prima che il blocco clone/install possa
+scaricarlo. L'AI non pubblica e non sostituisce tale prerequisito con path,
+branch o artefatti privati. La preparazione offline non equivale a disponibilità
+online o release fisicamente qualificata.
+
 ## 1. Principio architetturale
 
 Il driver possiede il sensore. Fedora possiede Fedora.
@@ -81,7 +120,7 @@ login/password/desktop/sudo/PolicyKit è un **RELEASE_BLOCKER**.
 
 ---
 
-## 3. Baseline corrente — R0 completata
+## 3. Baseline di sicurezza — R0 completata
 
 La bonifica del target fisico ha riportato il percorso critico a componenti
 Fedora/KDE stock:
@@ -114,7 +153,18 @@ non costituisce motivo per reintrodurre automaticamente with-fingerprint.
 
 ---
 
-## 4. Regola VM-only da questo punto in avanti
+## 4. Regola VM-only e deroga finale esplicita R6/R7
+
+**Deroga corrente:** la decisione Utente del 23 settembre 2026 autorizza il
+prossimo gate sul Fedora fisico, eseguito dall'Utente tramite la sola procedura
+pubblica dopo closure offline. L'AI può eseguire build e test offline sintetici
+non privilegiati nello scope autorizzato; non installa dipendenze/runtime e
+non avvia USB, sudo o live. Non si prepara un ulteriore giro VM come prerequisito
+non richiesto. Tutte le invarianti factory e gli altri gate restano immutati.
+
+La regola generale precedente, riportata sotto per gli altri task, continua ad
+applicarsi fuori da questa deroga. I valori VM-only seguenti descrivono tale
+regola generale, non annullano l'eccezione esplicita corrente.
 
 Dopo la bonifica R0, il target fisico Fedora è una baseline di sicurezza e non
 è più il banco di prova del progetto.
@@ -562,10 +612,14 @@ aperta finché non esiste una soluzione conforme al failure model.
 
 ## R5 — Removal & Emergency Recovery Qualification su VM
 
-**Stato: AUTORIZZATA / CURRENT PHASE.** R4 è formalmente chiusa e
-`PLASMA_LOGIN=SUPPORTED_ON_TESTED_BASELINE`. L'Utente ha autorizzato R5 con
-scope ristretto a installazione/rimozione/recovery; la precedente matrice
-obbligatoria di Update Survivability non è più un release gate R5.
+**Stato: precedente qualifica lifecycle, fase operativa superata dalla nuova
+autorizzazione R6/R7.** R4 è formalmente chiusa e
+`PLASMA_LOGIN=SUPPORTED_ON_TESTED_BASELINE`. Rimozione normale e reinstallazione
+reader-present sono PASS riferiti; il force-remove TTY è riferito funzionante
+con limite di evidenza finale ancora esplicito. I contratti di rimozione sotto
+restano vincolanti, ma le vecchie guide VM non sono la procedura pubblica né il
+prossimo gate. La precedente matrice obbligatoria di Update Survivability non
+è un release gate reintrodotto da R6/R7.
 
 **Decisione Utente (23 settembre 2026):** il target realistico è una release
 installabile da un utente tecnico o assistito da AI, che possiede già il bundle
@@ -612,18 +666,13 @@ Login usa il manager corrente con gli output originali verificati. Le operazioni
 concorrenti sono serializzate. Qualifica sintetica e review nel manuale corrente;
 classificazione dei percorsi in `development/READER_PRESENT_LIFECYCLE_REVIEW.md`.
 
-**PM_DECISION=HUMAN_REQUIRED:** resta solo la sequenza correttiva VM in
-`deployment/recovery/R5_VM.md`, con installazione interna `docs/R5_INSTALL.md`.
-Nessuna nuova prova biometrica richiesta. La VM è riferita rimossa ma il suo
-stato preciso viene prima verificato. Il controllo password TTY usa runtime
-progetto assente e lettore ancora presente, senza workaround PAM.
-
-Documenti pubblici riscritti come prodotto; `PUBLICATION_MANIFEST.md` elenca
-singolarmente i documenti ammessi ed esclude evidenze interne. Come richiesto
-dal correttivo, la procedura interna non è presentata come installer finale:
-packaging pubblico ancora indisponibile, requisito di percorso finale non
-surrettiziamente dichiarato chiuso. **R5 non chiusa; R6 non iniziata né
-autorizzata.** Nessuna matrice update generale reintrodotta.
+**Procedura precedente ora storica:** `development/deployment/recovery/R5_VM.md`
+e `development/docs/R5_INSTALL.md` conservano la qualifica componente su VM e
+il precedente riuso degli output. Non devono essere presentate o rieseguite come
+installazione finale. La decisione R6/R7 autorizza invece build/import/install
+pubblici da sorgente e sostituisce l'allowlist con l'unica area interna
+`development/`. Il prossimo gate è la procedura pubblica sul Fedora fisico
+eseguita dall'Utente; la qualifica di quel nuovo percorso resta pendente.
 
 ### R5-A — Uninstall normale unificato
 
@@ -785,7 +834,7 @@ force-remove continues
 no dependency on vendor_ready()
 ~~~
 
-### R5-E — Sequenza live VM dopo Human Gate
+### R5-E — Sequenza live VM storica, non corrente
 
 Quando il lavoro offline e la documentazione sono pronti, **HUMAN_REQUIRED**.
 La live R5 deve essere preparata ma non eseguita autonomamente dall'AI.
@@ -856,44 +905,56 @@ FEDORA_SNAPSHOT_RESTORE_USED_BY_UNINSTALL=false
 R5=CLOSED
 ~~~
 
-**Orchestration boundary:** durante una sessione autonoma R5, eseguire tutto il
-lavoro offline sicuro possibile e fermarsi obbligatoriamente al successivo
-`HUMAN_REQUIRED` entro R5. **R6 non è autorizzata automaticamente.**
+**Boundary storico:** R5 non autorizzava automaticamente R6. La necessaria
+nuova autorizzazione esplicita è ora stata ricevuta con il prompt R6/R7;
+l'orchestrazione corrente segue quel task e resta soggetta ai gate hardware,
+privilegi e pubblicazione.
 
 ---
 ## R6 — Installer finale semplice e reversibile
 
-**Stato: NOT_AUTHORIZED.** L'ingresso in R6 richiede nuova autorizzazione esplicita
- dell'Utente dopo la chiusura di R5. Nessuna orchestrazione R5 può anticipare o
- avviare task R6.
+**Stato: PUBLIC_INSTALLER_OFFLINE_PASS; PHYSICAL_INSTALL_PENDING.** L'Utente ha autorizzato
+esplicitamente R6/R7. Il nuovo root `install.sh` costruisce il payload dai sorgenti
+pubblici, valida il bundle dell'Utente e richiede sudo per la transazione host.
+Il clone documentato è `$HOME/goodix-27c6-5125`; l'implementazione accetta altri
+path e non usa branch, history o output privati. Le dipendenze Fedora sono
+dichiarate nel blocco unico di `docs/INSTALLATION.md`.
 
-L'installer finale deve possedere soltanto i file del driver/runtime Goodix e,
-se R4 dimostra che è indispensabile, **un solo artefatto di integrazione Plasma
-Login strettamente project-owned**. Tale artefatto non può essere una copia
-congelata di un PAM vendor né può modificare direttamente file package-owned.
+Staging materiali default: `$HOME/goodix-5125-materials/`, esattamente cinque
+file, esterno al clone. L'importatore valida lo schema/identità e i digest del
+bundle fornito, non quelli del lettore di sviluppo. Conserva il pin globale
+compatibile della DLL OEM e richiede il checker C offline per il binding E4.
+Pubblica il set validato nella destinazione root con mode `0700`/`0600` e label
+corrette. Un set valido esistente e i template restano preservati. Nessuna
+lettura USB o provisioning è necessaria all'installazione.
 
-Target ideale:
+Runtime, login e removal sono indipendenti dal clone dopo installazione.
+L'update usa il medesimo entrypoint, controlla proprietà del software corrente
+e sostituisce sotto quiescenza con rollback dello stato software progetto in
+caso di errore. Le suite sintetiche e la simulazione dei 338 file pubblici senza
+`development/` o storia Git sono PASS: 112 test e due checker C compilati;
+la build nativa completa non è stata eseguita nell'ambiente privo delle dipendenze.
+Non è una qualifica installativa fisica. L'AI non installa pacchetti o runtime.
+
+L'installer possiede il runtime Goodix e la sola integrazione minima Plasma
+Login già scelta in R4. Nessun file vendor è copiato/congelato o modificato.
+I path operativi correnti sono:
 
 ~~~text
-/usr/local/lib64/goodix-27c6-5125/...
-/etc/systemd/system/fprintd.service.d/<unico-dropin-se-necessario>
-<eventuale integrazione login minima scelta e qualificata in R4>
+/usr/local/lib64/goodix-27c6-5125/
+/etc/systemd/system/fprintd.service.d/90-goodix-5125-runtime.conf
+/usr/local/lib64/goodix-plasma-login/
+/etc/pam.d/plasmalogin
+/usr/local/bin/goodix-uninstall
+/usr/local/bin/goodix-force-remove
+/usr/local/share/goodix-recovery/
 ~~~
 
-Più i materiali già separati e preservati:
-
-~~~text
-/var/lib/goodix-5125-poc/
-~~~
-
-Uninstall ideale:
-
-~~~text
-remove runtime
-remove own drop-in
-remove own login-integration artifact if present
-systemctl daemon-reload
-~~~
+I materiali sono separati e preservati in `/var/lib/goodix-5125-poc/`; i template
+restano sotto `/var/lib/fprint/`. La rimozione disarma prima il PAM/drop-in
+progetto, verifica la quiescenza, rimuove runtime/support e restituisce le label
+ai default correnti quando il mapping era proprio. Gli strumenti di recovery
+si eliminano per ultimi soltanto a cleanup riuscito.
 
 Non deve ripristinare file Fedora byte-per-byte perché non deve modificarli.
 L'eventuale integrazione login deve essere rimovibile eliminando soltanto
@@ -906,6 +967,20 @@ indisponibile il fingerprint.
 ---
 
 ## R7 — Release autonoma, sicura e sostenibile per l'utente finale
+
+**Stato: PUBLICABILITY_OFFLINE_PASS; PHYSICAL_INSTALL_PENDING.**
+L'albero pubblico è tutto ciò che è versionato eccetto `development/`. Devono
+passare audit strutturale, link/documentazione, build/test/installazione senza
+storia privata e verifica offline del root entrypoint da clone alternativo.
+Materiali del lettore, byte OEM non redistribuibili, capture e dati biometrici
+non possono comparire nel tree pubblico. Un elenco di eccezioni non è ammesso.
+
+L'URL pubblico deve ricevere dall'Utente la versione preparata prima della
+prova fisica con il blocco canonico. L'AI non esegue tale pubblicazione.
+La closure offline non consente di dichiarare la release completamente
+qualificata/pubblica prima della review dell'installazione fisica e dei minimi
+risultati lifecycle. Nessuna ulteriore procedura privata/VM sostituisce il
+percorso che dovrà utilizzare un utente esterno.
 
 L'obiettivo finale del progetto **non è l'upstream ufficiale**. L'obiettivo è
 una release pubblica sufficientemente autonoma, stabile e sicura da poter
@@ -983,8 +1058,9 @@ Prima di assegnare un task deve:
    ristretto e già autorizzato di R4 per l'integrazione fingerprint di Plasma Login;
 6. richiedere HUMAN_REQUIRED se per avanzare sembra necessario violare una
    invariante di questa roadmap;
-7. durante R5 fermarsi al successivo HUMAN_REQUIRED e non aprire R6 senza nuova
-   autorizzazione esplicita dell'Utente.
+7. applicare la nuova autorizzazione R6/R7 e completare il lavoro offline
+   consentito, fermandosi prima della pubblicazione e dell'installazione fisica
+   riservate all'Utente.
 
 ## AI Executor
 
@@ -997,8 +1073,8 @@ Deve:
 - non trasformare una limitation di Fedora/KDE in un nuovo sottosistema privato;
 - non usare il fatto che una patch “funziona” come prova di release-safety;
 - produrre test offline prima del Human Gate;
-- demandare all'Utente, dopo il gate, ogni build/install/runtime/live/update
-  test in VM secondo §4;
+- demandare all'Utente ogni installazione/runtime/live/update; per il gate
+  finale R6/R7 il target è il Fedora fisico secondo la deroga esplicita §4;
 - preservare le invarianti factory-preserving esistenti.
 
 ## Review

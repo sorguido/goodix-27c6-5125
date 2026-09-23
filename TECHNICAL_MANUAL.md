@@ -8,7 +8,8 @@ This implementation targets Goodix USB `27c6:5125`, firmware
 Successful authentication has been reported on the tested configuration.
 Other firmware, readers, desktop environments and network accounts are not
 qualified. [Validation](docs/VALIDATION.md) distinguishes observations from
-unverified behavior. Final public installation packaging is not available yet.
+unverified behavior. The root installer builds and installs from this tree; physical qualification
+of the complete installation path is still pending.
 
 ## Architecture
 
@@ -25,15 +26,19 @@ Fedora PAM / KDE / sudo / PolicyKit
 The device implementation belongs in libfprint. Fedora continues to provide
 `/usr/libexec/fprintd`, its service and D-Bus interface, the Plasma daemon and
 greeter, and normal authentication consumers. No private fprintd or Plasma
-binary is needed.
+binary is needed. The root `install.sh` builds the library and selector as the
+ordinary user from current source, then requests sudo for deployment. Build
+provenance uses source-content hashes and installed Fedora package versions,
+without depending on Git history or a particular clone location.
 
-The private library directory is `/usr/local/lib64/goodix-27c6-5125/`. It contains
+The project-owned library directory is `/usr/local/lib64/goodix-27c6-5125/`. It contains
 libfprint and the four required OpenCV libraries. Fedora supplies libgusb and
 OpenSSL. One service drop-in,
 `/etc/systemd/system/fprintd.service.d/90-goodix-5125-runtime.conf`, sets
 `LD_LIBRARY_PATH` for fprintd. It does not replace the service's `ExecStart`.
 
-The library is based on libfprint 1.94.100 with the Goodix device implementation,
+The bundled OpenCV libraries come from the installed Fedora development packages;
+the build records their actual versions, notices and SONAMEs. The library is based on libfprint 1.94.100 with the Goodix device implementation,
 SIGFM matching and image preprocessing. Source provenance and applicable
 licenses are described in [Licensing and provenance](docs/LICENSING_AND_PROVENANCE.md).
 
@@ -57,7 +62,9 @@ compatibility with all future packages. The removal commands never require the
 old vendor path to exist before removing the project override.
 
 KScreenLocker, ordinary sudo and PolicyKit use their Fedora authentication
-paths. No project PAM bridge, daemon or policy is installed for them. Console
+paths where the current Fedora policy enables fingerprint authentication. The
+installer does not change authselect or add global PAM rules. No project PAM
+bridge, daemon or policy is installed for them. Console
 and sudo conversation order follows the current Fedora policy: fingerprint can
 precede password, without a user-facing method selector.
 
@@ -81,11 +88,17 @@ delete enrolled fingers; do not put templates into source archives or reports.
 
 ## Protected device material
 
-Five pre-existing files under `/var/lib/goodix-5125-poc/` bind the host runtime
+The user stages five pre-existing files in `$HOME/goodix-5125-materials/`, outside
+the clone. The installer validates that exact set and imports it into
+`/var/lib/goodix-5125-poc/`. These files bind the host runtime
 to the intended reader and OEM compatibility input. The directory is root-owned
 mode `0700`; regular files are root-owned mode `0600`. The loader rejects unsafe
 metadata, malformed records and mismatched digests before using the material.
-See the complete [material contract](docs/DEVICE_MATERIALS.md).
+Validation uses the supplied reader's own manifest and file digests; no fixed
+reference-reader bundle is required. Offline checks validate format and file
+cross-bindings, while typed device-response bindings are checked at runtime.
+An already-valid installed set is retained. See the complete
+[material contract](docs/DEVICE_MATERIALS.md).
 
 The secure transport uses TLS 1.2 with a pre-existing reader PSK. The host acts
 as server; the reader acts as client. The OEM DLL is parsed for validated data,
@@ -110,9 +123,10 @@ The lifecycle implementation temporarily prevents service activation during
 runtime mutation, preserves an existing service mask, removes only a mask it
 created and never starts fprintd as an installation check. It uses ordinary
 host service controls, not direct USB commands or a private hardware daemon.
-An active or unquiescent service causes a precise failure, not an instruction
-to disconnect the reader. These controls require remaining real-system
-qualification; their implementation is not a public release-readiness claim.
+If service activation cannot be inhibited or fprintd cannot be quiesced, the
+operation fails with a precise error; the reader stays connected. Reader-present reinstallation has been reported successful. The complete
+source-built public installer still requires physical-system qualification;
+synthetic checks alone do not establish real PAM or SELinux behavior.
 
 ## Removal and recovery
 
@@ -123,7 +137,8 @@ points first and does not execute saved installer code. Neither depends on the
 repository, build output, Fedora version, vendor-file hash or vendor-file
 existence to remove the project.
 
-Both preserve material and templates. They remove project software, service
+Installed binaries and standalone removal scripts do not import from the clone;
+it can be moved or removed after installation. Both preserve material and templates. They remove project software, service
 integration and owned label effects, then remove recovery tooling last when
 cleanup succeeds. Failure output identifies unfinished cleanup. A normal restart
 closes old authentication sessions that may retain loaded code. These commands
@@ -141,5 +156,5 @@ by a successful fingerprint match.
 Keep password access available. Password-encrypted KWallet can request its own
 password after fingerprint login. Full recovery with unavailable biometrics,
 all future package changes and independent hardware remain qualification limits.
-The public installer and updater are not yet released; see
-[Installation](docs/INSTALLATION.md) for their availability.
+Use [Installation](docs/INSTALLATION.md) for the single install/update procedure
+and the current qualification status.

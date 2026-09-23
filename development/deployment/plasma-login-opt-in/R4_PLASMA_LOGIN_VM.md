@@ -27,7 +27,7 @@ build/install, R3 or other consumer tests, or qualify package updates.
 Login source: `6fc6e640710885954d9e6fd603b3bc47b45d2ac6`.
 Preserved VM output, relative to the private clone:
 `development/build-artifacts/plasma-login-opt-in/goodix-login-build.OeCmF8Ja`.
-The [completed installation and matching inverse](README.md) remain available.
+The [completed installation and matching inverse](../../../deployment/plasma-login-opt-in/README.md) remain available.
 Only `/etc/pam.d/plasmalogin` and the small support directory
 `/usr/local/lib64/goodix-plasma-login/` belong to this integration.
 The current Fedora PAM file was verified unchanged; no daemon, greeter, service
@@ -247,7 +247,7 @@ A PASS keeps the integration, R3 runtime and template. A prerequisite STOP or
 incomplete evidence without an observed failure requires review, not automatic
 uninstall. On actual login FAIL/regression, detach, reach the desktop with the
 normal password if possible, and complete cleanup. Run the exact
-[saved-candidate rollback block](README.md#owned-installation-and-inverse).
+[saved-candidate rollback block](../../../deployment/plasma-login-opt-in/README.md#owned-installation-and-inverse).
 It invokes `sudo python3 -I -B "$r4_build/manage.py" uninstall`, verifies removal
 of the owned PAM entry/support and reveals `/usr/lib/pam.d/plasmalogin` unchanged.
 It does not uninstall R3, delete templates, replay Fedora files or restart login.

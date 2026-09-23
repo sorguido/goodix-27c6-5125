@@ -206,7 +206,7 @@ authenticator does not restart PAM solely on fingerprint failure. A password
 failure or a new authentication session can restart it, which is why neither
 belongs to this fingerprint series. The driver permits only a clean NO_MATCH
 reopen and fences processing-error resubmission before new sensor work. See
-[the canonical review](../../Goodix%2027c6%205125%20manuale%20tecnico.md).
+[the canonical review](../../../../Goodix%2027c6%205125%20manuale%20tecnico.md).
 
 On success, lift the finger, confirm the desktop returned **without entering a
 password**, and detach USB. On failure/STOP, lift and detach USB via the VM

@@ -1,56 +1,46 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# Library build and offline checks
+# Source build and offline checks
 
-The software architecture builds a Goodix-enabled libfprint and the four OpenCV
-libraries it needs. Fedora supplies fprintd, libgusb, PAM and the desktop.
-A finished public installer, update package and generally supported public build
-recipe are not yet available; see [Installation status](../docs/INSTALLATION.md).
+Users install and update through the root `install.sh` using
+[the single installation block](../docs/INSTALLATION.md). No separate build
+command or manual payload selection is needed.
 
-## Build inputs and outputs
+## Build architecture
 
-The library uses the Fedora libfprint 1.94.100 source base, the source files named
-in `source-files.tsv`, their matching digests in `source-files.sha256`, and the
-inputs covered by `build-support/SHA256SUMS`. OpenCV package digests are recorded
-in `build-support/opencv-rpms.sha256`; downloaded packages are external inputs,
-not included source artifacts.
+`build-public.py` resolves the source root from its own location and builds as
+an ordinary user on Fedora 44 x86_64. It uses the checked-in libfprint base,
+Goodix driver and SIGFM sources, plus the installed Fedora development packages.
+It does not require Git history, a branch name, a particular clone directory or
+pre-existing build output.
 
-The current library builder produces libfprint, four OpenCV libraries, source
-and build provenance, ABI/dependency checks and license notices. It does not
-build a private fprintd, PAM consumer, greeter or Plasma daemon. Build inputs are
-separate from installed device material and fingerprint templates.
+The payload contains Goodix-enabled libfprint, four required OpenCV libraries,
+the Plasma Login selector and PAM entry, an offline material checker, license
+notices and source/build provenance. Fedora supplies fprintd, libgusb, OpenSSL,
+PAM, Plasma and the ordinary authentication consumers.
 
-Build scripts currently include environment-specific qualification constraints.
-They are available for source review and are not presented here as a universal
-installation procedure. Publishing a release requires checking its build and
-package path from the selected source surface, including all external inputs.
+The builder verifies the library ABI, dependency resolution, absence of test-only
+entry points, exact payload inventory and content hashes. OpenCV notices come
+from installed Fedora RPM license files. Build provenance records the current
+source-content digest and package versions, rather than requiring Git objects.
 
-## Source audit
+The [source ledger](source-files.tsv) and [matching digests](source-files.sha256)
+record the driver sources and per-file origins. [Licensing and provenance](../docs/LICENSING_AND_PROVENANCE.md)
+describes the combined library's terms.
 
-From the source root, this read-only audit verifies the active driver source
-manifest and build-support hashes without opening USB or changing host services:
+## Offline checks
 
-```bash
-production/check-source.sh --driver-only
-```
-
-Use that explicit scope. A successful source audit proves manifest consistency,
-not hardware support, password safety or installability.
-
-## Synthetic lifecycle tests
-
-The following checks use temporary filesystem fixtures and substitute host
-service, privilege and device operations:
+These checks use synthetic inputs and temporary fixtures. They substitute host
+service, privilege and device operations, and do not install software or open USB:
 
 ```bash
+python3 -B production/test_build_public.py
+python3 -B deployment/test_materials.py
+python3 -B deployment/test_install.py
 python3 -B deployment/recovery/test_remove.py
-python3 -B deployment/recovery/test_manage.py
-python3 -B deployment/minimal-runtime/test_offline.py
-python3 -B deployment/minimal-runtime/test_material_labels.py
-python3 -B deployment/plasma-login-opt-in/test_manage.py
 ```
 
-They exercise reader-present lifecycle control, ownership/drift handling,
-removal, preserved data and standalone command invocation. They are not a live
-authentication or hardware test. See [Validation](../docs/VALIDATION.md) for
-actual observations and [the publication manifest](../PUBLICATION_MANIFEST.md)
-for the source boundary.
+The suites cover the public builder and payload contract, distinct valid reader
+bundles, invalid material rejection, installer failure/rollback paths and removal
+without the clone. Running them does not prove hardware support or real Fedora
+PAM/SELinux behavior. See [Validation](../docs/VALIDATION.md) for observations and
+remaining limits.

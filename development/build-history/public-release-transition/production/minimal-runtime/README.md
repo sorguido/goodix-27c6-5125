@@ -8,7 +8,7 @@ below remain a build reference for future source changes. R3-A stock loading
 has also passed at install `92311c5`. Synthetic normal and ASan/UBSan suites
 now pass 44/44 at `b8cdd17`, whose normal runtime build is already complete
 at `/home/guido/goodix-r3-20260922-111144`, per the user. The next gate is the
-[clean replacement](../../deployment/minimal-runtime/README.md), ending with
+[clean replacement](../../../../deployment-history/public-release-transition/deployment/minimal-runtime/README.md), ending with
 fprintd stopped before load-check. Do not repeat either completed build.
 
 Run this procedure manually in the Fedora 44
@@ -26,7 +26,7 @@ exercise USB, or establish update survivability. No new installer/uninstaller
 is appropriate at this build-only boundary: no host runtime file is changed.
 The existing managed installer is historical and must not be used.
 
-The [runtime audit](../../docs/MINIMAL_RUNTIME.md) lists inputs, output,
+The [runtime audit](../../../../docs/MINIMAL_RUNTIME.md) lists inputs, output,
 exclusions, host-file boundaries and outstanding R3 work. Both the build's
 `build-provenance.txt` and the terminal result record the full source commit.
 The commit is provenance, not a separate approval requirement.

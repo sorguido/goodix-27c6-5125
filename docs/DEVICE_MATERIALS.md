@@ -10,6 +10,16 @@ Use only material you are entitled to use. Never substitute another reader's
 keys, guess missing values or generate a replacement PSK. A mismatch must be
 resolved without flashing, provisioning or changing the reader's persistent state.
 
+## Staging directory
+
+Place exactly the five files below in `$HOME/goodix-5125-materials/`, outside
+the repository. Do not rename them, share them or commit them. The public
+`install.sh` imports them automatically; no manual root copy is required.
+An optional `--materials /some/other/path` selects a different staging location.
+The source directory and ordinary files must belong to the installing user,
+without symlinks or hard links. Shared write permissions and executable files
+are rejected. Keep the source folder private. See [Installation](INSTALLATION.md).
+
 ## Required files
 
 | File | Contract |
@@ -68,8 +78,14 @@ bindings; they do not replace them.
 Material is stored under `/var/lib/goodix-5125-poc/`, root-owned mode `0700`,
 with regular root-owned mode-`0600` files. Symlinks and invalid metadata are
 rejected. The SELinux mapping uses `fprintd_var_lib_t` for the material tree.
-A finished public import/installation procedure is not yet available; see
-[Installation](INSTALLATION.md).
+The installer validates the complete source bundle before publishing a new
+material directory. It rejects missing/extra entries and unsafe metadata and
+sets restrictive destination modes for accepted source files, including files
+whose source mode is `0644`. A valid
+installed set is preserved; it is not silently replaced by a different bundle.
+The installer checks each reader's own supplied file bindings, without requiring
+equality with a reference reader. Typed response bindings remain runtime checks
+because they require that reader. No USB access is used for bundle import.
 
 Normal removal and emergency recovery retain these files. Removing a project
 SELinux mapping may change their labels back to current policy defaults, but

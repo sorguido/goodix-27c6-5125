@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""VM-only: production controls, real libpam, exclusively synthetic modules."""
+"""Production controls, real libpam, exclusively synthetic modules."""
 import pathlib
 import re
 import subprocess
@@ -35,7 +35,6 @@ def gate_fixtures(path):
 def main():
     if len(sys.argv) != 6:
         raise SystemExit("usage: test_dispatch.py DRIVER MOCK_MODULE PRODUCTION_PAM REAL_GATE_TEST_SO FIXTURES_DIR")
-    subprocess.run(["systemd-detect-virt", "--vm", "--quiet"], check=True)
     driver, module, config, real_gate = (pathlib.Path(p).resolve(strict=True) for p in sys.argv[1:5])
     fixtures = pathlib.Path(sys.argv[5]).resolve()
     original = config.read_text()

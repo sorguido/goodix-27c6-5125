@@ -82,6 +82,34 @@ def verify_files(directory, hashes, expected):
         require(digest(read(directory / name)) == checksum, f'project file drift: {directory / name}')
 
 
+def receipt_identity(receipt):
+    require(isinstance(receipt, dict), 'invalid project receipt')
+    if receipt.get('schema') == 2:
+        require(isinstance(receipt.get('source_id'), str) and
+                re.fullmatch('[0-9a-f]{64}', receipt['source_id']), 'invalid source identity')
+    else:
+        require(receipt.get('schema') == 1, 'unsupported project receipt')
+        identity = receipt.get('source_commit', receipt.get('build_commit'))
+        require(isinstance(identity, str) and re.fullmatch('[0-9a-f]{40}', identity),
+                'invalid legacy source identity')
+
+
+def runtime_inventory(receipt):
+    if receipt['schema'] == 1:
+        return RUNTIME_FILES, LINKS
+    files, links = receipt.get('files'), receipt.get('links')
+    require(isinstance(files, dict) and isinstance(links, dict), 'invalid runtime inventory')
+    require(links == LINKS, 'unexpected library links')
+    require('libfprint-2.so.2.0.0' in files, 'missing fingerprint library')
+    for part in ('core', 'features2d', 'flann', 'imgproc'):
+        require(sum(bool(re.fullmatch(r'libopencv_' + part + r'\.so\.[0-9.]+', name))
+                    for name in files) == 1, 'invalid OpenCV library inventory')
+    for name in files:
+        require(isinstance(name, str) and re.fullmatch(r'(?:licenses/)?[A-Za-z0-9_.+-]+', name)
+                and name not in ('.', '..', 'installation.json'), 'unsafe runtime file name')
+    return set(files), links
+
+
 def normal_preflight():
     """Check only our receipts and software, before ANY mutation or service action."""
     parents(CONFIG)
@@ -90,26 +118,28 @@ def normal_preflight():
     if present(SUPPORT):
         trusted(SUPPORT, directory=True)
         receipt = json.loads(read(SUPPORT / 'receipt.json'))
-        require(isinstance(receipt, dict), 'invalid login receipt')
-        require(receipt.get('schema') == 1 and isinstance(receipt.get('source_commit'), str)
-                and re.fullmatch('[0-9a-f]{40}', receipt['source_commit']), 'invalid login receipt')
-        require({p.name for p in SUPPORT.iterdir()} == {MODULE, 'manage.py', 'receipt.json'}, 'partial/drifted login support')
-        verify_files(SUPPORT, receipt.get('files'), {MODULE, 'manage.py'})
+        receipt_identity(receipt)
+        names = {MODULE, 'manage.py'} if receipt['schema'] == 1 else {MODULE}
+        require({p.name for p in SUPPORT.iterdir()} == names | {'receipt.json'},
+                'partial/drifted login support')
+        verify_files(SUPPORT, receipt.get('files'), names)
         require(digest(read(CONFIG)) == receipt.get('config_sha256'), 'project PAM configuration drift')
     else:
         require(not present(CONFIG), 'PAM override without project receipt')
     if present(RUNTIME):
         trusted(RUNTIME, directory=True)
         receipt = json.loads(read(RUNTIME / 'installation.json'))
-        require(isinstance(receipt, dict), 'invalid runtime receipt')
-        require(receipt.get('schema') == 1 and receipt.get('build_commit') ==
-                'b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226', 'unknown runtime receipt')
-        trusted(RUNTIME / 'licenses', directory=True)
+        receipt_identity(receipt)
+        files, links = runtime_inventory(receipt)
+        directories = {str(Path(name).parent) for name in files if '/' in name}
+        for name in directories:
+            trusted(RUNTIME / name, directory=True)
         require({str(p.relative_to(RUNTIME)) for p in RUNTIME.rglob('*')} ==
-                RUNTIME_FILES | set(LINKS) | {'licenses', 'installation.json'}, 'partial/drifted runtime contents')
-        verify_files(RUNTIME, receipt.get('files'), RUNTIME_FILES)
-        for name, target in LINKS.items():
-            require((RUNTIME / name).is_symlink() and os.readlink(RUNTIME / name) == target, 'project library link drift')
+                files | set(links) | directories | {'installation.json'}, 'partial/drifted runtime contents')
+        verify_files(RUNTIME, receipt.get('files'), files)
+        for name, target in links.items():
+            require((RUNTIME / name).is_symlink() and os.readlink(RUNTIME / name) == target,
+                    'project library link drift')
         require(read(DROPIN) == DROPIN_BYTES, 'project drop-in drift')
         record = receipt.get('material_selinux')
         if record is not None:
@@ -124,7 +154,8 @@ def normal_preflight():
     trusted(RECOVERY, directory=True)
     receipt = json.loads(read(RECOVERY / 'receipt.json'))
     require(isinstance(receipt, dict), 'invalid recovery receipt')
-    require(receipt.get('schema') == 1 and set(receipt.get('files', {})) == {NORMAL.name, FORCE.name}, 'invalid recovery receipt')
+    require(receipt.get('schema') in (1, 2) and set(receipt.get('files', {})) ==
+            {NORMAL.name, FORCE.name}, 'invalid recovery receipt')
     require({p.name for p in RECOVERY.iterdir()} == {'receipt.json'}, 'recovery directory drift')
     for path in (NORMAL, FORCE):
         require(digest(read(path)) == receipt['files'][path.name], f'recovery command drift: {path}')

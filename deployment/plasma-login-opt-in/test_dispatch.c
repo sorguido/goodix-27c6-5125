@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
-/* VM-only synthetic Linux-PAM unit test. Never loads a real auth module. */
+/* Synthetic Linux-PAM unit test. Never loads a real auth module. */
 #include <security/pam_appl.h>
 #include <stdio.h>
 #include <stdlib.h>

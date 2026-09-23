@@ -2,7 +2,7 @@
 
 > **HISTORICAL_ONLY / REJECTED_ARCHITECTURE — 22 settembre 2026.**
 > Questo handoff è superato dalla bonifica R0 e dalla
-> [roadmap distro-decoupled](../../../ROADMAP_DISTRO_DECOUPLED_RELEASE.md).
+> [roadmap distro-decoupled](../../ROADMAP_DISTRO_DECOUPLED_RELEASE.md).
 > La baseline installata, la console di recovery e il gate citati sotto sono
 > lo stato storico del 21 settembre, non istruzioni correnti. Non reinstallare
 > questa candidate. Sorgenti, evidenze e rollback restano preservati.

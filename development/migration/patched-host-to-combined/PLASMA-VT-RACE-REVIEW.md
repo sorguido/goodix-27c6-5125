@@ -34,7 +34,7 @@ della recovery tty1. tty12 resta la recovery separata.
 
 Acquisito il SRPM esatto Fedora 6.7.5-1.fc44, verificato tar contro SHA-512
 Fedora e conservati sorgenti/spec/quattro patch immutabili con manifest.
-Vedi [provenance](../../../reference/plasma-login-manager-fedora44-6.7.5/PROVENANCE.md).
+Vedi [provenance](../../reference/plasma-login-manager-fedora44-6.7.5/PROVENANCE.md).
 L'host ha systemd 259.9-1.fc44, kernel 7.2.5-200.fc44; le unit reali e la
 configurazione sono state lette senza cambiarle. `autovt@` risolve `getty@`;
 getty è Type=idle, StandardInput=tty, TTYPath=/dev/%I, TTYVHangup/Reset=yes.

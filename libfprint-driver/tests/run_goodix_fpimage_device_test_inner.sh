@@ -25,7 +25,7 @@ fi
 
 glib_cflags=$(pkg-config --cflags glib-2.0 gio-2.0 gobject-2.0 openssl)
 glib_libs=$(pkg-config --libs glib-2.0 gio-2.0 gobject-2.0 openssl)
-includes="-I$test_dir/support/d277 -I$test_dir/support -I$git_root/libfprint-driver -I$git_root/reference/libfprint-fedora44-1.94.100/source -I$git_root/Rockytkg/libfprint/libfprint -I$local_fp_dir -I$git_root/Rockytkg/libfprint/libfprint/sigfm -I$local_fp_dir/nbis/include -I$local_fp_dir/nbis/libfprint-include -I$build_dir"
+includes="-I$test_dir/support/post_tls -I$test_dir/support -I$git_root/libfprint-driver -I$git_root/reference/libfprint-fedora44-1.94.100/source -I$git_root/Rockytkg/libfprint/libfprint -I$local_fp_dir -I$git_root/Rockytkg/libfprint/libfprint/sigfm -I$local_fp_dir/nbis/include -I$local_fp_dir/nbis/libfprint-include -I$build_dir"
 strict_flags="-std=gnu11 -O2 -g -DGOODIX_ENABLE_TEST_SEAMS -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion -ffunction-sections -fdata-sections"
 local_flags="-DGOODIX_LIBFPRINT_SIGFM -std=gnu11 -O2 -g -Wall -Wextra -Werror -Wno-unused-parameter -Wno-missing-prototypes -Wno-discarded-qualifiers -Wno-sign-compare -Wno-cast-function-type -Wno-enum-conversion -Wno-maybe-uninitialized -ffunction-sections -fdata-sections"
 if [ "${GOODIX_STOCK_ATTEMPT_TEST:-0}" = 1 ]; then
@@ -108,8 +108,8 @@ gcc $strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_a0_protocol.c" \
   -o "$build_dir/goodix_a0_protocol.o"
 gcc $strict_flags $glib_cflags $includes -c \
-  "$git_root/libfprint-driver/goodix_d190_binder.c" \
-  -o "$build_dir/goodix_d190_binder.o"
+  "$git_root/libfprint-driver/goodix_action_binding.c" \
+  -o "$build_dir/goodix_action_binding.o"
 gcc $strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_target_material.c" \
   -o "$build_dir/goodix_target_material.o"
@@ -191,7 +191,7 @@ gcc -Wl,--gc-sections "$build_dir/metrics.o" -lstdc++ \
   "$build_dir/goodix_fpimage_pipeline.o" \
   "$build_dir/goodix_usb_router.o" \
   "$build_dir/goodix_a0_protocol.o" \
-  "$build_dir/goodix_d190_binder.o" \
+  "$build_dir/goodix_action_binding.o" \
   "$build_dir/goodix_target_material.o" \
   "$build_dir/goodix_runtime_inputs.o" \
   "$build_dir/goodix_runtime_material.o" \
@@ -263,8 +263,8 @@ gcc $san_strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_a0_protocol.c" \
   -o "$build_dir/goodix_a0_protocol_san.o"
 gcc $san_strict_flags $glib_cflags $includes -c \
-  "$git_root/libfprint-driver/goodix_d190_binder.c" \
-  -o "$build_dir/goodix_d190_binder_san.o"
+  "$git_root/libfprint-driver/goodix_action_binding.c" \
+  -o "$build_dir/goodix_action_binding_san.o"
 gcc $san_strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_target_material.c" \
   -o "$build_dir/goodix_target_material_san.o"
@@ -335,7 +335,7 @@ gcc $san_common -Wl,--gc-sections "$build_dir/metrics_san.o" -lstdc++ \
   "$build_dir/goodix_fpimage_pipeline_san.o" \
   "$build_dir/goodix_usb_router_san.o" \
   "$build_dir/goodix_a0_protocol_san.o" \
-  "$build_dir/goodix_d190_binder_san.o" \
+  "$build_dir/goodix_action_binding_san.o" \
   "$build_dir/goodix_target_material_san.o" \
   "$build_dir/goodix_runtime_inputs_san.o" \
   "$build_dir/goodix_runtime_material_san.o" \

@@ -2,7 +2,7 @@
 # Internal qualification install: continuously present reader
 
 **Internal development procedure, excluded from publication.** Public installation
-status is in [INSTALLATION.md](INSTALLATION.md); final packaging is not available.
+status is in [INSTALLATION.md](../../docs/INSTALLATION.md); final packaging is not available.
 This procedure reuses the accepted software outputs in the existing Fedora 44
 KDE x86_64 VM. It does not start R6. A five-file device-material set and retained
 template already exist; there is no material acquisition/import or enrollment.
@@ -84,7 +84,7 @@ private runtime, library environment drop-in and narrow material SELinux
 mapping. The R4 installer publishes its login entry after its module and labels
 are ready. Fedora still owns the daemon, greeter and vendor PAM; no authselect,
 sudo, PolicyKit or template change is performed. The recovery installer adds
-the [removal commands](UNINSTALL.md) to `/usr/local/bin`.
+the [removal commands](../../docs/UNINSTALL.md) to `/usr/local/bin`.
 
 Expected results are component install success, matching default login file
 labels, Fedora `/usr/libexec/fprintd` as `ExecStart`, only the private runtime
@@ -105,7 +105,7 @@ an unexpected project path is occupied, or desktop/password behavior regresses.
 Do not overwrite, rebuild, modify Fedora policy or retry authentication. Retain
 the exact error and point of failure. If any component was installed, leave the
 reader connected and run `goodix-uninstall`; if the desktop cannot be reached,
-follow the four [emergency steps](UNINSTALL.md#emergency-graphical-login-is-unavailable).
+follow the four [emergency steps](../../docs/UNINSTALL.md#emergency-graphical-login-is-unavailable).
 If normal removal refuses a partial installation, stop and report the refusal;
 the fixed-path emergency command is available without the build or repository.
 

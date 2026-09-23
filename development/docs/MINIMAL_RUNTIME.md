@@ -45,7 +45,7 @@ label, with clean release/drain/close and no retries or persistent families
 reported. **R3 is closed at the biometric boundary.** The canonical manual
 records full evidence, missing guest SHA/RPM/preflight output and limits of the
 qualification. The current human gate is
-[R4 read-only VM login configuration query](../deployment/minimal-runtime/R4_LOGIN_PREFLIGHT_VM.md), reader detached and desktop open.
+[R4 read-only VM login configuration query](../deployment-history/public-release-transition/deployment/minimal-runtime/R4_LOGIN_PREFLIGHT_VM.md), reader detached and desktop open.
 Stock KScreenLocker is SUPPORTED on the tested baseline: password unlock and
 first-contact fingerprint unlock passed, with closed/drained host cleanup.
 The audit query reports three nr_hugepages read denials, non-fatal for the
@@ -269,7 +269,7 @@ The user explicitly retains all VM execution. R2 review is
 original install/load evidence is also `ACCEPT_AND_CONTINUE`; its replacement
 by the qualified R3 build has completed.
 Direct AI access to the VM is neither needed nor a
-blocker. The previous [build procedure](../production/minimal-runtime/README.md)
+blocker. The previous [build procedure](../build-history/public-release-transition/production/minimal-runtime/README.md)
 remains reproducible reference, not the next task.
 
 R3-A preparation verification: 17 temporary-filesystem/input tests cover symmetric
@@ -281,7 +281,7 @@ also refuses this physical host from an unrelated cwd before mutation. Both
 shell wrappers pass syntax checks; the driver-only source audit remains PASS.
 
 The current **HUMAN_REQUIRED** is
-[R4 read-only VM login configuration query](../deployment/minimal-runtime/R4_LOGIN_PREFLIGHT_VM.md), reader detached and desktop open.
+[R4 read-only VM login configuration query](../deployment-history/public-release-transition/deployment/minimal-runtime/R4_LOGIN_PREFLIGHT_VM.md), reader detached and desktop open.
 Stock KScreenLocker is SUPPORTED on the tested baseline: password unlock and
 first-contact fingerprint unlock passed, with closed/drained host cleanup.
 The audit query reports three nr_hugepages read denials, non-fatal for the

@@ -1,23 +1,28 @@
 Goodix 27c6:5125 — licensing map
 
-This repository is multi-licensed. No single blanket license applies to every
-file or to the private development history.
+This repository is multi-licensed. Each source file retains its own copyright
+notices and license; no single blanket license replaces those terms.
 
-* New project-authored userspace core and connected tools under `core/` and
-  `tools/`: GPL-2.0-or-later.
-* Upstream-facing driver/glue under `libfprint-driver/`:
-  LGPL-2.1-or-later.
-* Historical project-authored revisions released through D246 remain available
-  under the BSD-2-Clause grant that accompanied those revisions. A copy is in
-  `LICENSES/BSD-2-Clause.txt`; that prior grant is not revoked.
-* Third-party works retain their stated licenses. Proprietary/OEM material,
-  captures, secrets and biometric data are not relicensed.
+* Goodix driver sources under libfprint-driver/: per-file SPDX identifiers,
+  predominantly LGPL-2.1-or-later. The image-preprocessing files under
+  libfprint-driver/rockytkg-imgproc/ retain GPL-2.0-or-later.
+* SIGFM source under Rockytkg/libfprint/libfprint/sigfm/: LGPL-2.1-or-later,
+  with the original contributor notices preserved.
+* The Fedora libfprint source base under reference/: original upstream
+  per-file terms, predominantly LGPL-2.1-or-later.
+* Project installation, build, recovery and Plasma Login selector code:
+  GPL-2.0-or-later, as stated by each file.
+* Earlier project-authored revisions that were distributed under BSD-2-Clause
+  remain available under the grant accompanying those revisions. That prior
+  grant is not revoked; its license text is in LICENSES/BSD-2-Clause.txt.
+* Third-party works retain their stated licenses. Open-source grants here do
+  not license OEM binaries, reader secrets, captures or biometric data.
 
-The Goodix-enabled `libfprint-2.so.2.0.0` release candidate combines source
-available under LGPL-2.1-or-later and GPL-2.0-or-later and links to
-Apache-2.0 components. That combined binary is conveyed under
-GPL-3.0-or-later, an option permitted by the existing “or later” grants;
-individual source files retain their stated licenses.
+The Goodix-enabled libfprint-2.so.2.0.0 combines source available under
+LGPL-2.1-or-later and GPL-2.0-or-later and links Apache-2.0 components. The
+combined binary is conveyed under GPL-3.0-or-later, as permitted by the
+applicable later-version grants. Individual source files retain their own
+notices and licenses; GPL source is not relicensed as LGPL.
 
-Canonical license texts are in `LICENSES/`. The operational directory map,
-provenance rules and exclusions are in `docs/LICENSING_AND_PROVENANCE.md`.
+Canonical license texts are in LICENSES/. Per-component origins, downstream
+changes and distribution requirements are in docs/LICENSING_AND_PROVENANCE.md.

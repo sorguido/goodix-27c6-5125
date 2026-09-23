@@ -7,14 +7,14 @@ Questo file è la costituzione operativa persistente per l'agente AI che lavora 
 Le fonti principali sono:
 
 1. decisione o autorizzazione esplicita corrente dell'Utente;
-2. questo `AGENTS.md`;
-3. `ROADMAP_DISTRO_DECOUPLED_RELEASE.md` per il boundary architetturale e la sequenza production/release attiva;
-4. `Goodix 27c6 5125 manuale tecnico.md` per lo stato e la conoscenza tecnica corrente;
+2. questo `development/AGENTS.md`;
+3. `development/ROADMAP_DISTRO_DECOUPLED_RELEASE.md` per il boundary architetturale e la sequenza production/release attiva;
+4. `development/Goodix 27c6 5125 manuale tecnico.md` per lo stato e la conoscenza tecnica corrente;
 5. evidenze versionate nel repository.
 
 Una decisione esplicita corrente dell'Utente può autorizzare una deroga limitata. Nessuna deroga può essere inferita da un generico “procedi”, dalla disponibilità dell'hardware o dal fatto che una stessa operazione sia stata autorizzata in passato.
 
-`START_PROMPT.md` definisce il bootstrap/recovery e il loop autonomo PM↔Executor. Non è una fonte autorizzativa per superare i gate di questo file.
+`development/START_PROMPT.md` definisce il bootstrap/recovery e il loop autonomo PM↔Executor. Non è una fonte autorizzativa per superare i gate di questo file.
 
 ---
 
@@ -31,7 +31,7 @@ Non assumere path hard-coded della workstation dell'Utente.
 Manuale tecnico canonico:
 
 ```text
-<git-root>/Goodix 27c6 5125 manuale tecnico.md
+<git-root>/development/Goodix 27c6 5125 manuale tecnico.md
 ```
 
 ### Golden branch rule
@@ -47,8 +47,8 @@ Prima di modificare qualunque file:
 1. identifica la Git root;
 2. verifica il branch corrente;
 3. verifica `git status --short`;
-4. durante bootstrap/recovery leggi integralmente `START_PROMPT.md`, questo
-   `AGENTS.md` e `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`;
+4. durante bootstrap/recovery leggi integralmente `development/START_PROMPT.md`, questo
+   `development/AGENTS.md` e `development/ROADMAP_DISTRO_DECOUPLED_RELEASE.md`;
 5. per la ripartenza ricostruisci lo stato dal task esplicito dell'Utente o, in
    sua assenza, dal più piccolo task tecnicamente giustificato **all'interno della
    fase attiva della roadmap**; non selezionare autonomamente lavoro fuori roadmap;
@@ -120,14 +120,23 @@ Salvo autorizzazione esplicita e specifica dell'Utente:
 
 Una implementazione terza più invasiva non costituisce autorizzazione a replicarne il comportamento sul target locale.
 
-Il materiale storico/deprecato non viene cancellato. L'eventuale archivio
-privato canonico è `red_tag/`.
-Prima di qualsiasi pubblicazione pubblica è obbligatorio auditare import,
-build, test, script, riferimenti documentali, provenance, licensing e
-dipendenze production, disaccoppiare ciò che è ancora referenziato, spostare in
-`red_tag/` tutto il materiale non pubblico e inserire la directory in
-`.gitignore`. Nessuna build, release o test pubblico può dipendere da
-`red_tag/`; non è un cestino.
+Il materiale storico/deprecato non viene cancellato. Per decisione esplicita
+Utente nel prompt `CODEX_R6_R7_FINAL_PUBLIC_RELEASE.md`, `development/` è
+l'unica area non pubblica del repository:
+
+```text
+PUBLIC_TREE = EVERYTHING_EXCEPT_TOP_LEVEL_DEVELOPMENT
+```
+
+Ogni file versionato esterno a `development/` deve essere pronto per la
+pubblicazione. Governance, evidenze, storia, snapshot privati e materiale non
+pubblico vivono sotto `development/`; nessuna allowlist, `.gitignore` o
+avvertenza documentale sostituisce lo spostamento. Prima della pubblicazione
+vanno auditati import, build, test, script, riferimenti, provenance, licensing
+e dipendenze. Nessuna build, installazione, release o test pubblico può dipendere
+da `development/` o dalla storia Git privata. Gli archivi privati eventualmente
+chiamati `red_tag/` devono essere sotto `development/`. La pubblicazione resta
+un'operazione soggetta a nuova autorizzazione esplicita.
 
 ---
 
@@ -268,7 +277,7 @@ driver/fingerprint non disponibile
 
 ## 5. Modalità autonoma PM ↔ Executor
 
-All'avvio tramite `START_PROMPT.md`, l'agente assume prima il ruolo **AI PM / Recovery Reviewer**.
+All'avvio tramite `development/START_PROMPT.md`, l'agente assume prima il ruolo **AI PM / Recovery Reviewer**.
 
 Deve ricostruire lo stato reale del repository prima di scegliere il primo task:
 
@@ -282,7 +291,7 @@ Deve ricostruire lo stato reale del repository prima di scegliere il primo task:
 - task/temi/confini tecnici ancora aperti pertinenti dal repository e dal manuale;
 - test, report, launcher e artefatti rilevanti.
 
-Il primo `CURRENT_TASK` di una ripartenza orchestrata deve essere scelto dal task esplicito dell'Utente o dal più piccolo task tecnicamente giustificato ricostruito da stato reale, roadmap, manuale, evidenze e blocker. In assenza di una nuova decisione esplicita dell'Utente, il task deve appartenere alla fase attiva R1-R7 di `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`. Non inventare una nuova direzione e non reintrodurre percorsi marcati `REJECTED_ARCHITECTURE` o `HISTORICAL_ONLY`.
+Il primo `CURRENT_TASK` di una ripartenza orchestrata deve essere scelto dal task esplicito dell'Utente o dal più piccolo task tecnicamente giustificato ricostruito da stato reale, roadmap, manuale, evidenze e blocker. In assenza di una nuova decisione esplicita dell'Utente, il task deve appartenere alla fase attiva R1-R7 di `development/ROADMAP_DISTRO_DECOUPLED_RELEASE.md`. Non inventare una nuova direzione e non reintrodurre percorsi marcati `REJECTED_ARCHITECTURE` o `HISTORICAL_ONLY`.
 
 Un worktree sporco non è automaticamente un errore. Può essere lavoro lasciato da una sessione interrotta. Non cancellarlo, resettarlo, stasharlo o sovrascriverlo senza averne ricostruito provenienza e intento.
 
@@ -337,7 +346,22 @@ Sono sempre Human Gate per l'agente:
 
 ### 6.1 Hardware e live
 
-Dopo la bonifica R0 descritta in `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`, tutte le nuove build/install/runtime validation, prove di update-survivability e live del progetto sono **VM-only**. Il Fedora fisico resta baseline di sicurezza: nessuna nuova mutazione runtime sul target fisico senza una nuova autorizzazione esplicita dell'Utente. Operazioni Git/documentali non sono mutazioni runtime host.
+Dopo la bonifica R0, la regola predefinita descritta in
+`development/ROADMAP_DISTRO_DECOUPLED_RELEASE.md` è **VM-only** per nuove
+installazioni, runtime validation, prove di update-survivability e live. Il
+Fedora fisico resta baseline di sicurezza senza nuova autorizzazione esplicita.
+Operazioni Git/documentali e verifiche offline non mutano il runtime host.
+
+**Deroga esplicita e limitata R6/R7 (23 settembre 2026):** il prompt Utente
+`CODEX_R6_R7_FINAL_PUBLIC_RELEASE.md` autorizza la preparazione dell'installer
+pubblico e la successiva installazione finale sul Fedora fisico, eseguita
+**soltanto dall'Utente** con la procedura pubblica dopo closure offline e Human
+Gate. L'AI può effettuare build/verifiche offline non privilegiate e sintetiche
+entro questo task, senza installare dipendenze o mutare il runtime host. Non
+può usare sudo/root, aprire USB, leggere materiali reali protetti o avviare live.
+La deroga non autorizza altre prove fisiche, modifiche delle invarianti factory,
+pubblicazione o push al repository pubblico. Non richiedere un'altra prova VM
+come prerequisito inventato della procedura finale autorizzata.
 
 - nuova esecuzione live sul sensore;
 - accesso USB Goodix reale;
@@ -502,7 +526,7 @@ e test offline proporzionati a spiegare quel failure.
 
 ### 8.1 Materiale storico
 
-Gli Operator Kit e `operator_kit/live_probe/` esistenti sono preservati come
+Gli Operator Kit e `development/private-root/operator_kit/live_probe/` esistenti sono preservati come
 evidenza e diagnostica storica, senza essere il default o una dipendenza per le
 nuove patch-first live. Non vengono cancellati o spostati automaticamente. Il
 complesso kit D293/04 è superato dalla decisione metodologica e non deve essere
@@ -604,7 +628,7 @@ provenance né invalidare automaticamente un live-critical set invariato.
 Ogni step che cambia conoscenza, decisioni o stato tecnico deve aggiornare organicamente:
 
 ```text
-Goodix 27c6 5125 manuale tecnico.md
+development/Goodix 27c6 5125 manuale tecnico.md
 ```
 
 Il manuale è la fonte narrativa canonica dello stato del progetto ed è essenziale per la ripresa autonoma dopo interruzione della sessione.
@@ -633,7 +657,7 @@ Quando cambia lo stato:
 - correggi o marca come superate formulazioni stale;
 - non duplicare inutilmente contenuto ancora valido.
 
-Nel percorso verso la pubblicazione pubblica, il manuale destinato alla pubblicazione deve essere rieditato e ristrutturato in inglese come vero manuale tecnico; non deve essere una traduzione letterale né un diario cronologico Dxxx. Tutta la documentazione pubblica è in inglese. `AGENTS.md` e `START_PROMPT.md` restano governance interna e non richiedono traduzione.
+Nel percorso verso la pubblicazione pubblica, il manuale destinato alla pubblicazione deve essere rieditato e ristrutturato in inglese come vero manuale tecnico; non deve essere una traduzione letterale né un diario cronologico Dxxx. Tutta la documentazione pubblica è in inglese. `development/AGENTS.md` e `development/START_PROMPT.md` restano governance interna e non richiedono traduzione.
 
 ---
 
@@ -668,7 +692,7 @@ La superficie di audit comprende:
 - baseline Git rilevante;
 - HEAD/commit finale o stato corrente del branch;
 - diff;
-- artefatti Dxxx pertinenti in `analysis/Dxxx/`;
+- artefatti Dxxx pertinenti in `development/private-root/analysis/Dxxx/`;
 - codice, test e documentazione realmente modificati;
 - manuale tecnico.
 
@@ -684,12 +708,13 @@ Non aggiungere a review set o materiale destinato alla pubblicazione:
 - cache/temporanei;
 - artefatti storici non modificati senza ragione.
 
-Le evidenze raw private autentiche possono vivere in `<git-root>/captures/` secondo la policy del repository privato e devono essere escluse da futuri export pubblici salvo audit specifico.
+Le evidenze raw private autentiche possono vivere in `<git-root>/development/captures/` secondo la policy del repository privato e devono essere escluse da futuri export pubblici salvo audit specifico.
 
-Prima di ogni pubblicazione pubblica, l'audit completo deve spostare in
-`red_tag/` il materiale non pubblico, aggiungere `red_tag/` a `.gitignore` e
-provare che build, test e release non dipendono da tale directory. Lo
-spostamento non va anticipato senza ragione.
+Prima di ogni pubblicazione pubblica, l'audit completo deve verificare che
+ogni materiale non pubblico sia sotto `development/` e che la copia di tutti
+gli altri file, senza storia Git privata, contenga build, test, installazione
+e documentazione autosufficienti. La decisione R6/R7 autorizza questa
+ristrutturazione, ma non una pubblicazione o push al repository pubblico.
 
 ---
 
@@ -746,10 +771,10 @@ docs/LICENSING_AND_PROVENANCE.md
 Snapshot Rockytkg canonico:
 
 ```text
-<git-root>/Rockytkg/
+<git-root>/development/Rockytkg/snapshot/
 ```
 
-Prima di audit, adattamento o riuso leggere `Rockytkg/PROVENANCE.md`.
+Prima di audit, adattamento o riuso leggere `development/Rockytkg/snapshot/PROVENANCE.md`.
 
 ---
 
@@ -781,7 +806,7 @@ La scelta del modello e della relativa configurazione appartiene all'Utente e al
 
 ## 19. Modifica delle policy
 
-L'agente autonomo non modifica `AGENTS.md` o `START_PROMPT.md` come normale attività tecnica.
+L'agente autonomo non modifica `development/AGENTS.md` o `development/START_PROMPT.md` come normale attività tecnica.
 
 Una modifica a questi file di governance richiede una decisione esplicita dell'Utente.
 
@@ -819,7 +844,7 @@ roadmap distro-decoupled vincolante
 +
 update survivability / distro decoupling
 +
-VM-only runtime validation
+VM-only runtime validation salvo deroga esplicita Utente
 =
 autonomia senza perdere controllo
 ```

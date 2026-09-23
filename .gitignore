@@ -1,5 +1,4 @@
-# The private repository versions project evidence, but not ephemeral editor,
-# interpreter, test, or coverage output.
+# Interpreter, editor and test output.
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -10,13 +9,10 @@ __pycache__/
 *.tmp
 *~
 
-# Private history, evidence, protected material, and superseded artifacts.
-# This directory is intentionally preserved only in the private workspace.
-red_tag/
-
-# Host-local, hash-verified build inputs. Keep documentation, not RPM payloads.
-GoodixArtifacts/opencv-4.13-rpms/*.rpm
-
-GoodixArtifacts/login-header-rpms/*.rpm
-
-GoodixArtifacts/plasma-header-rpms/*.rpm
+# Protected user-supplied material must remain outside this repository.
+/goodix-5125-materials/
+/target-material-manifest.json
+/transport-material.bin
+/target-config-90.bin
+/gfusb.dll
+/fdt-cache.bin

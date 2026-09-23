@@ -155,7 +155,7 @@ driver_sources = {
         '../../../../libfprint-driver/goodix_enrollment_fpi_usb_binding.c',
         '../../../../libfprint-driver/goodix_usb_router.c',
         '../../../../libfprint-driver/goodix_a0_protocol.c',
-        '../../../../libfprint-driver/goodix_d190_binder.c',
+        '../../../../libfprint-driver/goodix_action_binding.c',
         '../../../../libfprint-driver/goodix_target_material.c',
         '../../../../libfprint-driver/goodix_runtime_inputs.c',
         '../../../../libfprint-driver/goodix_runtime_material.c',

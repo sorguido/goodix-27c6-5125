@@ -1,7 +1,7 @@
 # R4 — explicit fingerprint choice at Plasma Login
 
 Status: **R4 CLOSED; Plasma Login SUPPORTED_ON_TESTED_BASELINE. R5 removal
-qualification is active; [current removal/recovery](UNINSTALL.md) awaits VM qualification.**
+qualification is active; [current removal/recovery](../../docs/UNINSTALL.md) awaits VM qualification.**
 Replan baseline: `4997fe47825cb1748bf34650b3b2eaaedb9dba49`; qualified login
 guide/guest checkout: `7d0e2d3bcd33dc1311f70cc26b0a72b6889acfbe`.
 The required fingerprint login is now demonstrated, rather than closed as a
@@ -36,7 +36,7 @@ It reports `R4_LOGIN_SAVED_BUILD=PASS`, `PLASMA_LOGIN_INSTALL=PASS`,
 `R4_LOGIN_INSTALLED_FILES=PASS`, all five default-label checks and
 `R4_PLASMA_INSTALL=PASS SENSOR_CONNECTED=false LOGIN_TEST=NOT_PERFORMED`.
 Silent vendor-hash and clean-worktree checks also passed. Review of the exact
-[procedure](../deployment/plasma-login-opt-in/README.md) and manager confirms
+[procedure](../../deployment/plasma-login-opt-in/README.md) and manager confirms
 manifest/source validation, installed bytes, root ownership/modes, exact receipt
 and support contents, with publication of the PAM entry last. Installer, inverse,
 module, PAM and tests have no delta from the tested source. This accepts the
@@ -107,8 +107,8 @@ and [documented control syntax](https://raw.githubusercontent.com/linux-pam/linu
 
 Putting `pam_fprintd sufficient` before password authentication alone retains
 the historical forced password wait. The stock module does not use the
-password token as a branch selector. Its [local source](../reference/fprintd-fedora44-1.94.5/source/pam/pam_fprintd.c)
-and [manual](../reference/fprintd-fedora44-1.94.5/source/data/pam_fprintd.pod)
+password token as a branch selector. Its [local source](../retired-public-tree/reference/fprintd-fedora44-1.94.5/source/pam/pam_fprintd.c)
+and [manual](../retired-public-tree/reference/fprintd-fedora44-1.94.5/source/data/pam_fprintd.pod)
 also distinguish serial PAM from concurrent application-managed conversations.
 
 A `pam_exec expose_authtok` empty-stdin test is not selected: v1.7.2 logs a
@@ -134,7 +134,7 @@ small option B selector, not a private Plasma implementation.
 
 ## Option B — one login integration, explicit owned files
 
-The candidate is [deployment/plasma-login-opt-in](../deployment/plasma-login-opt-in/README.md).
+The candidate is [deployment/plasma-login-opt-in](../../deployment/plasma-login-opt-in/README.md).
 It introduces one PAM service entry, `/etc/pam.d/plasmalogin`, plus its own
 selector library and removal metadata under
 `/usr/local/lib64/goodix-plasma-login/`. These are multiple explicitly owned

@@ -12,7 +12,7 @@ change the original copyright or grant of any source file.
 | Goodix driver | Project source | Per-file SPDX, predominantly LGPL-2.1-or-later; device, transport, secure session and image integration |
 | SIGFM | Rockytkg's materialized libfprint fork, commit `7ebe0c809b4d1df3400e84299a4ec4acdea84590` | LGPL-2.1-or-later; feature extraction and matching |
 | Image preprocessing | Adapted from Rockytkg, commit `227eba219fa9e3fbac5bd59aca79f624f67cd11b` | GPL-2.0-or-later; device-independent preprocessing subset |
-| OpenCV | Fedora 4.13.0-1.fc44 packages | Fedora expression `BSD-3-Clause AND Apache-2.0 AND ISC`; required runtime libraries |
+| OpenCV | Fedora OpenCV 4 packages (actual installed version recorded at build) | Fedora expression `BSD-3-Clause AND Apache-2.0 AND ISC`; required runtime libraries |
 | libgusb | Fedora system library | LGPL-2.1-or-later; USB dependency, not privately bundled |
 | OpenSSL | Fedora system library | Apache-2.0; TLS dependency |
 | Lifecycle and Plasma selector tools | Project source | GPL-2.0-or-later; ordinary Linux-PAM APIs, Python standard library and Fedora tools |
@@ -29,9 +29,10 @@ library to be conveyed under GPL-3.0-or-later. Individual source files retain
 their own notices and licenses; GPL code is not relabelled as LGPL.
 
 Library build outputs include the applicable license texts, OpenCV's license
-corpus extracted from the pinned packages, source manifests and build provenance.
-Final public package notices must reflect the actual payload; no finished public
-package or complete package SBOM is asserted here.
+corpus read from the installed Fedora RPM license files, source manifests and
+build provenance. Each local build records the actual package versions and
+payload hashes. Those records describe the produced software; they do not
+constitute an exhaustive dependency SBOM.
 
 ## Source provenance
 
@@ -61,7 +62,6 @@ or binaries, reader secrets, private captures, factory data, fingerprint images
 or templates. Those items are excluded from public source and software payloads.
 The runtime consumes a separately supplied legitimate device-material bundle.
 
-The [publication manifest](../PUBLICATION_MANIFEST.md) defines eligible source
-and documentation. Preserve original notices and corresponding source when
+Preserve original notices and corresponding source when
 redistributing components. [References](REFERENCES.md) and
 [acknowledgements](../ACKNOWLEDGEMENTS.md) identify the upstream projects.
