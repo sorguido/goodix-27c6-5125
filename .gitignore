@@ -10,6 +10,7 @@ __pycache__/
 *~
 
 # Protected user-supplied material must remain outside this repository.
+/development/
 /goodix-5125-materials/
 /target-material-manifest.json
 /transport-material.bin
