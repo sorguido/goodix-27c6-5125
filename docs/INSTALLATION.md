@@ -48,79 +48,23 @@ secrets or open USB to manufacture the bundle.
 
 ## Install
 
-The only bootstrap that must remain outside `install.sh` is obtaining the public
-repository itself: the script cannot run before it exists on disk. Everything
-after that — protected-material staging check, Fedora prerequisites, build,
-installation and failure reporting — is handled by `install.sh`.
-
-Paste this **single bootstrap block** into a normal desktop terminal. It uses
-`$HOME/goodix-27c6-5125` for the public clone. It never clears or replaces the
-terminal, redirects installer output, or runs the installation in the background:
-all clone, package-manager, build and installer output remains visible in the same
-terminal for the full operation.
+For a **first installation**, paste this block into a normal desktop terminal:
 
 ```bash
-_goodix_bootstrap() {
-    local REPO="$HOME/goodix-27c6-5125"
-    local rc
-
-    printf '\n==> [bootstrap 1/2] Ensuring Git is available\n'
-    if ! command -v git >/dev/null 2>&1; then
-        sudo dnf install git || {
-            rc=$?
-            printf 'GOODIX_BOOTSTRAP=STOP STEP=git_dependency EXIT_CODE=%d\n' "$rc" >&2
-            return "$rc"
-        }
-    fi
-
-    printf '\n==> [bootstrap 2/2] Cloning or updating the public repository\n'
-    if [ -d "$REPO/.git" ]; then
-        git -C "$REPO" pull --ff-only || {
-            rc=$?
-            printf 'GOODIX_BOOTSTRAP=STOP STEP=update EXIT_CODE=%d\n' "$rc" >&2
-            return "$rc"
-        }
-    elif [ -e "$REPO" ]; then
-        printf 'GOODIX_BOOTSTRAP=STOP STEP=clone REASON=path_exists_not_git PATH=%s\n' "$REPO" >&2
-        return 11
-    else
-        git clone https://github.com/sorguido/goodix-27c6-5125.git "$REPO" || {
-            rc=$?
-            printf 'GOODIX_BOOTSTRAP=STOP STEP=clone EXIT_CODE=%d\n' "$rc" >&2
-            return "$rc"
-        }
-    fi
-
-    cd "$REPO" || {
-        rc=$?
-        printf 'GOODIX_BOOTSTRAP=STOP STEP=enter_repository EXIT_CODE=%d\n' "$rc" >&2
-        return "$rc"
-    }
-
-    ./install.sh
-}
-
-if _goodix_bootstrap; then
-    printf '\nGOODIX_BOOTSTRAP=PASS\n'
-else
-    rc=$?
-    printf '\nGOODIX_BOOTSTRAP=STOP EXIT_CODE=%d\n' "$rc" >&2
-    printf 'The terminal remains open. Copy the complete output above before retrying.\n' >&2
-fi
-
-unset -f _goodix_bootstrap
+sudo dnf install git
+git clone https://github.com/sorguido/goodix-27c6-5125.git ~/goodix-27c6-5125
+cd ~/goodix-27c6-5125
+./install.sh
 ```
 
-The bootstrap deliberately uses a separate public clone at
-`$HOME/goodix-27c6-5125`. A development checkout elsewhere is not modified.
+`install.sh` handles the protected-material staging check, supported Fedora
+prerequisites, source build, installation and failure reporting. All package-manager,
+build and installer output remains visible in the same terminal; the script does
+not clear or replace the terminal, redirect the user-visible output, or run the
+installation in the background.
 
-Once the clone exists, `./install.sh` is also the direct entrypoint for subsequent
-local runs. It checks the materials directory, installs the supported Fedora
-prerequisites, builds the source and performs the privileged installation. A failure
-prints `GOODIX_INSTALL_BLOCK=STOP` with the failing stage and exit code; success
-prints `GOODIX_INSTALL_BLOCK=PASS`. Because the supported procedure is pasted
-into an already-open terminal, returning from either the bootstrap or installer
-does not close that terminal.
+If `$HOME/goodix-27c6-5125` already exists from an earlier installation, use the
+**Update or reinstall** block below instead of cloning over it.
 
 Fedora may ask for your sudo password and confirmation before installing packages.
 The installer later requests sudo itself for the system changes. If Fedora offers
@@ -135,11 +79,11 @@ It quiesces fprintd during replacement and does not start a fingerprint test.
 Fedora's daemon, greeter and vendor authentication files remain package-owned.
 
 Expect **`GOODIX_BUILD=PASS`** and material validation success, followed by
-**`GOODIX_INSTALL=PASS`**
-with **`READER_PRESENT_ALLOWED=true`**. Any error or missing final success marker
-means installation did not complete. Neither runtime nor either removal command
-needs the clone after successful installation. Keep the staging files securely
-for future reinstallations.
+**`GOODIX_INSTALL=PASS`** with **`READER_PRESENT_ALLOWED=true`**, and finally
+**`GOODIX_INSTALL_BLOCK=PASS`**. Any error or missing final success marker means
+installation did not complete. Neither runtime nor either removal command needs the
+clone after successful installation. Keep the staging files securely for future
+reinstallations.
 
 Advanced users may clone elsewhere: the installer resolves its own location.
 `./install.sh --materials /some/other/path` selects another staging directory;
@@ -180,12 +124,19 @@ Never attach your five files, templates, fingerprint images or raw USB captures.
 
 ## Update or reinstall
 
-Use the **same bootstrap block** with the same materials directory. It updates the
-public clone and then runs `install.sh`; the script checks dependencies and rebuilds
-from the current source. The installer
-checks existing project software and performs replacement while fprintd is
-quiescent. A valid installed material set and existing templates are preserved;
-changing a reader's protected bundle is not an implicit update operation.
+For an existing public clone, use:
+
+```bash
+cd ~/goodix-27c6-5125
+git pull --ff-only
+./install.sh
+```
+
+This updates the public clone and reruns the same installer. The script checks
+dependencies and rebuilds from the current source. Existing project software is
+replaced while fprintd is quiescent. A valid installed material set and existing
+templates are preserved; changing a reader's protected bundle is not an implicit
+update operation.
 
 After normal or emergency removal, the same block reinstalls the software and
 restores its material labels. Existing templates remain available. Incompatible
