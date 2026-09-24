@@ -18,6 +18,16 @@ stop_install() {
     exit "$rc"
 }
 
+# Preserve the historical read-only/help behavior: these modes must not install
+# packages or make privileged changes merely to answer a query.
+for arg in "$@"; do
+    case "$arg" in
+        -h|--help|--check)
+            exec /usr/bin/python3 -I -B "$ROOT/deployment/install.py" "$@"
+            ;;
+    esac
+done
+
 if [ "${EUID}" -eq 0 ]; then
     stop_install invocation 2 "run ./install.sh as your ordinary user; sudo is requested only when needed"
 fi
