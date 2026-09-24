@@ -1,168 +1,145 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# Installation and lifecycle management
+# Installation and updates
 
-## Requirements
+## Supported configuration
 
-- Fedora 44 KDE x86_64;
-- Goodix USB reader `27c6:5125` running APP12509;
-- a clean committed checkout of this source tree;
-- `git`, `flatpak`, `cpio`, `binutils`, `rpm-build`, `dnf5-plugins`, `fprintd`,
-  `fprintd-pam`, `libfprint`, `libgusb`, `selinux-policy-targeted`,
-  `checkpolicy`, `policycoreutils`, and `policycoreutils-devel`;
-- Flatpak SDK `org.freedesktop.Sdk//25.08` installed for the current user;
-- the legitimate protected-material set for the same physical reader.
+Fedora 44 KDE on x86_64, a local user account, Goodix USB `27c6:5125` running
+`GF_ST411SEC_APP_12509`, and Fedora's stock fprintd, PAM and Plasma Login.
+Other hardware, firmware, distributions and network accounts are unsupported.
+The complete installer still needs physical-system confirmation; see
+[validation](VALIDATION.md) before treating it as a qualified release.
 
-Install host prerequisites:
+## Prerequisites
 
-```bash
-sudo dnf5 install git flatpak cpio binutils rpm-build dnf5-plugins \
-  fprintd fprintd-pam libfprint libgusb selinux-policy-targeted checkpolicy \
-  policycoreutils policycoreutils-devel
-flatpak remote-add --user --if-not-exists flathub \
-  https://flathub.org/repo/flathub.flatpakrepo
-flatpak install --user flathub org.freedesktop.Sdk//25.08
+Use a working, supported Fedora installation with SELinux Enforcing, password
+login and ordinary sudo access. Finish authentication dialogs and close fingerprint settings.
+**Leave the reader connected and visible throughout installation and removal.**
+Keep your finger off it during administrative prompts.
+
+You need network access for the public clone and Fedora packages, disk space for
+a native source build, and an existing valid [device-material bundle](DEVICE_MATERIALS.md)
+for your own reader. The installer builds from the source you clone; it requires
+no previously compiled output. It does not obtain materials from the reader.
+
+## Prepare the five protected files
+
+Create or use **`$HOME/goodix-5125-materials/`**, outside the clone, and place
+exactly these five files directly inside it:
+
+```text
+target-material-manifest.json
+transport-material.bin
+target-config-90.bin
+gfusb.dll
+fdt-cache.bin
 ```
 
-## Clone the repository
-
-Clone the project and enter its source directory:
-
-```bash
-git clone https://github.com/sorguido/goodix-27c6-5125.git
-cd goodix-27c6-5125
-```
-
-Verify that the checkout is clean:
-
-```bash
-git status --short
-```
-
-The command should produce no output. All commands in the following sections
-are intended to be run from the repository root unless stated otherwise.
-
-## Pinned OpenCV build inputs
-
-Download, but do not install, the five Fedora RPMs expected by the build:
-
-```bash
-mkdir -p GoodixArtifacts/opencv-4.13-rpms
-dnf5 download --destdir GoodixArtifacts/opencv-4.13-rpms \
-  opencv-core-4.13.0-1.fc44.x86_64 \
-  opencv-devel-4.13.0-1.fc44.x86_64 \
-  opencv-features2d-4.13.0-1.fc44.x86_64 \
-  opencv-flann-4.13.0-1.fc44.x86_64 \
-  opencv-imgproc-4.13.0-1.fc44.x86_64
-(cd GoodixArtifacts/opencv-4.13-rpms && \
-  sha256sum -c ../../production/build-support/opencv-rpms.sha256)
-```
-
-Stop if a pinned package is unavailable or a digest differs.
-
-## Build a candidate
-
-The checkout must be clean and committed. Use a new or empty absolute output
-directory outside the repository:
-
-```bash
-mkdir -m 700 "$HOME/goodix-candidate"
-deployment/managed-install/manage.sh prepare "$HOME/goodix-candidate"
-(cd "$HOME/goodix-candidate/candidate" && sha256sum -c SHA256SUMS)
-```
-
-The build is unprivileged, runs with networking disabled, does not enumerate
-USB, and does not load protected material. A successful run prints
-`GOODIX_MANAGED_PREPARE=PASS`.
-
-## Import device-specific material
-
-The material directory supplied to the importer must contain exactly the five
-files listed in [Device-specific material](DEVICE_MATERIALS.md). That document
-explains which files come from the OEM Windows environment, which are
-project-derived, and how the historical transfer envelope differs from the
-runtime record. Every file must belong to the same physical reader and must
-have been obtained lawfully. Do not use a random, null, replacement, or
-cross-device PSK. Do not commit, upload, print, or attach this material to bug
-reports.
-
-```bash
-deployment/managed-install/manage.sh import-materials \
-  /absolute/path/to/the/device-material-set
-```
-
-The importer copies the files to root-only storage and leaves the source set
-unchanged. Success is `GOODIX_MANAGED_MATERIAL_IMPORT=PASS`.
+Do not rename them, put them in a subfolder, or place them inside the repository.
+In the file manager, enable hidden-file display and check that these are the only
+five entries and are ordinary files, not links. Keep this folder private and do
+not share or commit it. The directory and files must belong to your normal user;
+files must not be executable and must not allow other users to modify them. The installer checks names, metadata, formats and file
+bindings before importing anything; another reader's bundle is not a substitute.
+If you do not already have the complete five-file bundle, follow the detailed
+[device-material acquisition reference](DEVICE_MATERIALS.md) before continuing.
+That procedure is documented separately because it uses the reader's OEM Windows
+environment and capture evidence; the Linux installer itself does not extract
+secrets or open USB to manufacture the bundle.
 
 ## Install
 
-Review the candidate and keep a text console or other recovery path available.
-Then run:
+Paste this **single block** into a normal desktop terminal. It uses
+`$HOME/goodix-27c6-5125` for the clone and the materials folder above. Use a
+published revision containing `install.sh`; if the public repository does not
+yet contain that entrypoint, stop and wait for its publication.
 
 ```bash
-deployment/managed-install/manage.sh install \
-  "$HOME/goodix-candidate/candidate"
-deployment/managed-install/manage.sh status
+set -euo pipefail
+
+REPO="$HOME/goodix-27c6-5125"
+MATERIALS="$HOME/goodix-5125-materials"
+
+test -d "$MATERIALS"
+
+sudo dnf install git python3 gcc gcc-c++ meson ninja-build pkgconf-pkg-config \
+    glib2-devel libgusb-devel openssl-devel opencv-devel pam-devel binutils \
+    fprintd fprintd-pam policycoreutils-python-utils
+
+if [ ! -d "$REPO/.git" ]; then
+    git clone https://github.com/sorguido/goodix-27c6-5125.git "$REPO"
+else
+    git -C "$REPO" pull --ff-only
+fi
+
+cd "$REPO"
+./install.sh
 ```
 
-The transaction verifies the candidate, source commit, Fedora version, PAM
-package ownership, SELinux prerequisites, file metadata, and protected-material
-readiness. It fails closed on drift or collision.
+Fedora may ask for your sudo password and confirmation before installing packages.
+The installer later requests sudo itself for the system changes. If Fedora offers
+fingerprint first, leave the reader untouched and wait about 30 seconds for the
+password prompt. If password authentication is unavailable, stop; do not bypass it.
 
-After installation, connect the reader and use KDE System Settings > Users to
-enroll a fingerprint. Exercise the normal workflows in this order:
+The installer builds the Goodix library and Plasma Login selector as your normal
+user. It then imports the five files into `/var/lib/goodix-5125-poc/` with root-only
+permissions and SELinux labels, installs the runtime and login entry, and installs
+`goodix-uninstall` and `goodix-force-remove` in the normal command search path.
+It quiesces fprintd during replacement and does not start a fingerprint test.
+Fedora's daemon, greeter and vendor authentication files remain package-owned.
 
-1. password login;
-2. fingerprint verification in KDE;
-3. Plasma login with fingerprint;
-4. real session lock and fingerprint unlock;
-5. `sudo` with fingerprint;
-6. password fallback.
+Expect **`GOODIX_BUILD=PASS`** and material validation success, followed by
+**`GOODIX_INSTALL=PASS`**
+with **`READER_PRESENT_ALLOWED=true`**. Any error or missing final success marker
+means installation did not complete. Neither runtime nor either removal command
+needs the clone after successful installation. Keep the staging files securely
+for future reinstallations.
 
-For a verification series, allow at most three physical attempts and stop on
-the first match. Do not create a fourth attempt or an unbounded retry loop.
+Advanced users may clone elsewhere: the installer resolves its own location.
+`./install.sh --materials /some/other/path` selects another staging directory;
+the standard procedure above needs no override.
 
-## Update and rollback
+## Enrollment and basic verification
 
-Prepare a candidate from the new clean commit, then:
+After successful installation, use KDE's normal fingerprint settings to manage
+your enrolled fingers. If your finger is already enrolled, keep that enrollment;
+installation preserves existing templates. Otherwise enroll one finger following
+the normal prompts, without opening simultaneous fingerprint applications.
 
-```bash
-deployment/managed-install/manage.sh update /absolute/path/to/candidate
-deployment/managed-install/manage.sh status
-```
+Check ordinary password login first. For the fingerprint check at Plasma Login,
+submit the empty password field once and follow its prompts with the enrolled
+finger. Stop on the first successful match. If it does not match, allow at most
+three explicit physical attempts in that series; after the third failure use
+password and report the result. Do not start repeated test series or add a fourth
+attempt. A password-encrypted KWallet may ask for its own password after login.
+Other consumers offer fingerprint where the current Fedora authentication
+configuration enables it. The installer does not modify authselect or global
+PAM policy.
 
-Only one previous runtime is retained. A second update is rejected until the
-rollback slot is cleared by a supported lifecycle operation. To exchange the
-current and previous versions:
+## If installation or authentication fails
 
-```bash
-deployment/managed-install/manage.sh rollback
-```
+Stop at the first error and keep its exact non-secret message. A failed
+prerequisite does not authorize bypassing a safety check. The installer reports
+rollback if a system change fails; incomplete rollback is an error, not success.
 
-Rollback includes the managed PAM state. It does not delete protected material
-or fingerprint templates.
+If project software remains installed or authentication regresses, use
+**`goodix-uninstall`** from the working desktop. If normal removal refuses damaged
+project state or the desktop is unavailable, use **`goodix-force-remove`** according
+to [the emergency instructions](UNINSTALL.md). Follow its final restart instruction
+and verify password login. Keep the reader connected. Do not delete templates or
+materials, change Fedora PAM by hand, disable SELinux or hide the reader.
 
-## Uninstall and recovery
+Report the command, error, failure point and whether password/desktop access works.
+Never attach your five files, templates, fingerprint images or raw USB captures.
 
-```bash
-deployment/managed-install/manage.sh uninstall
-```
+## Update or reinstall
 
-Uninstall restores Fedora's fprintd runtime, removes the managed Plasma Login
-override, restores the original KDE fingerprint PAM file, and removes the
-managed SELinux policy and account hook. Protected material and fprintd
-templates are preserved deliberately.
+Use the **same install block** with the same materials directory. It updates the
+clone, checks dependencies and rebuilds from the current source. The installer
+checks existing project software and performs replacement while fprintd is
+quiescent. A valid installed material set and existing templates are preserved;
+changing a reader's protected bundle is not an implicit update operation.
 
-If graphical login is unavailable, use a text console and run the same
-uninstall command. Useful non-secret diagnostics are:
-
-```bash
-deployment/managed-install/manage.sh status
-systemctl status fprintd.service --no-pager
-journalctl -b -u fprintd.service --no-pager
-getenforce
-```
-
-Never attach `/var/lib/goodix-5125-poc`, `/var/lib/fprint`, a fingerprint
-image, a template, an OEM binary, or a capture. If the manager reports PAM or
-package drift, do not edit around the check; uninstall when permitted or wait
-for a reviewed compatibility update.
+After normal or emergency removal, the same block reinstalls the software and
+restores its material labels. Existing templates remain available. Incompatible
+Fedora changes may disable fingerprint functionality; report them or remove the
+project instead of replacing Fedora's own authentication components.

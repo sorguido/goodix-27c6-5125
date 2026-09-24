@@ -1635,6 +1635,86 @@ test_d279_08_production_release_failure (void)
 }
 
 static void
+login_expired (GoodixFpImageDevice *dev, gboolean ready, const char *reason, gpointer data)
+{
+  (void) dev;
+  g_assert_false (ready);
+  g_assert_nonnull (strstr (reason, "expired"));
+  *((gboolean *) data) = TRUE;
+}
+
+static void
+test_login_prepare_deadline (void)
+{
+  ProductionOpenSeam seam = { 0 };
+  TestFixture *f = production_fixture_new (&seam);
+  gboolean started = FALSE, expired = FALSE;
+  g_autoptr(GError) cancelled = g_error_new_literal (
+    G_IO_ERROR, G_IO_ERROR_CANCELLED, "synthetic cancelled RX");
+  fixture_open (f);
+  goodix_device_context_set_async_usb_submit_seam (
+    f->ctx, production_graph_submit_seam, &seam);
+  g_signal_connect (f->device, "goodix-login-prepared", G_CALLBACK (login_expired), &expired);
+  g_signal_emit_by_name (f->device, "goodix-login-prepare", &started);
+  g_assert_true (started);
+  guint64 generation = goodix_device_context_get_generation (f->ctx);
+  gint64 end = g_get_monotonic_time () + 12000000;
+  while (!expired && g_get_monotonic_time () < end)
+    {
+      g_main_context_iteration (NULL, FALSE);
+      g_usleep (1000);
+    }
+  g_assert_true (expired);
+  g_assert_true (goodix_device_context_get_poisoned (f->ctx));
+  g_assert_cmpuint (seam.out_submit_count, ==, 0);
+  goodix_device_context_complete_receive (f->ctx, generation, NULL, 0, cancelled);
+  fixture_close (f);
+  g_assert_cmpstr (seam.events->str, ==, "ACRF");
+  test_fixture_free (f);
+  production_seam_clear (&seam);
+}
+
+static void
+test_login_prepare_close_pending_rx (void)
+{
+  ProductionOpenSeam seam = { 0 };
+  TestFixture *f = production_fixture_new (&seam);
+  g_autoptr(GError) cancelled = g_error_new_literal (
+    G_IO_ERROR, G_IO_ERROR_CANCELLED, "synthetic cancelled RX");
+  gboolean started = FALSE;
+  fixture_open (f);
+  goodix_device_context_set_async_usb_submit_seam (
+    f->ctx, production_graph_submit_seam, &seam);
+  g_signal_emit_by_name (f->device, "goodix-login-prepare", &started);
+  g_assert_true (started);
+  guint64 generation = goodix_device_context_get_generation (f->ctx);
+  g_assert_cmpint (fpi_device_get_current_action (FP_DEVICE (f->device)), ==,
+                   FPI_DEVICE_ACTION_NONE);
+  g_assert_cmpuint (seam.acquire_count, ==, 1);
+  g_assert_cmpuint (seam.claim_count, ==, 1);
+  g_assert_cmpuint (seam.in_submit_count, ==, 1);
+  g_assert_cmpuint (seam.out_submit_count, ==, 0);
+  g_signal_emit_by_name (f->device, "goodix-login-prepare", &started);
+  g_assert_false (started);
+  g_assert_cmpuint (seam.in_submit_count, ==, 1);
+  f->done = FALSE;
+  fp_device_close (FP_DEVICE (f->device), NULL, (GAsyncReadyCallback) close_cb, f);
+  g_assert_false (f->done);
+  g_assert_cmpuint (seam.interface_release_count, ==, 0);
+  goodix_device_context_complete_receive (f->ctx, generation, NULL, 0, cancelled);
+  test_wait (f);
+  g_assert_true (f->success);
+  g_assert_null (goodix_fpimage_device_get_context (f->device));
+  g_assert_cmpstr (seam.events->str, ==, "ACRF");
+  /* Ordinary next open obtains fresh resources; no prepared/poisoned carryover. */
+  fixture_open (f);
+  fixture_close (f);
+  g_assert_cmpstr (seam.events->str, ==, "ACRFACRF");
+  test_fixture_free (f);
+  production_seam_clear (&seam);
+}
+
+static void
 test_d279_09_production_activation_binding (void)
 {
   ProductionOpenSeam seam = { 0 };
@@ -2516,6 +2596,8 @@ int
 main (int argc, char **argv)
 {
   g_test_init (&argc, &argv, NULL);
+  g_test_add_func ("/login/prepare-close-drains-rx", test_login_prepare_close_pending_rx);
+  g_test_add_func ("/login/preparation-deadline", test_login_prepare_deadline);
 
   g_test_add_func ("/goodix-fpimage-device/lifecycle-base-capture",
                    test_lifecycle_base_capture);

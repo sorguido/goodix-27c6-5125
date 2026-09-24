@@ -1,0 +1,55 @@
+{
+  "revisions": [
+    {
+      "recovery": {
+        "deployment/managed-install/root-transaction.sh": "d304c2e2004a10a6761e67f8eb6dca90e15f8f1921e21e984545bfc24bd74356",
+        "production/polkit/deploy.py": "7c4678b828bf4b3b27dbbc550c8ac0b1617c00a043ebab4e62c41917643886d3",
+        "production/sudo/rules.py": "05ab5a9f049838ce5ce510e495889a367b4439cd1db13713b3f1884f11b47a18"
+      },
+      "source": {
+        "host-plan.json": "e807881d26ad6056cf1dff91fbd717024407c69b11033db253a90ffd93e4a2a4",
+        "inventory.py": "c48612ed42e43f85a3dc87c7b0ffbef055ac1d7bc2510825c4c45379eadc9190",
+        "manifest.py": "90283dbd86cd61da1196a37af65d15a45aa6e2b0fcbf5c5cb66aaf867e7a6744",
+        "migration.py": "cdca61f52d2b80bb9537d59ad67dce171732762c228c4c9e3e8cbee8cd67cf74",
+        "recovery.py": "2b37a7e840bad695cc2bfbf846ee1c761af851a97627ff6f8b0a8721f0c28fa5"
+      },
+      "source_commit": "f97de44e0192f249ccb80fd9b32e1488195f0101"
+    },
+    {
+      "recovery": {
+        "deployment/managed-install/root-transaction.sh": "d304c2e2004a10a6761e67f8eb6dca90e15f8f1921e21e984545bfc24bd74356",
+        "production/polkit/deploy.py": "7c4678b828bf4b3b27dbbc550c8ac0b1617c00a043ebab4e62c41917643886d3",
+        "production/sudo/rules.py": "05ab5a9f049838ce5ce510e495889a367b4439cd1db13713b3f1884f11b47a18"
+      },
+      "source": {
+        "host-plan.json": "ff6b8d6870153d4cee2f06cb2eaf0a158d935a3bf60c9936ef71c276f480e112",
+        "inventory.py": "c48612ed42e43f85a3dc87c7b0ffbef055ac1d7bc2510825c4c45379eadc9190",
+        "legacy-recovery.json": "23f88bc5e709f5f48d5b81efc179692c83ce56214bafd915888091a195af2bef",
+        "manifest.py": "90283dbd86cd61da1196a37af65d15a45aa6e2b0fcbf5c5cb66aaf867e7a6744",
+        "migration.py": "b0e7a4aac688a16c57009a9baed5250dcc02019a5e9741b5f17d0e18c4f19d53",
+        "package_baseline.py": "2912c9ade0e06ba1741fdd5d51aaf6b3afe7d94c1e2f70e76209991a6ec35a1f",
+        "rearm.py": "6e3f180f8ebe7add1728e640ccf3fd54c7ce689fc52babd8dd03d9bed7bd3b4b",
+        "recovery.py": "8c7578ebffca2e4a7472af856de468ae216fe802bfc11422c097eb1dc1cd8b9e"
+      },
+      "source_commit": "d7de50585d555b1ca676e4fcf6c9ed77cc20d601"
+    },
+    {
+      "recovery": {
+        "deployment/managed-install/root-transaction.sh": "31c774425a3a44ea83b9d66268a4e8a4a654d7c0fcf08c97df6cf212eb6de00e",
+        "production/polkit/deploy.py": "374ab6d2fbea7cd4252300c03da897283f8d544bc6864d2fb32aa364b41fafbf",
+        "production/sudo/rules.py": "05ab5a9f049838ce5ce510e495889a367b4439cd1db13713b3f1884f11b47a18"
+      },
+      "source": {
+        "host-plan.json": "ff6b8d6870153d4cee2f06cb2eaf0a158d935a3bf60c9936ef71c276f480e112",
+        "inventory.py": "c48612ed42e43f85a3dc87c7b0ffbef055ac1d7bc2510825c4c45379eadc9190",
+        "legacy-recovery.json": "db115e29da7c6e4593d0a679af3bd33f1aa7b4ca8b896c9af5979232a208dd5b",
+        "manifest.py": "90283dbd86cd61da1196a37af65d15a45aa6e2b0fcbf5c5cb66aaf867e7a6744",
+        "migration.py": "b0e7a4aac688a16c57009a9baed5250dcc02019a5e9741b5f17d0e18c4f19d53",
+        "package_baseline.py": "2912c9ade0e06ba1741fdd5d51aaf6b3afe7d94c1e2f70e76209991a6ec35a1f",
+        "rearm.py": "8b81d3752d50451fe87b483e336e1261142f51b036136c9df58d958f00ab1da4",
+        "recovery.py": "8c7578ebffca2e4a7472af856de468ae216fe802bfc11422c097eb1dc1cd8b9e"
+      },
+      "source_commit": "86d9ebc2cc70aeee43f52c07246e0f24d3e0ef0a"
+    }
+  ]
+}

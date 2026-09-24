@@ -1,0 +1,59 @@
+{
+  "schema": "d232-target-material-v1",
+  "classification": "TARGET_SPECIFIC_NON_SECRET_HASH_PINNED_RAW_EXCLUDED",
+  "target": {
+    "vid": "0x27c6",
+    "pid": "0x5125",
+    "app": "GF_ST411SEC_APP_12509",
+    "gfusb_version": "1.1.125.14",
+    "gfusb_sha256": "904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2",
+    "capture_sha256": "50071c0f97fa12d8f3201be015cb632c83687006e2d703c5d3f2a7d9719c184b"
+  },
+  "e4": {
+    "request_body_hex": "030002bb00000000",
+    "typed_prefix_hex": "00030002bb20000000",
+    "validator_length": 32,
+    "validator_sha256": "1fa642d3f190e7074d1db201aa32ee8f34e41d69d55797158b9480affb3d0b87",
+    "source_packet": 57
+  },
+  "a2": {
+    "request_body_hex": "0114",
+    "response_body_length": 3,
+    "response_body_sha256": "39e469ce5a5ba3136c4a44381f2e4183dca275257adfcf3c0025094f05c022f5",
+    "source_packets": [63, 81]
+  },
+  "chip82": {
+    "request_body_hex": "0000000400",
+    "response_body_length": 4,
+    "response_body_sha256": "82537d2c108887baef128b47ad401fc888d54b184673b1fc23811d79ab6d5703",
+    "source_packet": 69
+  },
+  "otp_a6": {
+    "request_body_hex": "0000",
+    "response_body_length": 64,
+    "response_body_sha256": "d7e81a415aa5e7b0168c9a632756d1dc8b7b47346cc0a44dc68796f854c2b92b",
+    "source_packet": 75
+  },
+  "dac": [
+    {"order": 1, "register": "0x0220", "value_le_hex": "d80b", "config_tuple_offset": 117},
+    {"order": 2, "register": "0x0236", "value_le_hex": "be00", "config_tuple_offset": 121},
+    {"order": 3, "register": "0x0238", "value_le_hex": "bd00", "config_tuple_offset": 125},
+    {"order": 4, "register": "0x023a", "value_le_hex": "bc00", "config_tuple_offset": 129}
+  ],
+  "config90": {
+    "body_length": 224,
+    "body_sha256": "e1988b1115ade748f6cf5dca8d31aadf99871a7865b97d7ec0971d0da21d4d82",
+    "finalizer_offset": 222,
+    "finalizer_le_hex": "519a",
+    "finalizer_rule": "(-0xa5a5-sum(111 LE16 words at offsets 0..221)) mod 65536",
+    "source_packet": 103,
+    "raw_in_bundle": false,
+    "future_protected_store_path": "/var/lib/goodix-5125-poc/target-config-90.bin"
+  },
+  "raw_capture_in_bundle": false,
+  "raw_config90_in_bundle": false,
+  "secret_material_present": false,
+  "first_capture_status": "definitively_lost",
+  "packet_level_capture_count": 1,
+  "provenance_complete": true
+}

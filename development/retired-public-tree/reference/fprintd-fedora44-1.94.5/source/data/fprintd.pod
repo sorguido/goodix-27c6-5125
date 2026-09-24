@@ -1,0 +1,104 @@
+=head1 NAME
+
+fprintd - Fingerprint management daemon, and test applications
+
+=head1 SYNOPSIS
+
+B<fprintd-enroll> [-f finger] [usename]
+
+B<fprintd-list> username [usernames...]
+
+B<fprintd-verify> [-f finger] [usename]
+
+B<fprintd-delete> username [usernames...]
+
+=head1 DESCRIPTION
+
+This manual page documents briefly the B<fprintd> command-line utilities.
+
+The B<fprintd> daemon is accessed through B<D-Bus> by those command-line utilities.
+
+=head1 ARGUMENTS
+
+=over 8
+
+=item B<username>
+
+The username for the user for which you want to query or modify the fingerprint database.
+
+Note that B<fprintd-list> and B<fprintd-delete> require at least one username to be passed, and support multiple usernames.
+
+B<fprintd-enroll> and B<fprintd-verify> will use the current username if none are passed on the command-line.
+
+=item B<-f finger>
+
+For B<fprintd-enroll>, the finger to enroll. Possible values are:
+
+left-thumb,
+left-index-finger,
+left-middle-finger,
+left-ring-finger,
+left-little-finger,
+right-thumb,
+right-index-finger,
+right-middle-finger,
+right-ring-finger,
+right-little-finger.
+
+The default is to choose automatically, selecting the first available finger for swipe devices, or all the enrolled fingers, for press devices.
+
+=back
+
+=head1 TEST APPLICATIONS
+
+=over 8
+
+=back
+
+=head2 fprintd-enroll
+
+=over 8
+
+Will enroll the user's right index finger into the database.
+
+=back
+
+=head2 fprintd-list
+
+=over 8
+
+Will list the user's enrolled fingerprints.
+
+=back
+
+=head2 fprintd-verify
+
+=over 8
+
+Will verify the user's fingerprints against the database.
+
+=back
+
+=head2 fprintd-delete
+
+=over 8
+
+Will delete the user's right index finger into the database.
+
+=back
+
+=head1 AUTHOR
+
+B<fprintd> was written by Bastien Nocera and Daniel Drake.
+
+=head1 DIRECTORIES
+
+By default, fprintd stores the fingerprints in B</var/lib/fprint/>
+
+=head1 SEE ALSO
+
+=over 8
+
+=item B<gnome-control-center>
+
+=back

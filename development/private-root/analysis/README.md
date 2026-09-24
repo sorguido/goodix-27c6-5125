@@ -6,9 +6,8 @@ Dxxx, incluso bundle e checksum, appartiene a `analysis/Dxxx/`; la root non è
 usata per output di step. Lo stato qui riassunto descrive l'esito storico e non
 costituisce autorizzazione live.
 
-La review complessiva successiva alla chiusura D291 e la roadmap per le fasi
-di integrazione, packaging e release sono in
-`analysis/PROJECT_NEXT_STEPS_PLAN.md`. Phase B resta corrente. Il corrective
+La review complessiva successiva alla chiusura D291 e la qualificazione dello
+stack sono nel manuale tecnico canonico. Il corrective
 D293 ha risolto R9 nel driver e R1–R6 nel percorso operatore. La decisione
 Utente R7 del 13 settembre 2026 adotta il protocollo KDE nativo, senza policy
 click-specific nel driver production. D293/04 chiude F1–F4 offline ed è

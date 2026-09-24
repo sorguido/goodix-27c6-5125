@@ -1,45 +1,46 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# Reproducible production build
+# Source build and offline checks
 
-This directory is the build authority for Fedora 44 KDE x86_64 and Goodix
-`27c6:5125` / APP12509. It builds directly from the publishable source tree and
-does not require private Git history or any excluded directory.
+Users install and update through the root `install.sh` using
+[the single installation block](../docs/INSTALLATION.md). No separate build
+command or manual payload selection is needed.
 
-The build combines:
+## Build architecture
 
-- `reference/libfprint-fedora44-1.94.100/source/`;
-- the 62 hash-pinned files listed in `source-files.tsv`;
-- the fixed build support under `build-support/`;
-- five pinned Fedora 44 OpenCV RPMs under
-  `GoodixArtifacts/opencv-4.13-rpms/`.
+`build-public.py` resolves the source root from its own location and builds as
+an ordinary user on Fedora 44 x86_64. It uses the checked-in libfprint base,
+Goodix driver and SIGFM sources, plus the installed Fedora development packages.
+It does not require Git history, a branch name, a particular clone directory or
+pre-existing build output.
 
-Run the source audit:
+The payload contains Goodix-enabled libfprint, four required OpenCV libraries,
+the Plasma Login selector and PAM entry, an offline material checker, license
+notices and source/build provenance. Fedora supplies fprintd, libgusb, OpenSSL,
+PAM, Plasma and the ordinary authentication consumers.
+
+The builder verifies the library ABI, dependency resolution, absence of test-only
+entry points, exact payload inventory and content hashes. OpenCV notices come
+from installed Fedora RPM license files. Build provenance records the current
+source-content digest and package versions, rather than requiring Git objects.
+
+The [source ledger](source-files.tsv) and [matching digests](source-files.sha256)
+record the driver sources and per-file origins. [Licensing and provenance](../docs/LICENSING_AND_PROVENANCE.md)
+describes the combined library's terms.
+
+## Offline checks
+
+These checks use synthetic inputs and temporary fixtures. They substitute host
+service, privilege and device operations, and do not install software or open USB:
 
 ```bash
-production/check-source.sh
+python3 -B production/test_build_public.py
+python3 -B deployment/test_materials.py
+python3 -B deployment/test_install.py
+python3 -B deployment/recovery/test_remove.py
 ```
 
-Build into a new or empty absolute directory:
-
-```bash
-production/build.sh normal /absolute/path/to/output
-production/build.sh sanitizer /absolute/path/to/output
-```
-
-The build must run unprivileged. It uses the user-installed Flatpak SDK
-`org.freedesktop.Sdk//25.08` with network access disabled. It does not enumerate
-USB, load device material, install host files, or start fprintd.
-
-The normal output contains `libfprint-2.so.2.0.0`, staged runtime libraries,
-OpenCV notices, ABI reports, and `artifact.sha256`. The script verifies the
-Fedora fprintd symbol set, rejects RPATH/RUNPATH, rejects host-only symbols, and
-reports a zero dependency count for excluded private content.
-
-The expected qualified library digest is:
-
-```text
-115db4450272435c80ecb61e3540577b99c8355fb02a0f1648175104a7c3dd20
-```
-
-Use `deployment/managed-install/manage.sh prepare` to turn a normal build into
-an installable, content-addressed candidate with licenses, notices, and SBOM.
+The suites cover the public builder and payload contract, distinct valid reader
+bundles, invalid material rejection, installer failure/rollback paths and removal
+without the clone. Running them does not prove hardware support or real Fedora
+PAM/SELinux behavior. See [Validation](../docs/VALIDATION.md) for observations and
+remaining limits.

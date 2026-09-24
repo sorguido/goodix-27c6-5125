@@ -1,144 +1,160 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Technical manual
 
-## Product boundary
+## Hardware and operating-system boundary
 
-The driver supports one qualified target: Goodix USB `27c6:5125` with
-`GF_ST411SEC_APP_12509`, on Fedora 44 KDE x86_64. The runtime replaces only the
-libfprint library used by Fedora's existing fprintd daemon. Applications and
-PAM consumers continue to use standard fprintd interfaces.
+This implementation targets Goodix USB `27c6:5125`, firmware
+`GF_ST411SEC_APP_12509`, and Fedora 44 KDE x86_64 with local accounts.
+Successful authentication has been reported on the tested configuration.
+Other firmware, readers, desktop environments and network accounts are not
+qualified. [Validation](docs/VALIDATION.md) distinguishes observations from
+unverified behavior. The root installer builds and installs from this tree; physical qualification
+of the complete installation path is still pending.
 
-```text
-KDE / PAM / sudo
-        |
-     fprintd
-        |
-patched libfprint 1.94.100
-        |
-Goodix APP12509 driver
-        |
-     USB reader
-```
-
-## Source and runtime composition
-
-`reference/libfprint-fedora44-1.94.100/source/` contains the Fedora 44
-libfprint base with the bounded integration changes required by this driver.
-`libfprint-driver/` contains the target-specific transport, secure-session,
-image, enrollment, and lifecycle implementation. The four SIGFM source files
-under `Rockytkg/libfprint/libfprint/sigfm/` provide the qualified matcher.
-
-`production/` is the build authority. It verifies the hash-pinned 62-file
-target-specific source set and builds the library in a network-isolated Flatpak
-SDK. `deployment/managed-install/` prepares, installs, updates, rolls back, and
-removes immutable runtime versions.
-
-## Runtime lifecycle
-
-The fprintd systemd drop-in starts a small wrapper. The wrapper validates the
-active runtime link and root-only protected-material set, then launches Fedora's
-`/usr/libexec/fprintd` with an `LD_LIBRARY_PATH` limited to the selected runtime
-and `FP_DRIVERS_ALLOWLIST=goodix_27c6_5125`.
-
-The driver uses bounded asynchronous USB transfers through libfprint. It owns a
-single action at a time, prevents implicit sensor-reaching retries, and releases
-the device on cancellation or terminal completion. Verification permits up to
-three physical attempts at the PAM/KDE layer and stops on the first match.
-
-## Secure session and protected material
-
-The reader uses a TLS 1.2 PSK session carried in Goodix B0 frames. The host is
-the TLS server; the reader is the client. The qualified cipher suite is
-`PSK-AES128-GCM-SHA256` and the client identity is `Client_identity`.
-
-The runtime requires five root-owned files in `/var/lib/goodix-5125-poc/`:
-
-- `target-material-manifest.json`;
-- `transport-material.bin`;
-- `target-config-90.bin`;
-- `gfusb.dll`;
-- `fdt-cache.bin`.
-
-They must belong to the same physical device and be obtained lawfully from its
-OEM Windows environment. The repository never embeds or logs their contents.
-The loader requires a root-owned mode-0700 directory and regular mode-0600
-files, rejects symlinks, and validates fixed sizes and digests before use.
-Their individual origins, transformations, formats, and handling rules are
-documented in [Device-specific material](docs/DEVICE_MATERIALS.md).
-
-The public helper tools under `tools/device-materials/` cover the Windows DPAPI
-transport export, Linux `G5125XFR` → `G5125POC` finalization, and offline
-CONFIG90 extraction from a user-supplied USBPcap `.pcapng` capture. These tools
-never provision a new PSK and the CONFIG90 extractor has no USB/device access.
-
-## Image and biometric pipeline
-
-An acquisition yields a 7,684-byte image record: 7,680 bytes of packed 12-bit
-samples plus a CRC-32/MPEG-2 trailer. Decoding produces an owned 80x64 raster.
-The pipeline applies the qualified R2 preprocessing stage and uses SIGFM for
-feature extraction, enrollment template construction, serialization, and
-matching.
-
-Enrollment is bounded to eight accepted physical samples. Samples that do not
-add sufficient diversity are rejected without advancing the template. A
-successful final sample is not reported complete until the terminal finger-up
-event is observed. Verification performs one acquisition per explicit action;
-the consumer decides whether another physical attempt is permitted.
-
-Templates are stored by fprintd in its normal root-owned storage. They are not
-placed in the source tree or build candidate. Removing the managed runtime does
-not delete templates or protected material.
-
-## Desktop and PAM integration
-
-The installer preserves Fedora package ownership and password fallback:
-
-- Plasma Login Manager receives an `/etc/pam.d/plasmalogin` override generated
-  from the verified vendor file; `/usr/lib/pam.d/plasmalogin` is unchanged.
-- `/etc/pam.d/kde-fingerprint`, a `plasma-workspace` configuration file, is
-  transformed by replacing only its authentication substack with a bounded
-  `pam_fprintd` rule.
-- authselect and the global `fingerprint-auth` stack are not modified.
-
-Original and managed PAM files are hash-pinned in the install state. Package
-drift, local edits, `.rpmnew`, `.rpmsave`, collisions, or unexpected metadata
-cause the transaction to fail closed.
-
-## Managed filesystem layout
+## Architecture
 
 ```text
-/usr/lib64/goodix-27c6-5125/<source-commit>/   immutable runtime
-/usr/lib64/goodix-27c6-5125/current           active symlink
-/usr/libexec/goodix-27c6-5125/fprintd-wrapper
-/etc/systemd/system/fprintd.service.d/99-goodix-27c6-5125-managed.conf
-/var/lib/goodix-27c6-5125-managed/            state and PAM recovery copies
-/var/lib/goodix-5125-poc/                     protected device material
+Goodix reader
+    ↕
+Goodix-enabled libfprint + image matching
+    ↕
+Fedora fprintd
+    ↕
+Fedora PAM / KDE / sudo / PolicyKit
 ```
 
-The installer retains at most one previous runtime for rollback. Uninstall
-restores the Fedora fprintd and PAM configuration while deliberately preserving
-protected material and fprintd templates.
+The device implementation belongs in libfprint. Fedora continues to provide
+`/usr/libexec/fprintd`, its service and D-Bus interface, the Plasma daemon and
+greeter, and normal authentication consumers. No private fprintd or Plasma
+binary is needed. The root `install.sh` builds the library and selector as the
+ordinary user from current source, then requests sudo for deployment. Build
+provenance uses source-content hashes and installed Fedora package versions,
+without depending on Git history or a particular clone location.
 
-## Safety invariants
+The project-owned library directory is `/usr/local/lib64/goodix-27c6-5125/`. It contains
+libfprint and the four required OpenCV libraries. Fedora supplies libgusb and
+OpenSSL. One service drop-in,
+`/etc/systemd/system/fprintd.service.d/90-goodix-5125-runtime.conf`, sets
+`LD_LIBRARY_PATH` for fprintd. It does not replace the service's `ExecStart`.
 
-The supported path does not flash firmware, enter IAP, invoke ClearApp, read or
-write OTP, provision a PSK, replace factory data, or intentionally change a
-persistent device mode. Unknown commands and unexpected protocol states fail
-closed. The Windows factory path is expected to remain usable.
+The bundled OpenCV libraries come from the installed Fedora development packages;
+the build records their actual versions, notices and SONAMEs. The library is based on libfprint 1.94.100 with the Goodix device implementation,
+SIGFM matching and image preprocessing. Source provenance and applicable
+licenses are described in [Licensing and provenance](docs/LICENSING_AND_PROVENANCE.md).
 
-## Known limitations
+## Plasma Login and other consumers
 
-- Only the target configuration listed above is supported.
-- The repository ships helper tooling for preparing transport material and for
-  extracting CONFIG90 from a local OEM USB capture, but it does not ship OEM
-  binaries, caches, captures, secrets or factory material. Users must lawfully
-  obtain those inputs from their own reader/environment.
-- The public repository form is substantially tested but has not yet been
-  exercised completely across every acquisition, installation and recovery
-  path on independent hardware. In particular, reader-to-reader portability of
-  newly extracted CONFIG90 material remains a separate qualification boundary.
-- No universal FAR or FRR claim is made.
-- Passwordless biometric login does not unlock a password-encrypted KWallet;
-  a separate wallet prompt can therefore be expected.
-- Fedora package changes to PAM layout or pinned build dependencies require a
-  reviewed update rather than an automatic bypass.
+The tested Fedora Plasma Login password stack does not itself offer the required
+fingerprint choice. A small project-owned PAM selector adds that choice through
+`/etc/pam.d/plasmalogin` and
+`/usr/local/lib64/goodix-plasma-login/pam_goodix_login_gate.so`.
+
+A nonempty password proceeds to the current Fedora password stack. Empty-field
+submission explicitly selects stock `pam_fprintd` with `max-tries=3 timeout=30`;
+the timeout applies per attempt. The integration includes the current Fedora
+vendor PAM for password, account and session processing. It does not copy or
+freeze a vendor configuration. Removing the project entry exposes Fedora's
+current configuration.
+
+The vendor path is a compatibility dependency. A future incompatible PAM layout
+can affect login; successful authentication on the tested system does not prove
+compatibility with all future packages. The removal commands never require the
+old vendor path to exist before removing the project override.
+
+KScreenLocker, ordinary sudo and PolicyKit use their Fedora authentication
+paths where the current Fedora policy enables fingerprint authentication. The
+installer does not change authselect or add global PAM rules. No project PAM
+bridge, daemon or policy is installed for them. Console
+and sudo conversation order follows the current Fedora policy: fingerprint can
+precede password, without a user-facing method selector.
+
+## Enrollment, verification and templates
+
+The driver performs asynchronous, bounded transfers and owns one action at a
+time. A clean NO_MATCH may be followed by another explicit action after cleanup;
+MATCH and processing-error paths prevent hidden capture resubmission. Consumers
+control their explicit attempt series. The Plasma Login series is bounded to
+three attempts and stops on the first match.
+
+Enrollment gathers eight accepted samples, checks diversity and waits for
+terminal finger release before reporting completion. The image pipeline decodes
+an 80×64 raster from the packed image record, preprocesses it and uses SIGFM to
+construct and match templates. This is not a claim of a measured false-match or
+false-rejection rate.
+
+Fedora fprintd stores templates under `/var/lib/fprint/`. Runtime removal and
+reinstallation preserve them. Use normal KDE/fprintd interfaces to manage or
+delete enrolled fingers; do not put templates into source archives or reports.
+
+## Protected device material
+
+The user stages five pre-existing files in `$HOME/goodix-5125-materials/`, outside
+the clone. The installer validates that exact set and imports it into
+`/var/lib/goodix-5125-poc/`. These files bind the host runtime
+to the intended reader and OEM compatibility input. The directory is root-owned
+mode `0700`; regular files are root-owned mode `0600`. The loader rejects unsafe
+metadata, malformed records and mismatched digests before using the material.
+Validation uses the supplied reader's own manifest and file digests; no fixed
+reference-reader bundle is required. Offline checks validate format and file
+cross-bindings, while typed device-response bindings are checked at runtime.
+An already-valid installed set is retained. See the complete
+[material contract](docs/DEVICE_MATERIALS.md).
+
+The secure transport uses TLS 1.2 with a pre-existing reader PSK. The host acts
+as server; the reader acts as client. The OEM DLL is parsed for validated data,
+not executed. The project does not generate, replace or provision reader keys,
+and does not distribute protected material or acquisition tooling.
+
+SELinux uses an exact local file-context mapping for this directory and its
+contents to `fprintd_var_lib_t`. No custom permission-granting SELinux module is
+required by this architecture. Removal returns the explicit material paths to
+current policy defaults when removing an owned mapping, while preserving bytes
+and Unix ownership/mode. Templates and their labels are not changed.
+
+## Lifecycle with the reader present
+
+An integrated reader remains connected and visible throughout installation,
+update, removal and recovery. Presence in sysfs is not an error or permission to
+start capture. Recovery-tool installation does not access the device or operate
+fprintd. Runtime replacement/removal must stop fprintd and verify an inactive
+service with no main process before changing its loaded library files.
+
+The lifecycle implementation temporarily prevents service activation during
+runtime mutation, preserves an existing service mask, removes only a mask it
+created and never starts fprintd as an installation check. It uses ordinary
+host service controls, not direct USB commands or a private hardware daemon.
+If service activation cannot be inhibited or fprintd cannot be quiesced, the
+operation fails with a precise error; the reader stays connected. Reader-present reinstallation has been reported successful. The complete
+source-built public installer still requires physical-system qualification;
+synthetic checks alone do not establish real PAM or SELinux behavior.
+
+## Removal and recovery
+
+`goodix-uninstall` checks the project's software receipts, ownership and hashes.
+`goodix-force-remove` uses a fixed inventory of project paths and tolerates
+missing receipts and partial installations. It removes authentication entry
+points first and does not execute saved installer code. Neither depends on the
+repository, build output, Fedora version, vendor-file hash or vendor-file
+existence to remove the project.
+
+Installed binaries and standalone removal scripts do not import from the clone;
+it can be moved or removed after installation. Both preserve material and templates. They remove project software, service
+integration and owned label effects, then remove recovery tooling last when
+cleanup succeeds. Failure output identifies unfinished cleanup. A normal restart
+closes old authentication sessions that may retain loaded code. These commands
+expose the current Fedora state; they cannot repair unrelated Fedora failures
+or bypass console/sudo authentication. See [Uninstall and recovery](docs/UNINSTALL.md).
+
+## Safety and support limits
+
+Flashing, IAP, ClearApp, OTP writes, PSK replacement/provisioning, factory-data
+writes and persistent identity changes are outside the supported path. Unknown
+or unsafe protocol states fail closed. The design preserves the factory/Windows
+path; exhaustive Windows compatibility and factory readback are not established
+by a successful fingerprint match.
+
+Keep password access available. Password-encrypted KWallet can request its own
+password after fingerprint login. Full recovery with unavailable biometrics,
+all future package changes and independent hardware remain qualification limits.
+Use [Installation](docs/INSTALLATION.md) for the single install/update procedure
+and the current qualification status.

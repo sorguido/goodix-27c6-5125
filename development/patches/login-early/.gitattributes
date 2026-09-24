@@ -1,0 +1,3 @@
+# Unified-diff context includes blank prefixes and space-before-tab prefixes.
+# Check the expanded source diff, rather than treating patch syntax as C code.
+fprintd.patch -whitespace

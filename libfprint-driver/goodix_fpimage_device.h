@@ -96,6 +96,9 @@ typedef struct
   guint production_identify_enroll_handoff_count;
   guint production_logical_action_attempt_count;
   guint production_transport_epoch_count;
+  /* Cumulative telemetry only; never limits explicit stock capture actions. */
+  guint production_capture_attempt_count;
+  gboolean production_capture_terminal;
   gboolean production_identify_enroll_handoff_armed;
   guint auxiliary_b0_observed_count;
   guint terminal_enroll_completion_hold_count;
@@ -241,6 +244,9 @@ gboolean goodix_device_context_has_pending_enrollment_graph (
 GoodixSecureSession *goodix_device_context_get_secure_session (GoodixDeviceContext *ctx);
 GoodixPostTlsLifecycle *goodix_device_context_get_post_tls_lifecycle (
   GoodixDeviceContext *ctx);
+/* Synthetic post-secure-session entry; real login callbacks/lifecycle follow. */
+gboolean goodix_device_context_test_login_post_tls (GoodixDeviceContext *ctx,
+  const GoodixPostTlsMaterial *material, GoodixPostTlsAudit *audit, GError **error);
 #endif
 #ifdef GOODIX_ENABLE_TEST_SEAMS
 void goodix_device_context_set_usb_submit_seam (GoodixDeviceContext *ctx,

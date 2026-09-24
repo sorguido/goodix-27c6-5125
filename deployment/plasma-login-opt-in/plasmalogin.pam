@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Project-owned opt-in prefix; the current Fedora file owns the remaining stack.
+# Only explicit empty input AND compatible current vendor auth enable fingerprint.
+auth [success=ignore default=2] /usr/local/lib64/goodix-plasma-login/pam_goodix_login_gate.so
+auth [ignore=ignore default=1] pam_selinux_permit.so
+auth sufficient pam_fprintd.so max-tries=3 timeout=30
+# Clear only our prefix state, including cached jump effects during pam_setcred.
+# No vendor module has executed yet. This line never grants authentication.
+auth [default=reset] pam_permit.so
+auth include /usr/lib/pam.d/plasmalogin
+account include /usr/lib/pam.d/plasmalogin
+password include /usr/lib/pam.d/plasmalogin
+session include /usr/lib/pam.d/plasmalogin

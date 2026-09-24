@@ -1,0 +1,25 @@
+#!/usr/bin/bash
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Read-only qualification, also invoked by the human-managed service at startup.
+set -euo pipefail
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin LC_ALL=C
+fail() { echo "PLASMA_VT_PREFLIGHT=STOP reason=$1" >&2; exit 1; }
+[[ $# == 0 ]] || fail arguments
+[[ $(rpm -q plasma-login-manager) == plasma-login-manager-6.7.5-1.fc44.x86_64 ]] || fail package_drift
+sha256sum --check --status <<'SUMS' || fail vendor_drift
+4de1dfb9181818c43e6a4481d3c1ba2272ddac1218f727418301e45bffc54ebd  /usr/bin/plasmalogin
+382bbf8d62b78cff1b93a2e811e67edd82c87054ea4614aca6e7cd355c61ffe4  /usr/libexec/plasmalogin-helper
+dfc4d48a0fbd32d2947aa3a0f8a175248477b7bb47d561ac40ac77a0708cfaff  /usr/lib/systemd/system/plasmalogin.service
+SUMS
+[[ $(busctl get-property org.freedesktop.login1 /org/freedesktop/login1 org.freedesktop.login1.Manager NAutoVTs) == 'u 6' ]] || fail auto_vts_drift
+# Default ReserveVT=6; accept only that effective value in [Login].
+reserve=$(systemd-analyze cat-config systemd/logind.conf | awk '
+  BEGIN {value=6; section=""}
+  /^[[:space:]]*[#;]/ {next}
+  /^[[:space:]]*\[/ {section=$0; gsub(/[[:space:]]/,"",section); next}
+  section=="[Login]" && /^[[:space:]]*ReserveVT[[:space:]]*=/ {
+    sub(/^[^=]*=/,""); gsub(/^[[:space:]]+|[[:space:]]+$/,""); value=$0
+  }
+  END {print value}')
+[[ $reserve == 6 ]] || fail reserved_vt_drift
+echo PLASMA_VT_PREFLIGHT=PASS

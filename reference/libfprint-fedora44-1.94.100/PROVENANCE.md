@@ -19,4 +19,4 @@ byte-identical to the upstream archive.
 
 Upstream and Fedora source files retain their original per-file copyright and
 license notices. The downstream Goodix integration and imported components are
-described in `docs/LICENSING_AND_PROVENANCE.md`.
+described in [Licensing and provenance](../../docs/LICENSING_AND_PROVENANCE.md).

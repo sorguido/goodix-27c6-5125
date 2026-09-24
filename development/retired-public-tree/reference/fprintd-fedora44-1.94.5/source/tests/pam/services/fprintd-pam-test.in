@@ -1,0 +1,1 @@
+auth   required     @FPRINTDPAMPATH@ debug timeout=10
