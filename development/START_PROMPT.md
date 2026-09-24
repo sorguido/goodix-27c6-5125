@@ -34,7 +34,7 @@ Esegui il bootstrap previsto da `development/AGENTS.md` prima di modificare il r
 In particolare, durante il bootstrap/recovery iniziale:
 
 - determina Git root, branch, HEAD e stato del worktree;
-- applica il Golden Branch Gate canonico (`development` è l'unico branch scrivibile dalla modalità autonoma);
+- applica il Golden Branch Gate canonico (`main` è l'unico branch scrivibile dalla modalità autonoma; la directory `development/` è soltanto l'area interna/non pubblica);
 - leggi integralmente `development/START_PROMPT.md` e `development/AGENTS.md`;
 - nel manuale tecnico leggi obbligatoriamente, tramite indice e ricerca mirata,
   la sezione di stato corrente, l'ultimo avanzamento consolidato e i blocker
@@ -278,7 +278,7 @@ Non usarlo semplicemente perché un Dxxx è chiuso, un commit esiste, i test son
 
 La formulazione del task successivo non conclude il lavoro: eseguilo nel ciclo seguente.
 
-Non fermarti soltanto perché hai completato un task locale, creato/pushato un commit su `development`, ottenuto test verdi, prodotto una review o aggiornato il manuale.
+Non fermarti soltanto perché hai completato un task locale, creato/pushato un commit su `main`, ottenuto test verdi, prodotto una review o aggiornato il manuale.
 
 Per ridurre lavoro ridondante durante la stessa sessione:
 

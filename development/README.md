@@ -5,6 +5,11 @@ l'albero pubblico come tutti i file del repository eccetto `development/`.
 Nessun import, build, test o installazione pubblico può dipendere da questa
 area o dalla storia Git privata.
 
+Il nome della directory è storico e **non corrisponde a un branch Git richiesto**.
+Il repository usa `main` come unico branch operativo; un eventuale branch
+legacy chiamato `development` può essere eliminato senza modificare il ruolo
+di questa directory.
+
 La ripartenza autonoma legge [START_PROMPT.md](START_PROMPT.md),
 [AGENTS.md](AGENTS.md), [roadmap](ROADMAP_DISTRO_DECOUPLED_RELEASE.md) e lo stato
 corrente nel [manuale tecnico](<Goodix 27c6 5125 manuale tecnico.md>).

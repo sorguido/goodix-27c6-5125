@@ -39,8 +39,14 @@ Manuale tecnico canonico:
 La modalità autonoma opera **esclusivamente** sul branch:
 
 ```text
-development
+main
 ```
+
+Il repository usa ora un modello Git a singolo branch operativo. La directory
+top-level `development/` resta l'area interna/non pubblica del repository ma
+**non implica né richiede l'esistenza di un branch Git chiamato `development`**.
+Un eventuale branch legacy `development` non è una dipendenza del progetto e
+può essere eliminato dall'Utente.
 
 Prima di modificare qualunque file:
 
@@ -70,7 +76,7 @@ La lettura integrale del manuale resta eccezionale ed è richiesta soltanto
 quando una decisione trasversale o una contraddizione non può essere risolta
 con ricerca mirata e lettura delle sezioni rilevanti.
 
-Se il branch corrente **non è `development`**:
+Se il branch corrente **non è `main`**:
 
 - non modificare file;
 - non cambiare branch autonomamente;
@@ -78,14 +84,10 @@ Se il branch corrente **non è `development`**:
 - non eseguire push;
 - termina con `HUMAN_REQUIRED`.
 
-I branch seguenti sono read-only per l'agente autonomo:
-
-```text
-main
-bakcup_pre_agentic_mode
-```
-
-Possono essere letti o confrontati. Non possono essere aggiornati dall'agente.
+`bakcup_pre_agentic_mode` e qualunque altro branch eventualmente presente
+sono read-only per l'agente autonomo salvo decisione esplicita dell'Utente.
+Il branch legacy `development`, se ancora esiste durante la transizione, è
+solo leggibile/confrontabile e non deve essere usato come branch operativo.
 
 ---
 
@@ -302,7 +304,7 @@ Durante il loop, la roadmap distro-decoupled è un boundary operativo vincolante
 - implementa il `CURRENT_TASK`;
 - esegue test/verifiche pertinenti;
 - aggiorna il manuale quando cambia conoscenza o stato;
-- può creare commit e fare normale push solo su `development`;
+- può creare commit normali e fare normale push solo su `main`;
 - non auto-approva il proprio lavoro.
 
 ### AI PM / Reviewer
@@ -382,12 +384,12 @@ pertinenti; non deve delegare la safety a credenziali autorizzative consumabili.
 
 ### 6.3 Git protetto
 
-- qualsiasi modifica di `main`;
-- commit su `main`;
-- push verso `main`;
-- merge in `main`;
-- rebase/cherry-pick/update-ref/reset che alteri `main`;
+La normale modifica/commit/push su `main` è parte dell'operatività autonoma
+consentita. Restano Human Gate o vietate senza autorizzazione esplicita:
+
 - qualsiasi modifica di `bakcup_pre_agentic_mode`;
+- creazione, cancellazione o rinomina di branch;
+- merge, rebase, cherry-pick o update-ref che alterino la topologia della storia;
 - force push;
 - amend di commit già condivisi;
 - history rewrite;
@@ -422,38 +424,37 @@ Fermarsi anche quando una capability, informazione o risorsa esterna indispensab
 
 ## 7. Git autonomo consentito
 
-### `development`
+### `main` — unico branch operativo
 
 Consentito:
 
 - modificare file coerenti con lo scope;
 - creare commit normali;
-- eseguire push normali verso `origin/development`;
+- eseguire push normali verso `origin/main`;
 - leggere/confrontare altri ref senza modificarli.
 
-Preferire commit coerenti e recuperabili dopo review AI PM positiva o a milestone tecniche chiaramente definite.
+Preferire commit coerenti e recuperabili dopo review AI PM positiva o a milestone
+tecniche chiaramente definite.
 
-Vietato:
+Vietato senza autorizzazione esplicita dell'Utente:
 
 - force push;
-- rebase distruttivo;
+- rebase o history rewrite;
 - amend di storia condivisa;
 - reset distruttivi;
+- merge/cherry-pick/update-ref che cambino la topologia della storia;
+- creazione, cancellazione o rinomina di branch;
 - cancellazione di lavoro preesistente non attribuito con certezza all'agente;
 - switch di branch per aggirare i vincoli.
 
-### `main`
+### Altri branch
+
+`bakcup_pre_agentic_mode` e qualsiasi altro branch eventualmente presente,
+incluso l'eventuale legacy `development`, sono read-only per l'agente autonomo:
 
 ```text
 READ / COMPARE: consentito
 WRITE / COMMIT / PUSH / MERGE / REBASE / UPDATE-REF: vietato
-```
-
-### `bakcup_pre_agentic_mode`
-
-```text
-READ / COMPARE: consentito
-QUALSIASI MODIFICA: vietata
 ```
 
 L'esistenza di branch, commit o PR non costituisce da sola prova di correttezza.
@@ -826,7 +827,7 @@ Questo non impedisce modifiche ai documenti quando l'Utente le richiede esplicit
 ```text
 sicurezza hardware forte
 +
-branch development isolato e recuperabile
+main unico branch operativo con storia recuperabile
 +
 selezione del lavoro task e theme-driven
 +

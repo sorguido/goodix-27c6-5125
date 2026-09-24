@@ -3,7 +3,7 @@
 > **Status:** ACTIVE
 >
 > **Scope:** guida vincolante per l'architettura production/release e per
-> l'orchestrazione AI PM / AI Executor sul branch **development**.
+> l'orchestrazione AI PM / AI Executor sul branch **main**.
 >
 > **Decisione Utente:** un normale aggiornamento Fedora/libfprint può rendere
 > temporaneamente indisponibile il fingerprint e richiedere la reinstallazione
@@ -15,8 +15,9 @@
 
 ## Stato corrente — R6/R7 autorizzata (23 settembre 2026)
 
-Il prompt Utente `CODEX_R6_R7_FINAL_PUBLIC_RELEASE.md` autorizza esplicitamente
-la preparazione finale R6/R7 su `development`. R4 resta funzionalmente PASS;
+Il prompt Utente `CODEX_R6_R7_FINAL_PUBLIC_RELEASE.md` ha autorizzato la
+preparazione finale R6/R7, ora consolidata su `main`, che è l'unico branch
+operativo. R4 resta funzionalmente PASS;
 normal uninstall e reinstallazione sono PASS riferiti. L'Utente riferisce ora
 anche reinstallazione corretta con lettore UP/presente. Il force-remove TTY è
 riferito funzionante; output e inventario finale completi restano incompleti.
@@ -26,8 +27,9 @@ Il deliverable corrente è un albero interamente pubblico eccetto la directory
 `development/`, con un solo installer root `install.sh`. Governance, evidenze,
 manuale interno e materiale non pubblico sono sotto `development/`. La precedente
 allowlist è eliminata. La history privata resta intatta, non pubblicata e non
-necessaria a build, test o installazione. Nessuna operazione su `main` o pubblico
-è autorizzata all'AI.
+necessaria a build, test o installazione. La normale modifica/commit/push
+autonoma avviene su `main` secondo `development/AGENTS.md`; operazioni sul
+repository pubblico restano soggette ad autorizzazione esplicita dell'Utente.
 
 Il nuovo percorso compila da sorgente pubblica, importa i cinque materiali da
 `$HOME/goodix-5125-materials` e installa runtime, selector Plasma e comandi
@@ -189,16 +191,16 @@ VM_ONLY_RUNTIME_VALIDATION=true
 AI_SOURCE_WORKSPACE=PHYSICAL_FEDORA
 AI_VM_ACCESS_REQUIRED=false
 VM_EXECUTION=HUMAN_ONLY_AFTER_GATE
-VM_REPOSITORY_SYNC=USER_PULL_DEVELOPMENT
+VM_REPOSITORY_SYNC=USER_PULL_MAIN
 ~~~
 
 La VM non è un ambiente al quale l'AI deve accedere direttamente. Quando il
 lavoro richiede build, installazione, runtime, live o update-validation in VM:
 
 1. l'AI prepara, verifica nello scope offline consentito e committa su
-   `development` tutto il necessario per la prova;
+   `main` tutto il necessario per la prova;
 2. termina con `HUMAN_REQUIRED`, consegnando comandi ed evidenze attese;
-3. l'Utente esegue manualmente il pull di `development` nella VM;
+3. l'Utente esegue manualmente il pull di `main` nella VM;
 4. l'Utente esegue la prova e restituisce evidenze/output;
 5. l'AI riprende dal repository e dagli output forniti.
 
