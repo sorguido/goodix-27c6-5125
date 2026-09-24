@@ -90,7 +90,7 @@ def host_preflight():
     if library_paths:
         require(library_paths == ['LD_LIBRARY_PATH=/usr/local/lib64/goodix-27c6-5125'],
                 'foreign library environment')
-        require(r.present(r.DROPIN) and r.read(r.DROPIN) in r.SUPPORTED_DROPINS,
+        require(r.present(r.DROPIN) and r.read(r.DROPIN) == r.DROPIN_BYTES,
                 'foreign library environment')
 
 

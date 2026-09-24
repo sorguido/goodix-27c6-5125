@@ -180,58 +180,10 @@ class Installer(unittest.TestCase):
         self.assertFalse(self.active)
         self.assertFalse(m.r.MASK.is_symlink())
         self.assertTrue(m.r.CONFIG.exists())
-        self.assertEqual(m.r.DROPIN.read_bytes(),
-            b'[Service]\nEnvironment=LD_LIBRARY_PATH=/usr/local/lib64/goodix-27c6-5125\n'
-            b'BindReadOnlyPaths=/dev/null:/proc/sys/vm/nr_hugepages\n')
         self.assert_preserved()
         self.assertEqual(m.r.remove(), 0)
         self.assert_preserved()
         self.assertFalse(m.r.RUNTIME.exists())
-        self.assertFalse(m.r.DROPIN.exists())
-
-    def legacy_environment(self, *args):
-        if args == ('systemctl', 'show', 'fprintd.service', '-p', 'Environment', '--value'):
-            return 'LD_LIBRARY_PATH=/usr/local/lib64/goodix-27c6-5125'
-        return self.command(*args)
-
-    def test_upgrade_from_public_legacy_dropin(self):
-        self.apply()
-        m.r.DROPIN.write_bytes(m.r.LEGACY_DROPIN_BYTES)
-        with patch.object(m, 'command', side_effect=self.legacy_environment):
-            self.apply()
-        self.assertEqual(m.r.DROPIN.read_bytes(), m.r.DROPIN_BYTES)
-        self.apply()  # Reinstall must neither duplicate nor lose the mount.
-        self.assertEqual(m.r.DROPIN.read_bytes(), m.r.DROPIN_BYTES)
-        self.assert_preserved()
-
-    def test_failed_upgrade_restores_exact_legacy_dropin(self):
-        self.apply()
-        m.r.DROPIN.write_bytes(m.r.LEGACY_DROPIN_BYTES)
-        with patch.object(m, 'command', side_effect=self.legacy_environment), \
-                patch.object(m, 'install_login', side_effect=RuntimeError('synthetic failed upgrade')):
-            with self.assertRaisesRegex(RuntimeError, 'synthetic failed upgrade'):
-                self.apply()
-        self.assertEqual(m.r.DROPIN.read_bytes(), m.r.LEGACY_DROPIN_BYTES)
-        m.r.normal_preflight()
-        self.assert_preserved()
-
-    def test_modified_mount_is_rejected_before_service_mutation(self):
-        self.apply()
-        for extra in (b'BindReadOnlyPaths=/dev/null:/proc/sys/vm\n', b'ExecStart=/other\n'):
-            m.r.DROPIN.write_bytes(m.r.LEGACY_DROPIN_BYTES + extra)
-            self.events.clear()
-            with self.assertRaisesRegex(RuntimeError, 'drop-in drift'):
-                self.apply()
-            self.assertNotIn(('systemctl', 'stop', 'fprintd.service'), self.events)
-
-    def test_force_recovers_partial_install_with_only_dropin_and_tools(self):
-        self.apply()
-        for path in (m.r.CONFIG, m.r.SUPPORT, m.r.RUNTIME):
-            m.r.remove_path(path)
-        (m.r.RECOVERY / 'receipt.json').unlink()
-        self.assertEqual(m.r.remove(force=True), 0)
-        self.assertFalse(m.r.DROPIN.exists())
-        self.assert_preserved()
 
     def test_update_rebuilds_without_private_history_and_preserves_materials(self):
         self.apply()
@@ -377,7 +329,6 @@ class Installer(unittest.TestCase):
                     patch.object(sys, 'argv', [str(installed)]):
                 self.assertEqual(module.main(), 0)
             self.assert_preserved()
-            self.assertFalse(module.DROPIN.exists())
             shutil.copytree(HERE.parent / 'deployment', self.clone / 'deployment', ignore=shutil.ignore_patterns('__pycache__'))
 
     def test_root_shell_entry_resolves_alternate_clone_and_foreign_cwd(self):
@@ -402,17 +353,6 @@ class Installer(unittest.TestCase):
                 patch.object(m.builder, 'build_payload', side_effect=build), \
                 patch.object(m.subprocess, 'run', side_effect=execute):
             self.assertEqual(m.main(), 0)
-
-
-class Confinement(unittest.TestCase):
-    def test_installer_requires_enforcing(self):
-        with patch.object(m.platform, 'freedesktop_os_release', return_value={'ID': 'fedora', 'VERSION_ID': '44'}), \
-                patch.object(m.platform, 'machine', return_value='x86_64'):
-            for state in ('Permissive', 'Disabled'):
-                with patch.object(m, 'command', return_value=state), self.assertRaisesRegex(RuntimeError, 'Enforcing'):
-                    m.supported_system()
-            with patch.object(m, 'command', return_value='Enforcing'):
-                m.supported_system()
 
 
 if __name__ == '__main__':

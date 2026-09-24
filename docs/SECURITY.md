@@ -40,14 +40,6 @@ Plasma Login selector. It does not ship a replacement daemon/greeter or freeze
 Fedora's vendor authentication files. SELinux uses a narrow material label
 mapping, without a custom permission-granting policy module.
 
-SELinux remains Enforcing. The fprintd service sees `/dev/null` at the exact
-path `/proc/sys/vm/nr_hugepages` through a read-only, service-local bind mount.
-This makes an optional oneTBB allocator probe receive EOF without reading the
-real sysctl. It adds no SELinux permissions or `dontaudit` rules and leaves
-unrelated AVCs visible. The host's sysctl and other services are unaffected.
-Both removal commands remove this configuration with the existing project
-drop-in. See the [technical explanation and validation scope](SELINUX_HUGEPAGES.md).
-
 Password access must remain available. A future incompatible Fedora PAM layout
 can affect the selector; compatibility across all future updates has not been
 proven. [Removal](UNINSTALL.md) exposes the current Fedora configuration without

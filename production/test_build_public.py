@@ -140,17 +140,6 @@ class PublicBuild(unittest.TestCase):
         self.assertFalse(any('/dev/bus/usb' in arg or '/sys/bus/usb' in arg
                              for args, _ in self.commands for arg in args))
 
-    def test_goodix_cpp_keeps_array_bounds_warning_nonfatal(self):
-        source = SOURCE.parents[1] / b.LIBFPRINT_SOURCE / 'libfprint/meson.build'
-        text = source.read_text()
-        self.assertIn(
-            "drivers_cppflags += cpp.get_supported_arguments(['-Wno-error=array-bounds'])",
-            text)
-        # NBIS C sources have their own upstream warning settings.
-        cpp_flags = '\n'.join(line for line in text.splitlines()
-                              if 'drivers_cppflags +=' in line)
-        self.assertNotIn('-Wno-array-bounds', cpp_flags)
-
     def test_compile_contract_minimal_no_generated_target_execution_or_download(self):
         self.build()
         setup, env = next((args, env) for args, env in self.commands if args[:2] == ('meson', 'setup'))

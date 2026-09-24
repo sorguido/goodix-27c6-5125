@@ -66,9 +66,8 @@ recognition accuracy, hardware behavior or complete operating-system recovery.
   the installer does not modify authselect or global PAM policy.
 - Password-encrypted KWallet may require a separate password after fingerprint login.
 - Ordinary sudo evidence does not separately qualify every login-shell variant.
-- The recurring SELinux `nr_hugepages` denial has a service-local configuration
-  fix with offline allocator and lifecycle tests. Multi-consumer live qualification
-  of that fix is pending; see [scope and verification](SELINUX_HUGEPAGES.md).
+- A recurring SELinux read denial involving `nr_hugepages` was non-fatal during
+  tested authentication; this does not classify every future denial.
 - Full factory-state readback, exhaustive Windows compatibility, power-loss recovery
   and every future update combination have not been demonstrated.
 

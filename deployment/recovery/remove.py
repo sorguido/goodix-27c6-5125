@@ -35,11 +35,7 @@ RUNTIME_FILES = set(LIBRARIES) | {
     *('licenses/' + name + '.txt' for name in
       ('GPL-2.0-or-later', 'LGPL-2.1-or-later', 'GPL-3.0-or-later', 'Apache-2.0'))}
 LINKS = {'libfprint-2.so.2': 'libfprint-2.so.2.0.0', 'libfprint-2.so': 'libfprint-2.so.2'}
-LEGACY_DROPIN_BYTES = b'[Service]\nEnvironment=LD_LIBRARY_PATH=/usr/local/lib64/goodix-27c6-5125\n'
-# oneTBB probes this sysctl when OpenCV is loaded, even with huge pages disabled.
-# Give only this service EOF at that exact path. No SELinux rule/permission changes.
-DROPIN_BYTES = LEGACY_DROPIN_BYTES + b'BindReadOnlyPaths=/dev/null:/proc/sys/vm/nr_hugepages\n'
-SUPPORTED_DROPINS = (LEGACY_DROPIN_BYTES, DROPIN_BYTES)
+DROPIN_BYTES = b'[Service]\nEnvironment=LD_LIBRARY_PATH=/usr/local/lib64/goodix-27c6-5125\n'
 ENV = {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'LC_ALL': 'C'}
 
 
@@ -144,7 +140,7 @@ def normal_preflight():
         for name, target in links.items():
             require((RUNTIME / name).is_symlink() and os.readlink(RUNTIME / name) == target,
                     'project library link drift')
-        require(read(DROPIN) in SUPPORTED_DROPINS, 'project drop-in drift')
+        require(read(DROPIN) == DROPIN_BYTES, 'project drop-in drift')
         record = receipt.get('material_selinux')
         if record is not None:
             require(isinstance(record, dict) and record.get('rule') == RULE
