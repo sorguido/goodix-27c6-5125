@@ -6,8 +6,9 @@
 Fedora 44 KDE on x86_64, a local user account, Goodix USB `27c6:5125` running
 `GF_ST411SEC_APP_12509`, and Fedora's stock fprintd, PAM and Plasma Login.
 Other hardware, firmware, distributions and network accounts are unsupported.
-The complete installer still needs physical-system confirmation; see
-[validation](VALIDATION.md) before treating it as a qualified release.
+The complete installer has been exercised successfully on a freshly installed and
+updated Fedora 44 KDE VM and on the physical Fedora 44 KDE qualification system
+with SELinux Enforcing; see [validation](VALIDATION.md) for the evidence boundary.
 
 ## Prerequisites
 
@@ -103,8 +104,10 @@ three explicit physical attempts in that series; after the third failure use
 password and report the result. Do not start repeated test series or add a fourth
 attempt. A password-encrypted KWallet may ask for its own password after login.
 Other consumers offer fingerprint where the current Fedora authentication
-configuration enables it. The installer does not modify authselect or global
-PAM policy.
+configuration enables it. The installer does not modify authselect or global PAM
+policy. The qualified fresh Fedora baseline had authselect `with-fingerprint`
+enabled; systems with an altered Fedora authentication policy may not offer
+fingerprint to those consumers until that host policy is corrected.
 
 ## If installation or authentication fails
 

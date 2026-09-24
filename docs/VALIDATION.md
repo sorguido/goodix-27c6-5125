@@ -19,6 +19,7 @@ observations reviewed against the implementation and available telemetry.
 | Normal removal | Software paths removed, Fedora fprintd exposed without private library environment, password login and KDE desktop remained usable |
 | Material/template preservation | File inode, size, owner, mode and modification time unchanged across reported normal removal; metadata evidence does not establish a cryptographic comparison of all bytes |
 | Reinstallation | Installation and subsequent Plasma fingerprint login succeeded; corrected reinstallation with the reader continuously present was also reported successful |
+| Complete public installation | Fresh Fedora 44 KDE VM installation passed; installation on the physical Fedora 44 KDE qualification system passed with SELinux Enforcing, followed by working Plasma Login, ordinary sudo, KScreenLocker, PolicyKit and password fallback |
 | Emergency removal | Successful text-console removal was reported with the reader connected; exact final output and every resulting file/service/label check were not supplied |
 
 ## Complete installation path
@@ -28,10 +29,14 @@ user's five files, installs the runtime and login integration, and installs
 standalone removal commands. It is independent of clone location and private
 build outputs. The reader remains connected throughout the lifecycle.
 
-**The complete public procedure still needs installation on a physical Fedora
-system and review of its minimum lifecycle results before a qualified release.**
-Previous component and reader-present success reports do not by themselves
-qualify the newly combined build/import/install transaction.
+The complete public procedure has now been exercised successfully on a freshly
+installed and updated Fedora 44 KDE VM and on the physical Fedora 44 KDE
+qualification system. On the physical system, installation completed with SELinux
+Enforcing; fingerprint authentication then passed for Plasma Login, ordinary sudo,
+KScreenLocker and PolicyKit, while password fallback remained available. These
+results qualify the combined build/import/install transaction for the tested
+configuration; they do not extend qualification to other readers, firmware,
+distributions or future Fedora changes.
 
 ## Offline evidence
 
@@ -55,7 +60,6 @@ recognition accuracy, hardware behavior or complete operating-system recovery.
 - No automated acquisition/extraction tooling is shipped or qualified as part
   of the release; the detailed [device-material acquisition reference](DEVICE_MATERIALS.md)
   documents how the five final files are derived.
-- Physical qualification of the combined public installer remains pending.
 - Console/sudo authentication can offer fingerprint before password. The expected
   untouched-reader timeout is about 30 seconds, depending on Fedora policy; no
   immediate method selector is provided. A fully broken password stack cannot
@@ -63,11 +67,15 @@ recognition accuracy, hardware behavior or complete operating-system recovery.
 - The Plasma Login selector depends on the current Fedora vendor PAM path.
   Compatibility with all future package changes is not established.
 - Stock consumers use fingerprints only where current Fedora policy enables them;
-  the installer does not modify authselect or global PAM policy.
+  the installer does not modify authselect or global PAM policy. The qualified
+  fresh Fedora baseline had authselect `with-fingerprint` enabled; a host with an
+  altered authentication policy may not offer fingerprint to sudo, PolicyKit or
+  KScreenLocker.
 - Password-encrypted KWallet may require a separate password after fingerprint login.
 - Ordinary sudo evidence does not separately qualify every login-shell variant.
-- A recurring SELinux read denial involving `nr_hugepages` was non-fatal during
-  tested authentication; this does not classify every future denial.
+- The integrated SELinux `dontaudit` rule suppresses the known non-fatal oneTBB
+  `nr_hugepages` read probe without granting access; it does not classify
+  unrelated future denials.
 - Full factory-state readback, exhaustive Windows compatibility, power-loss recovery
   and every future update combination have not been demonstrated.
 

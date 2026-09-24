@@ -12,10 +12,12 @@ keys and persistent reader state.
 - Goodix USB `27c6:5125`, firmware `GF_ST411SEC_APP_12509`.
 - Fedora-provided fprintd, PAM, Plasma Login, KScreenLocker, sudo and PolicyKit.
 
-Enrollment, verification, screen unlocking, ordinary sudo, PolicyKit and Plasma
-fingerprint login have worked on the tested configuration. Evidence covers one
-reader; see [validation and limitations](docs/VALIDATION.md). Physical installation
-of the complete public installer still needs confirmation before a qualified release.
+Enrollment, verification, screen unlocking, ordinary sudo, PolicyKit, Plasma
+fingerprint login and password fallback have worked on the tested configuration.
+The complete public installer has also passed installation on a freshly installed
+and updated Fedora VM and on the physical Fedora 44 KDE qualification system with
+SELinux Enforcing. Evidence covers one reader; see
+[validation and limitations](docs/VALIDATION.md).
 
 ## Installation
 

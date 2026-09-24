@@ -5,11 +5,12 @@
 
 This implementation targets Goodix USB `27c6:5125`, firmware
 `GF_ST411SEC_APP_12509`, and Fedora 44 KDE x86_64 with local accounts.
-Successful authentication has been reported on the tested configuration.
-Other firmware, readers, desktop environments and network accounts are not
-qualified. [Validation](docs/VALIDATION.md) distinguishes observations from
-unverified behavior. The root installer builds and installs from this tree; physical qualification
-of the complete installation path is still pending.
+Successful authentication and complete public installation have been reported on
+the tested configuration. Other firmware, readers, desktop environments and
+network accounts are not qualified. [Validation](docs/VALIDATION.md) distinguishes
+observations from unverified behavior. The root installer builds and installs from
+this tree and has been exercised on both a freshly installed and updated Fedora VM
+and the physical Fedora 44 KDE qualification system with SELinux Enforcing.
 
 ## Architecture
 
@@ -124,9 +125,11 @@ runtime mutation, preserves an existing service mask, removes only a mask it
 created and never starts fprintd as an installation check. It uses ordinary
 host service controls, not direct USB commands or a private hardware daemon.
 If service activation cannot be inhibited or fprintd cannot be quiesced, the
-operation fails with a precise error; the reader stays connected. Reader-present reinstallation has been reported successful. The complete
-source-built public installer still requires physical-system qualification;
-synthetic checks alone do not establish real PAM or SELinux behavior.
+operation fails with a precise error; the reader stays connected. Reader-present
+reinstallation has been reported successful. The complete source-built public
+installer has now passed physical-system qualification on the tested Fedora 44 KDE
+system; synthetic checks do not extend that evidence to unrelated hosts or future
+PAM and SELinux policy changes.
 
 ## Removal and recovery
 
