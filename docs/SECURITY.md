@@ -37,8 +37,14 @@ does not install an account-deletion hook or promise automatic template deletion
 Fedora owns fprintd, Plasma, PAM, sudo and PolicyKit. The project adds a private
 library directory, a narrow service environment drop-in and a minimal
 Plasma Login selector. It does not ship a replacement daemon/greeter or freeze
-Fedora's vendor authentication files. SELinux uses a narrow material label
-mapping, without a custom permission-granting policy module.
+Fedora's vendor authentication files.
+SELinux remains Enforcing. On Fedora, the installer also adds one project-owned
+`dontaudit` rule for the known non-fatal oneTBB `nr_hugepages` read probe. The
+rule grants no access: it only suppresses audit notifications for denied
+`fprintd_t -> sysctl_vm_t:file read` events. Because SELinux policy is type-based,
+the same suppression can also cover other denied reads with that exact tuple.
+`goodix-uninstall` and `goodix-force-remove` remove the project module and restore
+Fedora's normal audit behavior.
 
 Password access must remain available. A future incompatible Fedora PAM layout
 can affect the selector; compatibility across all future updates has not been

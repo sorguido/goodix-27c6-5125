@@ -76,7 +76,6 @@ remain unproven.
 - [Technical architecture](TECHNICAL_MANUAL.md)
 - [Device-specific material contract](docs/DEVICE_MATERIALS.md)
 - [Security and privacy](docs/SECURITY.md)
-- [Optional Fedora SELinux notification suppression](docs/SELINUX.md)
 - [Validation scope and known limitations](docs/VALIDATION.md)
 - [Licensing and provenance](docs/LICENSING_AND_PROVENANCE.md)
 - [Upstream references](docs/REFERENCES.md)

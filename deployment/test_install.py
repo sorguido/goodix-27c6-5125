@@ -56,6 +56,7 @@ class Installer(unittest.TestCase):
         self.events = []
         self.active = True
         self.rule = False
+        self.selinux_modules = []
         self.fail_login = False
         self.ctx.enter_context(patch.object(m, 'command', side_effect=self.command))
         self.ctx.enter_context(patch.object(m.r, 'command', side_effect=self.command))
@@ -138,6 +139,21 @@ class Installer(unittest.TestCase):
         if args[:3] == ('semanage', 'fcontext', '-d'):
             self.rule = False
             return ''
+        if args == ('semodule', '-lfull'):
+            return '\n'.join(self.selinux_modules)
+        if args[:4] == ('semodule', '-X', m.r.SELINUX_MODULE_PRIORITY, '-i'):
+            self.assertEqual(len(args), 5)
+            self.assertTrue(m.r.NORMAL.exists() and m.r.FORCE.exists() and m.r.RECOVERY.exists())
+            self.assertEqual(Path(args[4]).name, m.r.SELINUX_MODULE_NAME + '.cil')
+            self.assertEqual(Path(args[4]).read_text(), m.r.SELINUX_MODULE_RULE + '\n')
+            self.selinux_modules.append(
+                f'{m.r.SELINUX_MODULE_PRIORITY} {m.r.SELINUX_MODULE_NAME} cil')
+            return ''
+        if args == ('semodule', '-X', m.r.SELINUX_MODULE_PRIORITY,
+                    '-r', m.r.SELINUX_MODULE_NAME):
+            self.selinux_modules.remove(
+                f'{m.r.SELINUX_MODULE_PRIORITY} {m.r.SELINUX_MODULE_NAME} cil')
+            return ''
         if args[0].endswith('/check-material'):
             self.assertEqual(Path(args[1]), m.r.MATERIAL)
             return 'GOODIX_MATERIAL_CHECK=PASS'
@@ -180,10 +196,13 @@ class Installer(unittest.TestCase):
         self.assertFalse(self.active)
         self.assertFalse(m.r.MASK.is_symlink())
         self.assertTrue(m.r.CONFIG.exists())
+        self.assertEqual(self.selinux_modules,
+                         [f'{m.r.SELINUX_MODULE_PRIORITY} {m.r.SELINUX_MODULE_NAME} cil'])
         self.assert_preserved()
         self.assertEqual(m.r.remove(), 0)
         self.assert_preserved()
         self.assertFalse(m.r.RUNTIME.exists())
+        self.assertEqual(self.selinux_modules, [])
 
     def test_update_rebuilds_without_private_history_and_preserves_materials(self):
         self.apply()
@@ -207,6 +226,7 @@ class Installer(unittest.TestCase):
                 self.apply()
         self.assertFalse(any(m.r.present(p) for p in m.software_paths()))
         self.assertFalse(self.rule)
+        self.assertEqual(self.selinux_modules, [])
         self.assertFalse(m.r.MASK.is_symlink())
         self.assert_preserved()
 
@@ -219,7 +239,25 @@ class Installer(unittest.TestCase):
         self.assertEqual((m.r.RUNTIME / 'installation.json').read_bytes(), before)
         m.r.normal_preflight()
         self.assertTrue(self.rule)
+        self.assertEqual(self.selinux_modules,
+                         [f'{m.r.SELINUX_MODULE_PRIORITY} {m.r.SELINUX_MODULE_NAME} cil'])
         self.assert_preserved()
+
+    def test_existing_expected_selinux_module_is_not_overwritten(self):
+        expected = f'{m.r.SELINUX_MODULE_PRIORITY} {m.r.SELINUX_MODULE_NAME} cil'
+        self.selinux_modules = [expected]
+        self.apply()
+        self.assertEqual(self.selinux_modules, [expected])
+        self.assertFalse(any(args[:4] == ('semodule', '-X', m.r.SELINUX_MODULE_PRIORITY, '-i')
+                             for args in self.events))
+
+    def test_unexpected_selinux_module_priority_stops_before_mutation(self):
+        unexpected = f'300 {m.r.SELINUX_MODULE_NAME} cil'
+        self.selinux_modules = [unexpected]
+        with self.assertRaisesRegex(RuntimeError, 'unexpected priority/state'):
+            self.apply()
+        self.assertEqual(self.selinux_modules, [unexpected])
+        self.assertFalse(any(m.r.present(path) for path in m.software_paths()))
 
     def test_final_mask_release_reload_failure_reports_installed_state(self):
         def fail_final_reload(*args):

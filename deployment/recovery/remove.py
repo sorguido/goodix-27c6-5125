@@ -25,6 +25,9 @@ MATERIAL = Path('/var/lib/goodix-5125-poc')
 MATERIAL_NAMES = ('target-material-manifest.json', 'transport-material.bin',
                   'target-config-90.bin', 'gfusb.dll', 'fdt-cache.bin')
 RULE = r'/var/lib/goodix-5125-poc(/.*)?'
+SELINUX_MODULE_NAME = 'goodix_5125_hugepage'
+SELINUX_MODULE_PRIORITY = '400'
+SELINUX_MODULE_RULE = '(dontaudit fprintd_t sysctl_vm_t (file (read)))'
 MODULE = 'pam_goodix_login_gate.so'
 LIBRARIES = ('libfprint-2.so.2.0.0',) + tuple(
     'libopencv_' + part + '.so.413' for part in ('core', 'features2d', 'flann', 'imgproc'))
@@ -210,6 +213,29 @@ def remove_label():
         command('restorecon', '-F', '--', *paths)
 
 
+def selinux_module_present():
+    lines = []
+    for line in command('semodule', '-lfull').splitlines():
+        fields = line.split()
+        if len(fields) >= 2 and fields[1] == SELINUX_MODULE_NAME:
+            lines.append(line)
+    if not lines:
+        return False
+    expected = (len(lines) == 1 and
+                lines[0].split()[:2] == [SELINUX_MODULE_PRIORITY, SELINUX_MODULE_NAME])
+    require(expected, 'project SELinux module has an unexpected priority/state; '
+            'left untouched: ' + ' | '.join(lines))
+    return True
+
+
+def remove_selinux_module():
+    if not selinux_module_present():
+        return
+    command('semodule', '-X', SELINUX_MODULE_PRIORITY, '-r', SELINUX_MODULE_NAME)
+    require(not selinux_module_present(),
+            'project SELinux module remains at priority ' + SELINUX_MODULE_PRIORITY)
+
+
 def inhibit_activation():
     """Temporarily block service activation, without hiding or opening a device."""
     parents(MASK)
@@ -288,6 +314,7 @@ def remove(force=False):
         # Even failure to inhibit cannot prevent removing the authentication
         # entry points above or attempting to stop an already-running service.
         stopped = attempt('stop fingerprint service', stop_and_verify)
+        attempt('project SELinux huge-page module', remove_selinux_module)
         if login_removed:
             attempt('login support', lambda: remove_path(SUPPORT))
         if inhibited and stopped:

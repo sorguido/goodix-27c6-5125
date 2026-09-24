@@ -58,6 +58,7 @@ assume that cleanup completed.
 | `/etc/systemd/system/fprintd.service.d/90-goodix-5125-runtime.conf` | Removes the private library environment and reloads service configuration |
 | `/usr/local/lib64/goodix-27c6-5125/` | Removes private libfprint/OpenCV, links, notices and installation metadata |
 | Exact project material SELinux mapping | Removes an owned mapping and reapplies current policy labels to explicit material paths |
+| Project-owned SELinux huge-page `dontaudit` module | Removes the project module and restores Fedora's normal audit visibility |
 | `/usr/local/bin/goodix-uninstall`, `/usr/local/bin/goodix-force-remove`, `/usr/local/share/goodix-recovery/` | Removes recovery tools last after successful cleanup |
 
 Removal stops and quiesces fprintd before removing runtime files. It does not

@@ -174,6 +174,27 @@ def install_tools(source_id):
     command('restorecon', '-F', str(r.RECOVERY), str(r.RECOVERY / 'receipt.json'), str(r.NORMAL), str(r.FORCE))
 
 
+def install_selinux_module():
+    if r.selinux_module_present():
+        return
+    with tempfile.TemporaryDirectory(prefix='goodix-selinux-') as directory:
+        policy = Path(directory) / (r.SELINUX_MODULE_NAME + '.cil')
+        descriptor = os.open(policy, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, 'w', encoding='ascii') as stream:
+            stream.write(r.SELINUX_MODULE_RULE + '\n')
+            stream.flush()
+            os.fsync(stream.fileno())
+        command('semodule', '-X', r.SELINUX_MODULE_PRIORITY, '-i', str(policy))
+    require(r.selinux_module_present(), 'project SELinux module installation could not be verified')
+
+
+def restore_selinux_module(was_present):
+    if was_present:
+        install_selinux_module()
+    else:
+        r.remove_selinux_module()
+
+
 def install_runtime(payload, manifest, rule_preexisting):
     r.RUNTIME.mkdir(mode=0o755)
     hashes = {}
@@ -216,12 +237,17 @@ def install_login(payload, source_id):
     command('restorecon', '-F', str(r.CONFIG))
 
 
-def rollback(saved, rule_before):
+def rollback(saved, rule_before, selinux_module_before):
     try:
         r.stop_and_verify()
     except (RuntimeError, OSError, subprocess.SubprocessError) as error:
+        module_error = ''
+        try:
+            restore_selinux_module(selinux_module_before)
+        except (RuntimeError, OSError, subprocess.SubprocessError) as restore_error:
+            module_error = '; SELinux module rollback also failed: ' + str(restore_error)
         raise RuntimeError('rollback incomplete: service could not be quiesced; software and recovery '
-                           'commands retained. Report this error: ' + str(error)) from error
+                           'commands retained. Report this error: ' + str(error) + module_error) from error
     errors = []
     tool_paths = (r.NORMAL, r.FORCE, r.RECOVERY)
     for path in software_paths():
@@ -251,6 +277,10 @@ def rollback(saved, rule_before):
         if r.present(r.MATERIAL):
             command('restorecon', '-F', '--', str(r.MATERIAL), *(str(r.MATERIAL / n) for n in r.MATERIAL_NAMES))
         command('systemctl', 'daemon-reload')
+    except (RuntimeError, OSError, subprocess.SubprocessError) as error:
+        errors.append(str(error))
+    try:
+        restore_selinux_module(selinux_module_before)
     except (RuntimeError, OSError, subprocess.SubprocessError) as error:
         errors.append(str(error))
     # Keep current rescue commands if any non-tool cleanup/restoration failed.
@@ -308,6 +338,7 @@ def apply(payload, material_directory, owner_uid):
         safe_parent(path)
     if any(r.present(p) for p in software_paths()):
         r.normal_preflight()  # Refuse partial/foreign state before any mutation.
+    selinux_module_before = r.selinux_module_present()
     rule_before = material_rule()
     # Make an immutable root-owned copy before executing the compiled checker.
     with tempfile.TemporaryDirectory(prefix='goodix-install-') as staging_name:
@@ -323,6 +354,7 @@ def apply(payload, material_directory, owner_uid):
                     with redirect_stdout(io.StringIO()):
                         require(r.remove(force=False) == 0, 'existing installation could not be removed')
                 install_tools(manifest['source_id'])
+                install_selinux_module()
                 materials.install_materials(bundle, r.MATERIAL,
                     native_check=lambda directory: command(str(staged_payload / 'check-material'), str(directory)))
                 preexisting = material_rule()
@@ -336,7 +368,7 @@ def apply(payload, material_directory, owner_uid):
                 r.normal_preflight()
                 r.stop_and_verify()
             except BaseException:
-                rollback(saved, rule_before)
+                rollback(saved, rule_before, selinux_module_before)
                 print('GOODIX_ROLLBACK=PASS PRIOR_PROJECT_SOFTWARE_RESTORED=true', file=sys.stderr)
                 raise
     print('GOODIX_INSTALL=PASS READER_PRESENT_ALLOWED=true')

@@ -41,6 +41,7 @@ class RecoveryTests(unittest.TestCase):
         self.events = []
         self.active = True
         self.rule = True
+        self.selinux_modules = []
         self.fail = None
         self.output = io.StringIO()
         self.stack = contextlib.ExitStack()
@@ -82,6 +83,7 @@ class RecoveryTests(unittest.TestCase):
 
     def install_fixture(self):
         m = self.m
+        self.selinux_modules = [f'{m.SELINUX_MODULE_PRIORITY} {m.SELINUX_MODULE_NAME} cil']
         self.write(m.CONFIG, b'SYNTHETIC PROJECT PAM ENTRY\n')
         login_files = {m.MODULE: b'SYNTHETIC LOGIN MODULE', 'manage.py': b'SYNTHETIC OLD INVERSE'}
         for name, data in login_files.items():
@@ -133,6 +135,14 @@ class RecoveryTests(unittest.TestCase):
         if args == ('semanage', 'fcontext', '-d', '-f', 'a', self.m.RULE):
             self.rule = False
             return ''
+        if args == ('semodule', '-lfull'):
+            return '\n'.join(self.selinux_modules)
+        if args == ('semodule', '-X', self.m.SELINUX_MODULE_PRIORITY,
+                    '-r', self.m.SELINUX_MODULE_NAME):
+            self.assertTrue(self.m.NORMAL.exists() and self.m.FORCE.exists())
+            self.selinux_modules.remove(
+                f'{self.m.SELINUX_MODULE_PRIORITY} {self.m.SELINUX_MODULE_NAME} cil')
+            return ''
         if args[:3] == ('restorecon', '-F', '--'):
             expected = tuple(str(p) for p in (self.m.MATERIAL,
                              *(self.m.MATERIAL / name for name in self.m.MATERIAL_NAMES)))
@@ -156,6 +166,7 @@ class RecoveryTests(unittest.TestCase):
             self.assertFalse(self.m.present(path), str(path))
         self.assertFalse(self.active)
         self.assertFalse(self.m.MASK.exists() or self.m.MASK.is_symlink())
+        self.assertEqual(self.selinux_modules, [])
         self.assert_preserved()
         self.assertTrue(self.events)
         self.assertTrue(all(not login and not dropin for _args, login, dropin in self.events))
@@ -298,6 +309,27 @@ class RecoveryTests(unittest.TestCase):
         self.fail = None
         self.assertEqual(self.m.remove(force=True), 0)
         self.assert_removed()
+
+    def test_force_selinux_module_failure_reports_incomplete(self):
+        self.fail = ('semodule', '-X', self.m.SELINUX_MODULE_PRIORITY, '-r')
+        self.assertEqual(self.m.remove(force=True), 1)
+        self.assertEqual(self.selinux_modules,
+                         [f'{self.m.SELINUX_MODULE_PRIORITY} {self.m.SELINUX_MODULE_NAME} cil'])
+        self.assertTrue(self.m.NORMAL.exists())
+        self.assertTrue(self.m.FORCE.exists())
+        self.assertIn('project SELinux huge-page module', self.output.getvalue())
+        self.assertIn('GOODIX_REMOVAL=INCOMPLETE', self.output.getvalue())
+        self.assertNotIn('GOODIX_REMOVAL=PASS', self.output.getvalue())
+
+    def test_force_unexpected_selinux_module_priority_is_untouched(self):
+        unexpected = f'300 {self.m.SELINUX_MODULE_NAME} cil'
+        self.selinux_modules = [unexpected]
+        self.assertEqual(self.m.remove(force=True), 1)
+        self.assertEqual(self.selinux_modules, [unexpected])
+        self.assertFalse(any(args[:4] == ('semodule', '-X', self.m.SELINUX_MODULE_PRIORITY, '-r')
+                             for args, _login, _dropin in self.events))
+        self.assertIn('unexpected priority/state', self.output.getvalue())
+        self.assertIn('GOODIX_REMOVAL=INCOMPLETE', self.output.getvalue())
 
     def test_force_stop_failure_retains_tools_reports_incomplete(self):
         self.fail = ('systemctl', 'stop')
