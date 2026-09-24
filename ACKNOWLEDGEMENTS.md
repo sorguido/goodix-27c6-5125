@@ -9,8 +9,8 @@ and OpenSSL, and on the work of their contributors and Fedora maintainers.
 [Rockytkg's Goodix project](https://github.com/Rockytkg/goodix-linux-27c6-5125)
 provided an important implementation reference and the reused matching and
 image-processing source described in [Licensing and provenance](docs/LICENSING_AND_PROVENANCE.md).
-Its contribution is acknowledged without implying endorsement or compatibility
-with all behavior of either project. Original copyright notices are retained.
+The projects remain independently maintained and may differ in scope and
+behavior. Original copyright notices are retained.
 
 ## Development tools
 
