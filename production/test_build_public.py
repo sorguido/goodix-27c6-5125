@@ -146,7 +146,10 @@ class PublicBuild(unittest.TestCase):
         self.assertIn(
             "drivers_cppflags += cpp.get_supported_arguments(['-Wno-error=array-bounds'])",
             text)
-        self.assertNotIn('-Wno-array-bounds', text)
+        # NBIS C sources have their own upstream warning settings.
+        cpp_flags = '\n'.join(line for line in text.splitlines()
+                              if 'drivers_cppflags +=' in line)
+        self.assertNotIn('-Wno-array-bounds', cpp_flags)
 
     def test_compile_contract_minimal_no_generated_target_execution_or_download(self):
         self.build()
