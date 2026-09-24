@@ -1,7 +1,0 @@
-sequence,timestamp,phase,event,outcome,usb_open_count,command_count
-1,not_recorded,INPUT,operator risk acceptance read,granted,0,0
-2,not_recorded,SOURCE_AUDIT,D233 shipped entrypoint inspected,offline_only,0,0
-3,not_recorded,SOURCE_AUDIT,real backend reachability inspected,requires_injected_construction,0,0
-4,not_recorded,UNSEAL_DIFF_REVIEW,minimal source-seal edit assessed,insufficient,0,0
-5,not_recorded,TERMINAL,D234 decision selected,D234_BLOCKED_BY_UNSEAL_SCOPE_EXPANSION,0,0
-6,2026-08-15T21:15:24+02:00,REPORT,durable blocker artifacts prepared,success,0,0

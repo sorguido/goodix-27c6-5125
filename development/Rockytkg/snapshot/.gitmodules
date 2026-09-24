@@ -1,3 +1,0 @@
-[submodule "libfprint"]
-	path = libfprint
-	url = https://github.com/goodix-fp-linux-dev/libfprint.git

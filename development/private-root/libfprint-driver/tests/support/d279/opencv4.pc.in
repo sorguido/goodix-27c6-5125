@@ -1,9 +1,0 @@
-prefix=@PREFIX@
-includedir=${prefix}/include/opencv4
-libdir=${prefix}/lib64
-
-Name: OpenCV
-Description: Pinned Fedora 44 OpenCV subset for offline Goodix SIGFM validation
-Version: 4.13.0
-Libs: -L${libdir} -lopencv_features2d -lopencv_flann -lopencv_imgproc -lopencv_core
-Cflags: -I${includedir}

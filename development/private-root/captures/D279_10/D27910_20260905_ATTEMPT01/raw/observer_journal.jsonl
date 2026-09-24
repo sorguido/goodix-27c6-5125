@@ -1,2 +1,0 @@
-{"automatic_retry_count": 0, "event": "OBSERVER_STARTED", "observed_utc": "2026-09-05T05:41:51.492499Z", "schema": "D279_10_OBSERVER_JOURNAL_EVENT_V2"}
-{"automatic_retry_count": 0, "event": "WIRE_MILESTONE", "observed_utc": "2026-09-05T05:41:51.508207Z", "protocol_contradiction_count": 0, "schema": "D279_10_OBSERVER_JOURNAL_EVENT_V2", "stop_triggered": false, "third_b0_milestone_observed": false, "wire_acquisition_cycle_count": 0}

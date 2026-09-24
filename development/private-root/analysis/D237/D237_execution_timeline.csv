@@ -1,5 +1,0 @@
-sequence,phase,event,outcome,target_enumeration_count,usb_open_count,command_count
-1,AUTHORIZATION,D237 operator risk acceptance,granted,0,0,0
-2,SUDO_AUTH_GATE,sudo -n true,password_required,0,0,0
-3,TERMINAL,D237 decision,D237_BLOCKED_BY_SUDO_AUTH_NOT_PRIMED,0,0,0
-4,REPORT,durable D237 blocker artifacts,published,0,0,0

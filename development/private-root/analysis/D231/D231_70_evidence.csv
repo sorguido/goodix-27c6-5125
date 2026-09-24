@@ -1,9 +1,0 @@
-claim_id,claim,evidence_source,location_or_packet,value,independent_cross_check,confidence,residual_limit,falsifier
-70-001,Mode 7 dispatches idle branch,gfusb.dll 1.1.125.14,0x180024dd3..0x180025641,mode 7 branch,log setmode: idle,high,resident receiver absent,different target branch semantics
-70-002,0x70 body serializer,gfusb.dll 1.1.125.14,0x180025686..0x180025705,"body {0x14,0x00}; len 2; builder (7,0)",capture packet 82,high,builder coordinate names inferred,different serializer reaching wire
-70-003,SetMode called first in setDac,gfusb.dll 1.1.125.14,0x180028100..0x18002811e,"SetMode(7,0,0)",function-table binding at 0x180026c57,high,indirect call resolved by local table,different runtime table overwrite
-70-004,Register write order,gfusb.dll 1.1.125.14,0x180028227;0x180028292;0x1800282fd;0x180028368,0220 then 0236 then 0238 then 023a,capture packets 87/90/94/99,high,normal branch only,alternate 0x98 branch active
-70-005,Captured 0x70,recovered capture,packet 82,wire 70 body 1400 checksum 23,ACK packet 85,high,one available capture only,raw capture hash mismatch
-70-006,Cross-version 0x70 convergence,operator-supplied Rockytkg issue claim,gfusb.dll 1.1.125.13,"ChicagoHUSetMode(7,0,0); {20,0}; setmode idle",local 1.1.125.14 reconstruction and capture,medium-high,external binary and issue text not locally archived,primary 1.1.125.13 artifact contradicts claim
-70-007,Operational lifetime classification,host semantics plus OEM cold-start,DAC preamble,volatile idle mode transition,no persistent write primitive in host dataflow,medium-high,resident body unavailable,device-side proof of NVM mutation
-70-008,Coverage limit,operator declaration,first capture,definitively lost,D230 census counts only recovered capture,high,no packet-level comparison possible,recovery of authentic first capture

@@ -1,4 +1,0 @@
-LIBPAM_1.0 {
-  global: pam_start;
-  local: *;
-};

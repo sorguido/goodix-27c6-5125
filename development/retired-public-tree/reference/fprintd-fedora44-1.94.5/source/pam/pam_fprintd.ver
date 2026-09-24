@@ -1,6 +1,0 @@
-{
-global:
-	pam_*;
-local:
-	*;
-};

@@ -1,5 +1,0 @@
-add_subdirectory(settings)
-add_subdirectory(wallpaper)
-add_subdirectory(greeter)
-add_subdirectory(startkde)
-add_subdirectory(kcm)

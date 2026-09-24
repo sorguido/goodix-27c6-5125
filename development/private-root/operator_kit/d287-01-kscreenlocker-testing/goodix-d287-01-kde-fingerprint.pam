@@ -1,3 +1,0 @@
-# SPDX-License-Identifier: GPL-2.0-or-later
-# D287/01: one explicit fingerprint attempt in an isolated mount namespace.
-auth required pam_fprintd.so max-tries=1 timeout=45

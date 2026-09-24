@@ -1,5 +1,0 @@
-[   20.190683] <HOST> fprintd[1551]: GOODIX_SIGFM_MATCH_AUDIT event=start template_samples=8 threshold=40
-[   20.191212] <HOST> fprintd[1551]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=1 score=0 threshold=40
-[   20.191348] <HOST> fprintd[1551]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=2 score=65 threshold=40
-[   20.191353] <HOST> fprintd[1551]: GOODIX_SIGFM_MATCH_AUDIT event=outcome result=match matched_sample=2 comparisons=2 threshold=40
-[   20.193357] <HOST> fprintd[1551]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=75 outstanding=0 drained=1 context_closed=1

@@ -1,7 +1,0 @@
-﻿{
-    "pre_hardware_setup_complete":  true,
-    "schema":  "D255_AUTHORIZATION_CONSUMED_V3",
-    "consumed_utc":  "2026-08-22T20:56:32.4558326Z",
-    "repeat_forbidden_without_new_authorization":  true,
-    "authorization_sha256":  "238cbdf0667b7d5f9f091e66bf2727c0d97ced4190dd113dd0bcfd6c92f75d8e"
-}

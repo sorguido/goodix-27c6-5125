@@ -1,2 +1,0 @@
-Capturing on 'USBPcap1'
-218 packets captured
