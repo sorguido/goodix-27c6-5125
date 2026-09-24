@@ -7,7 +7,7 @@ This project builds on libfprint, fprintd, Linux-PAM, KDE Plasma, OpenCV, libgus
 and OpenSSL, and on the work of their contributors and Fedora maintainers.
 
 [Rockytkg's Goodix project](https://github.com/Rockytkg/goodix-linux-27c6-5125)
-provided an important implementation reference and the reused matching and
+provided an **important** implementation reference and the reused matching and
 image-processing source described in [Licensing and provenance](docs/LICENSING_AND_PROVENANCE.md).
 The projects remain independently maintained and may differ in scope and
 behavior. Original copyright notices are retained.
