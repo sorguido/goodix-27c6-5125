@@ -191,6 +191,11 @@ goodix_sigfm_deps = []
 if 'goodix_27c6_5125' in drivers
     drivers_cflags += '-DGOODIX_LIBFPRINT_SIGFM'
     drivers_cppflags += '-DGOODIX_LIBFPRINT_SIGFM'
+    # GCC/libstdc++ can emit a spurious array-bounds diagnostic from inlined
+    # std::vector copy/move code in the SIGFM C++ translation units. Keep the
+    # warning enabled, but do not promote this compiler/library diagnostic to
+    # an error for the Goodix C++ driver sources.
+    drivers_cppflags += cpp.get_supported_arguments(['-Wno-error=array-bounds'])
     libfprint_goodix_cflags += '-DGOODIX_LIBFPRINT_SIGFM'
     goodix_sigfm_deps += dependency('opencv4', required: true)
     goodix_sigfm_deps += declare_dependency(include_directories: [
