@@ -202,3 +202,20 @@ README, installation and validation wording were aligned so a first-time user is
 sent to the detailed material guide instead of being told only to arrive with a
 pre-existing bundle. No runtime, installer, protocol or safety code changed in
 this documentation correction.
+
+
+## Live installation audit correction — terminal preservation
+
+The first execution of the documented public installation block on a fresh
+Fedora 44 KDE VM exposed a documentation/UX defect: the block began with
+`set -euo pipefail` directly in the user's interactive shell. A non-zero
+command therefore terminated the whole Konsole session before the User could
+inspect the failing output. At that point the repository had not yet been
+cloned, so no root cause beyond "failure before clone completed" was inferred.
+
+The public block was corrected to use explicit per-step error handling inside a
+temporary shell function. It no longer changes the interactive shell's errexit
+state and contains no `exit` command. It reports a stable
+`GOODIX_INSTALL_BLOCK=STOP STEP=... EXIT_CODE=...` marker and leaves the
+terminal open on every handled failure. This is a documentation/installer-UX
+correction only; no runtime, material, USB or authentication code changed.

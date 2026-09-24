@@ -49,30 +49,75 @@ secrets or open USB to manufacture the bundle.
 ## Install
 
 Paste this **single block** into a normal desktop terminal. It uses
-`$HOME/goodix-27c6-5125` for the clone and the materials folder above. Use a
-published revision containing `install.sh`; if the public repository does not
-yet contain that entrypoint, stop and wait for its publication.
+`$HOME/goodix-27c6-5125` for the clone and the materials folder above. The
+block handles each failure explicitly: **it must never close the user's terminal**.
+On failure it prints the failing step and exit code, leaves the terminal open,
+and asks the user to retain the complete output. Use a published revision
+containing `install.sh`; if the public repository does not yet contain that
+entrypoint, the installer step will stop visibly instead of terminating the
+terminal session.
 
 ```bash
-set -euo pipefail
+_goodix_public_install() {
+    local REPO="$HOME/goodix-27c6-5125"
+    local MATERIALS="$HOME/goodix-5125-materials"
+    local rc
 
-REPO="$HOME/goodix-27c6-5125"
-MATERIALS="$HOME/goodix-5125-materials"
+    printf '\n==> [1/4] Checking protected-material staging directory\n'
+    if [ ! -d "$MATERIALS" ]; then
+        printf 'GOODIX_INSTALL_BLOCK=STOP STEP=materials REASON=directory_missing PATH=%s\n' "$MATERIALS" >&2
+        return 10
+    fi
 
-test -d "$MATERIALS"
+    printf '\n==> [2/4] Installing Fedora prerequisites\n'
+    sudo dnf install git python3 gcc gcc-c++ meson ninja-build pkgconf-pkg-config \
+        glib2-devel libgusb-devel openssl-devel opencv-devel pam-devel binutils \
+        fprintd fprintd-pam policycoreutils-python-utils || {
+            rc=$?
+            printf 'GOODIX_INSTALL_BLOCK=STOP STEP=dependencies EXIT_CODE=%d\n' "$rc" >&2
+            return "$rc"
+        }
 
-sudo dnf install git python3 gcc gcc-c++ meson ninja-build pkgconf-pkg-config \
-    glib2-devel libgusb-devel openssl-devel opencv-devel pam-devel binutils \
-    fprintd fprintd-pam policycoreutils-python-utils
+    printf '\n==> [3/4] Cloning or updating the public repository\n'
+    if [ ! -d "$REPO/.git" ]; then
+        git clone https://github.com/sorguido/goodix-27c6-5125.git "$REPO" || {
+            rc=$?
+            printf 'GOODIX_INSTALL_BLOCK=STOP STEP=clone EXIT_CODE=%d\n' "$rc" >&2
+            return "$rc"
+        }
+    else
+        git -C "$REPO" pull --ff-only || {
+            rc=$?
+            printf 'GOODIX_INSTALL_BLOCK=STOP STEP=update EXIT_CODE=%d\n' "$rc" >&2
+            return "$rc"
+        }
+    fi
 
-if [ ! -d "$REPO/.git" ]; then
-    git clone https://github.com/sorguido/goodix-27c6-5125.git "$REPO"
+    printf '\n==> [4/4] Building and installing Goodix support\n'
+    cd "$REPO" || {
+        rc=$?
+        printf 'GOODIX_INSTALL_BLOCK=STOP STEP=enter_repository EXIT_CODE=%d\n' "$rc" >&2
+        return "$rc"
+    }
+
+    ./install.sh || {
+        rc=$?
+        printf 'GOODIX_INSTALL_BLOCK=STOP STEP=installer EXIT_CODE=%d\n' "$rc" >&2
+        return "$rc"
+    }
+
+    return 0
+}
+
+if _goodix_public_install; then
+    printf '\nGOODIX_INSTALL_BLOCK=PASS\n'
 else
-    git -C "$REPO" pull --ff-only
+    rc=$?
+    printf '\nGOODIX_INSTALL_BLOCK=STOP EXIT_CODE=%d\n' "$rc" >&2
+    printf 'The terminal remains open. Copy the complete output above before retrying.\n' >&2
 fi
 
-cd "$REPO"
-./install.sh
+unset -f _goodix_public_install
 ```
 
 Fedora may ask for your sudo password and confirmation before installing packages.
