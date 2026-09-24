@@ -64,6 +64,21 @@ recognition accuracy, hardware behavior or complete operating-system recovery.
   untouched-reader timeout is about 30 seconds, depending on Fedora policy; no
   immediate method selector is provided. A fully broken password stack cannot
   be repaired by the removal command.
+- At Plasma Login on the tested system, after explicitly selecting fingerprint
+  authentication by submitting the empty password field, allow roughly one
+  second before placing the finger. This is not an artificial delay: with the
+  stock Fedora fprintd path, reader preparation starts only when PAM enters
+  `pam_fprintd`, so the Goodix device must still be opened and brought through
+  its secure-session/TLS and FDT preparation before it can accept the first
+  capture. Eliminating that startup interval would require preparing the device
+  before the authentication action and handing the prepared session into the
+  later verification step; stock fprintd does not expose that early-login
+  handoff. A project-specific implementation of it would therefore require a
+  modified or tightly coupled fprintd/greeter integration. The current release
+  deliberately accepts this small UX cost so Fedora can continue to own the
+  stock fprintd daemon and greeter, substantially reducing the authentication
+  surface the project must replace, maintain, roll back and keep compatible with
+  future Fedora updates.
 - The Plasma Login selector depends on the current Fedora vendor PAM path.
   Compatibility with all future package changes is not established.
 - Stock consumers use fingerprints only where current Fedora policy enables them;
