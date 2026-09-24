@@ -111,6 +111,16 @@ required by this architecture. Removal returns the explicit material paths to
 current policy defaults when removing an owned mapping, while preserving bytes
 and Unix ownership/mode. Templates and their labels are not changed.
 
+The existing fprintd service drop-in also binds `/dev/null` read-only over
+`/proc/sys/vm/nr_hugepages`, only in that service's mount namespace. OpenCV loads
+oneTBB, whose allocator probes this file during library initialization even with
+huge pages disabled. An empty response preserves its normal allocation path
+without reading the confined sysctl or suppressing audit events. The installer
+accepts the exact previous drop-in for upgrades; rollback restores its original
+bytes and both removal commands remove it. No new policy module, permission,
+global mount or consumer override is introduced. Details and the live qualification
+boundary are in [SELinux huge-page probe](docs/SELINUX_HUGEPAGES.md).
+
 ## Lifecycle with the reader present
 
 An integrated reader remains connected and visible throughout installation,
