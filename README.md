@@ -71,6 +71,13 @@ OTP writes and persistent factory changes. Compatibility with every future Fedor
 update, exhaustive Windows testing and broad independent hardware validation
 remain unproven.
 
+## 🎓 Learning — Goodix Behind the Scenes
+
+New to Linux fingerprint readers, libfprint, or biometric authentication?
+The illustrated [Learning guide](docs/learning/README.md) follows the journey
+from touching the sensor to Linux deciding **MATCH** or **NO MATCH**, in plain
+English. The technical manual remains the authority for engineering details.
+
 ## Documentation
 
 - [Installation and updates](docs/INSTALLATION.md)

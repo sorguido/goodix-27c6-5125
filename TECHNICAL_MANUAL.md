@@ -77,8 +77,10 @@ MATCH and processing-error paths prevent hidden capture resubmission. Consumers
 control their explicit attempt series. The Plasma Login series is bounded to
 three attempts and stops on the first match.
 
-Enrollment gathers eight accepted samples, checks diversity and waits for
-terminal finger release before reporting completion. The image pipeline decodes
+Enrollment gathers multiple samples and checks diversity. It can finish after
+at least three distinct samples followed by duplicate convergence, or at the
+cap of eight distinct samples; the physical-attempt budget is twenty. It waits
+for terminal finger release before reporting completion. The image pipeline decodes
 an 80×64 raster from the packed image record, preprocesses it and uses SIGFM to
 construct and match templates. This is not a claim of a measured false-match or
 false-rejection rate.
