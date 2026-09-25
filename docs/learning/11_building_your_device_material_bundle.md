@@ -207,6 +207,43 @@ biometric templates, directory dumps, seeds, validators, or recovered keys.
 Do not grant a cloud coding agent access to this work folder. The prompts
 below are specifications, not bundled or previously validated programs.
 
+### 🤖 Optional but recommended: have a second LLM review the helper
+
+If you are not comfortable reviewing Python yourself, ask a second independent
+LLM to review the generated helper **before** running it on private inputs.
+Give it only the public helper prompt/specification from this guide and the
+generated source code, after checking that the code contains no private data.
+Never provide captures, `Goodix_Cache.bin`, `goodix.dat`, `gfusb.dll`, hashes
+from your reader, PSK/validator/seed bytes, biometric data or other protected
+material. This optional review supplements, not replaces, the existing
+synthetic tests and validation checks; an LLM's PASS is not a safety guarantee.
+
+Use this one reviewer prompt for any of the helpers:
+
+```text
+Review the following locally generated helper script line-by-line against
+the public specification that follows. Do not redesign the workflow or
+weaken any validation. Check especially:
+- file/layout bounds and byte order;
+- cryptographic parameters;
+- ambiguity handling and fail-closed behavior;
+- secret logging/output;
+- network or telemetry calls;
+- temporary secret files;
+- accidental bypasses of validation.
+
+List every discrepancy with severity and exact code location.
+Return REVIEW=PASS only if no unresolved material discrepancy remains.
+Otherwise return REVIEW=CORRECTIVE and explain the required corrections.
+
+I will provide only:
+1. the public specification;
+2. the generated source code.
+
+Do not ask me for captures, caches, DLLs, hashes from my reader, PSKs,
+validators, seeds, biometric data or other private inputs.
+```
+
 ### Install the helper runtime once
 
 Use the [official Python Windows instructions](https://docs.python.org/3/using/windows.html)
@@ -464,6 +501,15 @@ interfaces appear after reboot, stop and repair the official installation.
 
 ## 🔌 10. Record one clean OEM initialization
 
+**Preferred when available:** use an existing qualified Windows VM and attach
+the reader manually **after capture has started**. This most directly follows
+the canonical “capture first, attach reader second” sequence. A VM is not
+mandatory: for native Windows or an integrated reader that cannot be passed
+through, use the exact-device disable/enable procedure below as the fallback.
+It may trigger useful OEM initialization, but is not guaranteed to reproduce
+every cold-start message. In either path, success means the extractor finds
+all required, unambiguous evidence—not simply that the procedure completed.
+
 ### Find the controller rather than guessing its number
 
 Open an administrator PowerShell **as your own account**, restore variables,
@@ -539,9 +585,28 @@ against your hardware.
 Use capture tools **inside the guest**. Map the guest's virtual controller
 while Goodix is attached, then detach only Goodix through the hypervisor's
 USB menu. Prevent automatic attachment from happening before recording starts.
-Start USBPcap in the guest on the mapped controller, using the command above,
-then manually attach the same reader to the guest. Wait for normal OEM
-initialization, do not touch it, and stop with Ctrl+C.
+With Goodix still detached, start USBPcap in the guest on the mapped controller
+using this narrower command instead of the native Windows command above:
+
+```powershell
+$CaptureInterface = Read-Host 'Paste the observed guest root-hub path, for example \\.\USBPcap2'
+$CaptureFile = Join-Path $Work 'captures\oem-init.pcap'
+if (Test-Path -LiteralPath $CaptureFile) { throw 'STOP: capture already exists; choose a new attempt name.' }
+& $UsbPcap -d $CaptureInterface --capture-from-new-devices -o $CaptureFile
+```
+
+Then manually attach only the same reader to the guest. Wait for normal OEM
+initialization, do not touch it, and stop with Ctrl+C. Omitting `-A` reduces
+unrelated traffic, capture size and exposure of keyboard/storage activity
+from devices already present. The
+[USBPcap command implementation](https://github.com/desowin/usbpcap/blob/master/USBPcapCMD/cmd.c)
+and [new-device filter setup](https://github.com/desowin/usbpcap/blob/master/USBPcapCMD/thread.c)
+support this mode without an existing-device selection. Descriptor injection
+is unnecessary for the reader's actual post-start attachment. This is not a
+VID/PID filter: other devices newly attached or re-enumerated on that root hub
+can also be included, so keep the capture private and attach no other devices.
+The native fallback retains `-A` because disabling/enabling the PnP device
+does not guarantee a new USB attachment.
 
 For VirtualBox, manual attachment is under **Devices → USB**; enabled matching
 USB filters can attach devices automatically. This ordering follows from the
