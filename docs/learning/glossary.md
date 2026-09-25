@@ -1,6 +1,18 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Glossary
 
+## A0 / B0 message classes
+
+Two outer message types used by this Goodix protocol. `A0` carries checked
+control commands, acknowledgements, typed replies, and events. `B0` wraps TLS
+records, including the protected baseline and image data after the handshake.
+
+## ACK
+
+Short for acknowledgement: a device reply confirming that it accepted a
+command at the protocol level. An ACK is not automatically proof that every
+later result is correct; some phases also require a separate typed reply.
+
 ## Authentication
 
 The process of checking that someone is allowed to act as a particular user.
@@ -33,6 +45,12 @@ transfer completing or image processing returning a result.
 Temporary exclusive use of the fingerprint device by one `fprintd` client.
 Claiming prevents unrelated clients from mixing operations on the same reader.
 
+## Command value / opcode
+
+A numeric label that tells a device which operation or message is being used.
+This guide calls values such as `0xA8` Goodix command values. "Opcode" is the
+common shorter term.
+
 ## Daemon
 
 A background service. `fprintd` is a daemon that waits for fingerprint requests
@@ -42,6 +60,12 @@ from other parts of Linux.
 
 A structured inter-process messaging system. It acts like an operating-system
 intercom between clients and services such as `fprintd`.
+
+## DAC
+
+Digital-to-analog converter. The current driver labels four runtime register
+phases as DAC tuning steps. Think of them as four electronic adjustment values;
+the guide does not claim an exact physical meaning for each value.
 
 ## Descriptor
 
@@ -85,9 +109,20 @@ Software stored inside a hardware device. The target reader reports
 Fedora's fingerprint background service. It exposes operations over D-Bus,
 manages clients and permissions, calls `libfprint`, and stores host templates.
 
+## Hash / cryptographic digest
+
+A compact data fingerprint calculated from some bytes. The driver compares a
+calculated digest with an expected one to detect missing, changed, or
+reader-mismatched material without treating the digest as the secret itself.
+
 ## Host
 
 The main computer running Linux, as opposed to the fingerprint sensor itself.
+
+## Hexadecimal / `0x`
+
+A way to write numbers using digits `0`–`9` and letters `A`–`F`. The prefix
+`0x` marks hexadecimal notation, so `A8` and `0xA8` name the same numeric value.
 
 ## Interrupt / IRQ
 
@@ -105,6 +140,12 @@ Goodix-enabled version for `fprintd` to load.
 A valid comparison where at least one enrolled sample reaches the configured
 similarity threshold. It is not a claim of pixel identity or perfect accuracy.
 
+## MCU
+
+Microcontroller unit: the tiny processor that controls the reader's internal
+operation. A state query can ask the reader's MCU whether expected conditions
+are active without exposing its implementation details.
+
 ## Minutiae
 
 Traditional fingerprint features such as ridge endings and bifurcations. They
@@ -116,6 +157,12 @@ minutiae list.
 
 A valid comparison where no enrolled sample reaches the match threshold. It is
 different from a capture or processing error.
+
+## OTP
+
+One-time programmable memory: factory information designed for restricted or
+one-time programming. This project reads and validates the expected
+factory/OTP-related response; the supported path does not write OTP memory.
 
 ## PAM
 

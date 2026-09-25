@@ -58,6 +58,15 @@ You can stop after any chapter and still keep a useful mental picture.
 10. [Safety and factory preservation](10_safety_and_factory_preservation.md) — why Linux support does not mean reprogramming the reader.
 11. [Glossary](glossary.md) — plain-English definitions for the important terms.
 
+## 🔬 Optional deep dive
+
+- [Appendix — The real Goodix conversation](appendix_real_goodix_conversation.md)
+  — what `A8`, `E4`, `D1`, `D4`, `AF`, FDT, and the other protocol labels mean
+  in plain English.
+
+The appendix is optional. Chapter 3 keeps the complete beginner mental model,
+so you can continue directly to Chapter 4 without learning command numbers.
+
 ## One rule to carry through the whole book
 
 The physical sensor does not make the final decision by itself in this

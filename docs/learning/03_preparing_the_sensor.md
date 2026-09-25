@@ -111,7 +111,7 @@ it back into factory storage.
 Chapter 9 explains where these files live and how they differ from fingerprint
 templates.
 
-## Under the hood, without the byte soup
+## The simple map, without the byte soup
 
 The real secure-session state machine includes identity checks, selected
 device-response validation, runtime mode/configuration steps, and finally the
@@ -124,6 +124,78 @@ model is enough:
 ```text
 identify → validate → configure for this session → encrypt → calibrate → arm
 ```
+
+## 🔬 Under the hood: the conversation has real steps
+
+Those six verbs are not placeholders for a single magic "start" command. The
+current driver expands them into a checked state machine. At the human level,
+the conversation looks like this:
+
+```text
+enter the project's checked re-entry path
+        ↓
+confirm the expected firmware target
+        ↓
+validate reader-specific compatibility material and replies
+        ↓
+perform the known cold-start preparation
+        ↓
+select the operating mode and apply runtime tuning
+        ↓
+send the validated runtime configuration block
+        ↓
+transition into TLS and complete the protected handshake
+        ↓
+begin the post-TLS working sequence
+        ↓
+collect fresh finger-detection information and a no-finger baseline
+        ↓
+arm the reader and wait
+```
+
+The implementation gives every step a precise phase label. These are the real
+labels, followed by a cautious beginner translation:
+
+| Current phase | Beginner translation |
+| --- | --- |
+| `REENTRY_RECOVERY_A2` | Run one bounded project re-entry step before identification. This label does not mean a factory reset. |
+| `A8` | Require the exact `GF_ST411SEC_APP_12509` identity expected by this driver. |
+| `E4` | Check the expected validator derived from the existing protected compatibility material. The validator is not the PSK. |
+| `OEM_COLD_START_A2_1` | Perform the first known cold-start preparation step. |
+| `CHIP_82` | Read four target-bound bytes and require their saved data fingerprint (cryptographic digest) to match the manifest. The code does not prove that they are an immutable chip ID. |
+| `OTP_A6` | Read and check the expected factory/OTP-related response; do not write factory information. |
+| `OEM_COLD_START_A2_2` | Perform the second known cold-start preparation step. |
+| `MODE_70` | Select the required runtime operating mode. |
+| `DAC_220` through `DAC_23A` | Apply four validated runtime tuning values using command `0x80`. |
+| `CONFIG_90` | Send the validated 224-byte runtime configuration block. |
+| `D1` | Leave the ordinary pre-TLS request/reply sequence and begin the `B0`-wrapped secure-transport transition. |
+| `TLS` | Complete the TLS 1.2 PSK handshake with the host as server and the reader as client. |
+| `D4` then `AF` | Begin the post-TLS sequence and confirm the reader controller is in the expected state. |
+| FDT bootstrap | Gather fresh detection readings, obtain the no-finger baseline, derive or validate tables, and send the first `0x32` arm command. |
+
+In exact phase order, the secure-session portion is:
+
+```text
+REENTRY_RECOVERY_A2 → A8 → E4 → OEM_COLD_START_A2_1
+→ CHIP_82 → OTP_A6 → OEM_COLD_START_A2_2 → MODE_70
+→ DAC_220 → DAC_236 → DAC_238 → DAC_23A → CONFIG_90
+→ D1 → TLS
+```
+
+The post-TLS lifecycle then continues with `D4 → AF → FDT preparation →
+0x32 arm → wait for a finger`. Each transition checks the expected message
+class, order, shape, acknowledgement, or typed reply. A mismatch stops the
+session instead of guessing what the reader meant.
+
+> [!NOTE]
+> The phase names are exact implementation labels. The translations beside
+> them are deliberately cautious: they explain what the current code checks,
+> not undocumented internal firmware behavior.
+
+> 🧪 **Want to open the box one level further?**
+> See [Appendix — The real Goodix conversation](appendix_real_goodix_conversation.md)
+> for a beginner-friendly walk-through of `A8`, `E4`, `D1`, `D4`, `AF`, FDT,
+> and the other labels.
 
 > 🔎 **Want to see this in the repository?**
 > The high-level secure-session sequence is in
@@ -140,6 +212,8 @@ identify → validate → configure for this session → encrypt → calibrate �
   capture.
 - TLS protects the conversation using the existing reader PSK.
 - Runtime setup is temporary; it is not permission to alter factory state.
+- The simple lifecycle maps to a real, ordered, fail-closed protocol state
+  machine.
 - Preparation time explains the small delay before the first accepted touch.
 
 ---
