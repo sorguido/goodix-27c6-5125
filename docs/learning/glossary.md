@@ -35,6 +35,12 @@ A saved, machine-readable representation of biometric features. In this
 project, a template contains SIGFM feature samples and metadata; it is not just
 a normal fingerprint photograph.
 
+## Binary file
+
+A file whose bytes represent structured data rather than ordinary text. The
+material bundle's four binary files must not be opened and saved through a
+text editor or converted to a string of hexadecimal characters.
+
 ## Callback
 
 A function arranged to run when an asynchronous event finishes, such as a USB
@@ -55,6 +61,12 @@ common shorter term.
 
 A background service. `fprintd` is a daemon that waits for fingerprint requests
 from other parts of Linux.
+
+## CRC
+
+Cyclic redundancy check: an arithmetic check that helps detect corrupted
+bytes. This project's FDT cache uses CRC-32/MPEG-2; other CRC-32 variants do
+not necessarily produce the same result. A valid CRC is not proof of origin.
 
 ## D-Bus
 
@@ -77,6 +89,28 @@ identical.
 
 Software that knows how to operate particular hardware. The Goodix driver
 translates `libfprint` actions into the protocol used by USB `27c6:5125`.
+
+## DLL
+
+Dynamic-link library: a Windows library file. The qualified `gfusb.dll` is
+copied as OEM material and parsed for producer inputs; Linux does not execute it.
+
+## DPAPI
+
+Windows Data Protection API. It protects data using a Windows security context.
+Recovering the existing Goodix cache needs the correct original context and
+the exact additional entropy; copying the file to a new Windows VM is not enough.
+
+## Endpoint
+
+A numbered USB communication channel. For the qualified Goodix bulk traffic,
+`0x01` carries host-to-reader data and `0x81` carries reader-to-host data.
+
+## Entropy (DPAPI optional entropy)
+
+Additional bytes supplied when protecting and recovering a DPAPI blob. In
+this Goodix format they are calculated by a fixed recipe, not randomly chosen.
+“Optional” is the API parameter's name, not permission to omit required bytes.
 
 ## Enrollment
 
@@ -109,17 +143,19 @@ Software stored inside a hardware device. The target reader reports
 Fedora's fingerprint background service. It exposes operations over D-Bus,
 manages clients and permissions, calls `libfprint`, and stores host templates.
 
-## Hash / cryptographic digest
+## Hash / cryptographic digest / SHA-256
 
 A compact data fingerprint calculated from some bytes. The driver compares a
 calculated digest with an expected one to detect missing, changed, or
 reader-mismatched material without treating the digest as the secret itself.
+SHA-256 produces 32 bytes, commonly written as 64 hexadecimal characters.
+Per-reader digests can still be private evidence; compare them locally.
 
 ## Host
 
 The main computer running Linux, as opposed to the fingerprint sensor itself.
 
-## Hexadecimal / `0x`
+## Hexadecimal / hex / `0x`
 
 A way to write numbers using digits `0`–`9` and letters `A`–`F`. The prefix
 `0x` marks hexadecimal notation, so `A8` and `0xA8` name the same numeric value.
@@ -134,6 +170,18 @@ IRQ tells the driver to move from waiting to image capture.
 The Linux fingerprint library that supplies common device behavior, drivers,
 image processing hooks, template handling, and matching. This project builds a
 Goodix-enabled version for `fprintd` to load.
+
+## Little-endian
+
+A byte order in which a number's least significant byte comes first. For
+example, the two-byte number `0x1234` is stored as `34 12`. It describes
+binary storage order, not how to spell a number in JSON.
+
+## Manifest
+
+A text packing list describing other material. The production Goodix manifest
+has exactly ten string fields: identity/schema information and six digests.
+It is not a place for raw keys, extra notes or a copy of every input.
 
 ## MATCH
 
@@ -176,6 +224,17 @@ State that survives closing a session or removing power. Factory firmware,
 reader key material, and host template files are persistent in different
 places.
 
+## pcapng
+
+A packet-capture file format that stores recorded packets with interface and
+timing metadata. A USB capture may contain sensitive traffic from multiple
+devices; the filename alone does not establish reader identity.
+
+## PE file
+
+Portable Executable: the structured Windows file format used by executables
+and DLLs. Its sections connect relative virtual addresses to on-disk bytes.
+
 ## PolicyKit
 
 A Linux authorization system used when applications request privileged actions.
@@ -186,6 +245,12 @@ PAM fingerprint path.
 
 Preparing decoded image data for feature extraction. The Goodix SIGFM path uses
 the no-finger baseline and current finger frame to produce an 8-bit raster.
+
+## PowerShell
+
+A Windows command shell and scripting environment. This guide uses it to
+copy files, inspect metadata and start local tools; text redirection is not
+an appropriate way to write protected binary records.
 
 ## Probe
 
@@ -209,6 +274,12 @@ A small numbered location inside a device used to control or report some part
 of its operation. The driver uses only the understood, target-bound runtime
 configuration path.
 
+## Reassembly
+
+Joining ordered fragments into complete protocol messages. One Goodix frame
+can span several USB transfers, and a transfer can contain several frames.
+Different devices, endpoints or attachment sessions must not be mixed.
+
 ## Retry
 
 A request to try a physical touch again because no trustworthy MATCH or NO
@@ -218,6 +289,12 @@ MATCH decision was produced, or because enrollment needs different coverage.
 
 The software and temporary state used while the system is operating. Runtime
 configuration is not the same as rewriting persistent factory state.
+
+## RVA
+
+Relative virtual address: an address relative to a loaded PE image. It is
+not a disk-file offset; a parser uses the file's section table to map it to
+file-backed bytes safely.
 
 ## SIGFM
 
@@ -240,6 +317,17 @@ integrity-checked conversation between host and reader using the existing PSK.
 Universal Serial Bus: the physical and protocol connection used by the host to
 exchange commands, events, and protected image data with the reader.
 
+## USBPcap
+
+A Windows USB capture component used with Wireshark. It records transfers
+on a selected root hub, potentially including devices other than the reader.
+It is different from Npcap, which is used for network capture.
+
+## TShark
+
+Wireshark's command-line capture/analysis tool. It can read a saved capture
+and print selected metadata fields without opening the graphical interface.
+
 ## Verification
 
 Capturing a new probe and comparing it with an enrolled template to produce
@@ -252,4 +340,4 @@ intended as permanent factory or user data.
 
 ---
 
-[← Previous: Safety and factory preservation](10_safety_and_factory_preservation.md) | [Up: Learning home](README.md)
+[← Previous: Building your device-material bundle](11_building_your_device_material_bundle.md) | [Up: Learning home](README.md)

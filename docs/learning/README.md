@@ -56,7 +56,8 @@ You can stop after any chapter and still keep a useful mental picture.
 8. [Login, lock screen, sudo, and PolicyKit](08_desktop_authentication.md) — one fingerprint stack, different experiences.
 9. [What is stored, and where](09_what_is_stored.md) — sensor state, device material, and host templates.
 10. [Safety and factory preservation](10_safety_and_factory_preservation.md) — why Linux support does not mean reprogramming the reader.
-11. [Glossary](glossary.md) — plain-English definitions for the important terms.
+11. [Building your device-material bundle](11_building_your_device_material_bundle.md) — a practical, from-zero walkthrough for collecting the Windows inputs, making a USB capture, deriving the protected transport material, and assembling the final bundle.
+12. [Glossary](glossary.md) — plain-English definitions for the important terms.
 
 ## 🔬 Optional deep dive
 

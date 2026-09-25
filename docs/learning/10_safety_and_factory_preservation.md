@@ -128,4 +128,4 @@ flows, not secrets or biometric contents.
 
 ---
 
-[← Previous: What is stored](09_what_is_stored.md) | [Up: Learning home](README.md) | [Next: Glossary →](glossary.md)
+[← Previous: What is stored](09_what_is_stored.md) | [Up: Learning home](README.md) | [Next: Building your device-material bundle →](11_building_your_device_material_bundle.md)

@@ -19,6 +19,13 @@ there and continue with [Installation](INSTALLATION.md). If you do not yet have
 the bundle, Part II below documents how each final file is derived from the same
 reader and its qualified OEM Windows environment.
 
+> [!TIP]
+> **Starting from zero?** Follow the
+> [beginner device-material walkthrough](learning/11_building_your_device_material_bundle.md)
+> for step-by-step Windows file collection, USB capture, local helper prompts,
+> and final bundle checks. This page remains the canonical technical contract;
+> the walkthrough does not add supported acquisition tooling to the release.
+
 The reader-specific files must describe the same physical reader. `gfusb.dll`
 is different: it is the qualified OEM implementation compatibility boundary,
 not a reader-identity value.
