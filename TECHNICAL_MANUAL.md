@@ -77,11 +77,15 @@ MATCH and processing-error paths prevent hidden capture resubmission. Consumers
 control their explicit attempt series. The Plasma Login series is bounded to
 three attempts and stops on the first match.
 
-Enrollment gathers eight accepted samples, checks diversity and waits for
-terminal finger release before reporting completion. The image pipeline decodes
-an 80×64 raster from the packed image record, preprocesses it and uses SIGFM to
-construct and match templates. This is not a claim of a measured false-match or
-false-rejection rate.
+Enrollment accepts up to eight template samples and checks their diversity. It
+can converge after at least three distinct views followed by two consecutive
+duplicate-like captures; the terminal capture is retained, so a completed
+template contains four to eight samples. Physical contacts are bounded at 20,
+and completion waits for terminal finger release. The tested enrollment reached
+all eight stages; eight is not required for every enrollment. The image pipeline
+decodes an 80×64 raster from the packed image record, preprocesses it and uses
+SIGFM to construct and match templates. This is not a claim of a measured
+false-match or false-rejection rate.
 
 Fedora fprintd stores templates under `/var/lib/fprint/`. Runtime removal and
 reinstallation preserve them. Use normal KDE/fprintd interfaces to manage or

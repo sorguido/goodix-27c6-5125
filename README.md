@@ -48,6 +48,13 @@ Keep password access available. Fingerprint login does not automatically unlock
 a password-encrypted KWallet. No recognition accuracy or false-acceptance rate
 is claimed for untested users or devices.
 
+## Learn how it works
+
+New to Linux fingerprint authentication? **[Goodix Behind the Scenes](docs/learning/README.md)**
+is a beginner-friendly tour from the desktop prompt to the sensor, image,
+template and final match decision. It uses diagrams and plain-language analogies;
+the technical manual remains the canonical specification.
+
 ## Uninstall and emergency recovery
 
 Run **`goodix-uninstall`** from a working desktop terminal. If graphical login
@@ -73,6 +80,7 @@ remain unproven.
 
 ## Documentation
 
+- [Beginner learning guide](docs/learning/README.md)
 - [Installation and updates](docs/INSTALLATION.md)
 - [Uninstall and emergency recovery](docs/UNINSTALL.md)
 - [Technical architecture](TECHNICAL_MANUAL.md)
