@@ -129,14 +129,18 @@ An A0 logical frame has this production layout:
 | `n-1` | 1 | Inner additive checksum | Chosen so `checksum_control + inner_length + sum(body) + checksum` is `0xAA` modulo 256 |
 
 The codec deliberately accepts a wire control and a checksum control as
-separate inputs. They are equal for ordinary production commands and responses,
-but the D1 request carries wire control `0xD1` while its checksum is calculated
-in the `0xD0` coordinate. A reviewer must therefore not infer the checksum
-control by masking or otherwise normalizing the on-wire byte.
+separate inputs. The required checksum coordinate is defined by the specific
+builder and phase; it must not be inferred generically from the wire control.
+Ordinary pre-TLS secure-session commands use the wire control itself, while D1
+carries wire control `0xD1` with checksum control `0xD0`. The post-TLS lifecycle
+builder uses `control & 0xFE`, for example wire control `0xAF` with checksum
+control `0xAE`. These encoding rules imply no broader control-bit semantics.
 
-Current production submits each complete A0 logical frame as one bulk-OUT
-request at its exact logical length; it does not add a 64-byte application
-padding tail. USB packetization beneath that request is separate. B0 has the
+Current production has two A0 physical-submission regimes. The pre-TLS
+secure-session builder submits each complete logical frame directly at its
+exact length. The post-TLS lifecycle builder requires a logical frame no longer
+than 64 bytes, copies it into a zero-initialized 64-byte buffer, and submits all
+64 bytes. USB packetization beneath either bulk request is separate. B0 has the
 same four-byte outer shape with type `0xB0`, and its payload is exactly one
 complete TLS record. B0 is only a Goodix transport wrapper: it adds no cipher,
 authentication, compression, or key layer beyond TLS itself.
@@ -145,7 +149,8 @@ authentication, compression, or key layer beyond TLS itself.
 | --- | --- |
 | TLS record length | Exact record emitted by OpenSSL, including the TLS record's own header; becomes the B0 payload length |
 | B0 logical-frame length | Four-byte Goodix header plus the complete TLS record |
-| A0 USB submission length | Exact A0 logical-frame length in one bulk request |
+| Pre-TLS A0 USB submission length | Exact A0 logical-frame length in one bulk request |
+| Post-TLS A0 USB submission length | Fixed 64 bytes; the zero-filled tail follows the logical frame |
 | B0 USB submission length | Always 64 bytes per staged request; the last request copies the remaining logical bytes into a zero-initialized 64-byte buffer |
 
 Only one physical OUT is outstanding. For B0, the next 64-byte staging chunk is
