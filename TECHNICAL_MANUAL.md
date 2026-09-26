@@ -87,6 +87,8 @@ Interface 0 supplies the bulk transport used by the implementation:
 | --- | --- |
 | Bulk OUT endpoint | `0x01` |
 | Bulk IN endpoint | `0x81` |
+| Bulk endpoint maximum packet size | 64 bytes |
+| Observed interrupt IN endpoint | `0x82`; not used as a separate protocol-event channel by this implementation |
 | Outbound B0 TLS chunk | Fixed 64-byte submission, zero-padded as needed |
 | Canonical image geometry | 80 × 64 pixels |
 | Canonical sample count | 5,120 |
@@ -105,6 +107,54 @@ physical orientation claim.
 Firmware flashing, application replacement, key provisioning, OTP writes,
 factory-data writes, and persistent identity or mode changes are outside the
 supported path.
+
+### 2.1 USB transport and A0/B0 framing
+
+The 64-byte endpoint maximum packet size is a USB bus-packet property, not a
+Goodix frame-length rule. The host USB stack may packetize one bulk submission;
+the receive router correspondingly accumulates bounded input and recognizes A0
+or B0 frames from their declared logical lengths rather than from transfer
+boundaries.
+
+An A0 logical frame has this production layout:
+
+| Offset | Size | Field | Current rule |
+| --- | ---: | --- | --- |
+| `0` | 1 | Outer type | `0xA0` |
+| `1..2` | 2 | Outer payload length | Little-endian; `body_length + 4` |
+| `3` | 1 | Outer additive tag | `(0xA0 + length_low + length_high) mod 256` |
+| `4` | 1 | Wire control | Command or response control carried on the wire |
+| `5..6` | 2 | Inner length | Little-endian; body plus the final checksum |
+| `7..n-2` | variable | Body | Phase-specific bounded bytes |
+| `n-1` | 1 | Inner additive checksum | Chosen so `checksum_control + inner_length + sum(body) + checksum` is `0xAA` modulo 256 |
+
+The codec deliberately accepts a wire control and a checksum control as
+separate inputs. They are equal for ordinary production commands and responses,
+but the D1 request carries wire control `0xD1` while its checksum is calculated
+in the `0xD0` coordinate. A reviewer must therefore not infer the checksum
+control by masking or otherwise normalizing the on-wire byte.
+
+Current production submits each complete A0 logical frame as one bulk-OUT
+request at its exact logical length; it does not add a 64-byte application
+padding tail. USB packetization beneath that request is separate. B0 has the
+same four-byte outer shape with type `0xB0`, and its payload is exactly one
+complete TLS record. B0 is only a Goodix transport wrapper: it adds no cipher,
+authentication, compression, or key layer beyond TLS itself.
+
+| Quantity | Meaning in the current implementation |
+| --- | --- |
+| TLS record length | Exact record emitted by OpenSSL, including the TLS record's own header; becomes the B0 payload length |
+| B0 logical-frame length | Four-byte Goodix header plus the complete TLS record |
+| A0 USB submission length | Exact A0 logical-frame length in one bulk request |
+| B0 USB submission length | Always 64 bytes per staged request; the last request copies the remaining logical bytes into a zero-initialized 64-byte buffer |
+
+Only one physical OUT is outstanding. For B0, the next 64-byte staging chunk is
+submitted only after the preceding completion succeeds for the active action
+generation; the record is complete only after every chunk completion. Stale
+generation callbacks cannot advance the current record. On receive, the single
+router similarly owns one outstanding bulk IN, tolerates fragmented or
+coalesced USB completions, and delivers a frame only after its complete bounded
+logical length is present.
 
 ## 3. System architecture and ownership
 
@@ -238,8 +288,9 @@ raw USB captures, or derived secrets to a bug report.
 The reader is the TLS client and the host driver is the TLS server. The session
 uses TLS 1.2 with the reader's existing PSK. OpenSSL runs over memory BIOs; TLS
 records are carried inside the validated B0 transport rather than on a socket.
-The implementation pins `PSK-AES128-GCM-SHA256`, disables session tickets, and
-requires the expected client identity.
+The implementation pins `PSK-AES128-GCM-SHA256` (TLS codepoint `0x00A8`),
+disables session tickets, and requires the exact client identity
+`Client_identity`.
 
 The implementation:
 
@@ -338,17 +389,36 @@ REENTRY_RECOVERY_A2
 → TLS
 ```
 
+The phase contracts are deliberately narrower than informal command names:
+
+| Phase/control | Known role | Required response contract | Runtime/persistence evidence boundary |
+| --- | --- | --- | --- |
+| Re-entry `A2` | Establish the bounded project re-entry state before identification | ACK plus the target-pinned three-byte typed A2 response | Temporary session preparation; not a USB reset, retry loop, or factory reset |
+| `A8` | Return and confirm the supported application identity | ACK plus exact typed `GF_ST411SEC_APP_12509` response | Read/check only |
+| `E4` | Validate the existing target/material compatibility binding | ACK plus the expected typed validator response | Does not expose, replace, or provision the PSK |
+| Cold-start `A2` #1 | First supported sensor-reset step in the known cold-start path | ACK plus the target-pinned three-byte typed A2 response | Exact request resets the sensor side in current evidence; classified as volatile, not absolute NVM readback proof |
+| `0x82` | Read and bind a four-byte target response | ACK plus a four-byte digest-pinned typed response | Read/check; not claimed to be an immutable chip identifier |
+| `A6` | Read and bind factory/OTP-related data | ACK plus a 64-byte digest-pinned typed response | Read/check, never an OTP write |
+| Cold-start `A2` #2 | Second supported sensor-reset step in the known cold-start path | ACK plus the same target-pinned A2 response shape | Same bounded volatile classification as the first cold-start A2 |
+| `0x70` | Select the supported runtime mode | ACK only | Runtime/session mode; no absolute NVM non-mutation claim |
+| Four `0x80` DAC writes | Apply validated values to registers `0x0220`, `0x0236`, `0x0238`, and `0x023A` | ACK only for each write | Validated runtime register values; not firmware, OTP, identity, or provisioning |
+| `0x90` | Download/write the validated 224-byte configuration | ACK plus exact typed success body `01 00` | Configuration write path classified as runtime for the exact supported replay; it is not a read and not universal NVM proof |
+| `D1` | Change from A0 command traffic to B0-wrapped TLS | No ordinary A0 ACK; the reader's B0/TLS ClientHello is required | Transport transition only |
+
+For every ACK-bearing phase above, current production accepts only status
+`0x01` or `0x07`, requires the exact command echo and two-byte ACK body, and
+does not assign invented names or bit meanings to those status values. The ACK
+itself is an A0 outer frame with inner control `0xB0`; that must not be confused
+with an outer B0 TLS wrapper. ACK-plus-typed phases require two distinct logical
+responses in order, while ACK-only phases complete on the strict ACK. D1 instead
+changes the expected outer class directly to B0/TLS.
+
 `CHIP_82` is an implementation phase name for a checked four-byte
 target-bound response, not a claim that the value is an immutable chip ID.
 `OTP_A6` is a read and check of a 64-byte factory/OTP-related response; it does
 not write OTP. The four DAC phases apply the validated runtime values for
 registers `0x0220`, `0x0236`, `0x0238`, and `0x023A`, and `CONFIG_90` sends the
 validated 224-byte configuration.
-
-Some phases require both an acknowledgement and a typed response; others have a
-defined acknowledgement-only shape. The transition into TLS is special: the
-next expected input is the reader's TLS ClientHello, not a fabricated command
-acknowledgement. An event valid in one phase is not accepted in another.
 
 The command-level conversation, including the phase names needed for protocol
 review, is documented in the public
@@ -385,6 +455,36 @@ A0 D4
 
 FDT preparation is part of each fresh action's trusted state. A threshold or
 baseline from an uncertain epoch is not silently reused.
+
+### 6.4 FDT table derivation and arming
+
+FDT state is fresh, action-local, and generation-scoped. Each accepted event
+must belong to the active generation and have exactly six little-endian 16-bit
+raw channel words. Reserved touch-flag bits outside the low six bits fail
+closed. Let `R[i]` be raw channel word `i` and `T[i]` its touch bit:
+
+| Boundary | Required event | Derived 12-byte table for channel `i` |
+| --- | --- | --- |
+| Baseline learning/refresh | Control `0x36`, IRQ `0x0100`, flags zero | `table[2i] = 0x80`; `table[2i+1] = (R[i] >> 1) & 0xFF`; components `0x00` and `0xFF` are rejected |
+| Finger-down up-table | Control `0x32`, IRQ `0x0002`, at least one valid touch bit | `table[2i] = 0x80`; active channel: `table[2i+1] = (R[i] >> 1) + 0x1D`; inactive channel: `0x1B`; overflow is rejected |
+| Release down-table | Control `0x34`, IRQ `0x0200`, flags zero | `table[2i] = 0x80`; `table[2i+1] = R[i] >> 1`; overflow is rejected |
+
+The preparation sequence issues `0x36` and accepts IRQ `0x0100` readings to
+learn/refresh the current table. Three fresh readings participate in the
+current bootstrap; measured deltas are checked against the returned threshold
+before the first arm. Command `0x32` arms finger-down detection with body prefix
+`08 01`, the validated 12-byte current table (the fresh down-table on re-arm),
+and the applicable little-endian timestamp. IRQ `0x0002` is the finger-down
+boundary used before image acquisition; its raw words and touch mask also
+produce the up-table later used by `0x34` in the release path.
+
+The IRQ `0x0200` release event must yield a fresh valid down-table before reuse.
+Re-arm uses that table and the re-arm timestamp, never a stale table from
+another generation. Submission is allowed only after the complete release tail
+has reached the re-arm gate, libfprint is again awaiting a finger, a fresh
+down-table is valid, and no re-arm has already been submitted. Failure of any
+formula, phase, generation, flag, threshold, or lifecycle gate terminates the
+action instead of silently reusing old FDT state.
 
 ## 7. Finger detection, capture, release, and cancellation
 
