@@ -24,24 +24,22 @@ def pcap_header(data):
 
 
 def packets(data):
+    # USBPcap timestamps precede serialization locking. Preserve file order,
+    # including timestamp inversions; timestamps never order protocol evidence.
     require(0 < len(data) <= LIMIT, 'CAPTURE_EMPTY' if not data else BAD)
     if data[:4] != b'\x0a\x0d\x0d\x0a':
         endian, resolution, snap = pcap_header(data)
-        offset, previous = 24, -1
+        offset = 24
         while offset < len(data):
             require(offset + 16 <= len(data), BAD)
             sec, fraction, captured, original = struct.unpack_from(endian + 'IIII', data, offset)
             offset += 16
             require(27 <= captured == original <= snap and fraction < resolution and
                     offset + captured <= len(data), BAD)
-            stamp = sec * resolution + fraction
-            require(stamp >= previous, BAD)
-            previous = stamp
             yield 0, data[offset:offset + captured]
             offset += captured
         return
     offset, endian, interfaces, sections = 0, '<', [], 0
-    previous = {}
     while offset < len(data):
         require(offset + 12 <= len(data), BAD)
         section = data[offset:offset + 4] == b'\x0a\x0d\x0d\x0a'
@@ -67,9 +65,6 @@ def packets(data):
             interface, hi, lo, captured, original = struct.unpack_from(endian + 'IIIII', body)
             require(interface < len(interfaces) and 27 <= captured == original <= interfaces[interface] and
                     20 + ((captured + 3) & ~3) <= len(body), BAD)
-            stamp = (hi << 32) | lo
-            require(stamp >= previous.get(interface, -1), BAD)
-            previous[interface] = stamp
             yield interface, body[20:20 + captured]
         else:
             # ISB / name-resolution / custom non-packet metadata are harmless;

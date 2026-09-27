@@ -24,6 +24,7 @@ class App:
         self.events = queue.Queue()
         self.cancel = threading.Event()
         self.busy = False
+        self.settle_seconds = capture_session.SETTLE_SECONDS
         self.closing = False
         self.sources = self.prerequisites = self.storage = self.run = None
         self.panel = ttk.Frame(root, padding=24)
@@ -103,8 +104,13 @@ class App:
                    'No upload or telemetry. Only Install USBPcap downloads an official installer; '
                    'Open detailed guide opens the public guide in your browser.')
         self.label('Start this app normally, not as administrator. USBPcap will request its own UAC prompt when needed.')
+        self.button('Show Windows/Python baseline', self.show_baseline)
         self.button('Continue', self.begin)
         self.button('Open detailed guide', self.detailed_guide)
+
+    def show_baseline(self):
+        self.work(windows.baseline_report, lambda report: messagebox.showinfo(
+            'Windows/Python baseline — report these fields at the Human Gate', report, parent=self.root))
 
     def begin(self):
         self.work(windows.app_directory, self.source_screen, 'PLATFORM_UNSUPPORTED')
@@ -150,7 +156,7 @@ class App:
                    '\nReboot required — ' + ('yes' if prerequisites.reboot_required else 'no'))
         if prerequisites.executable is None:
             self.label('Install the official USBPcap driver and USBPcapCMD only. Read and accept the installer licenses yourself. '
-                       'Leave the optional “Detect USB 3.0” component unchecked. Reboot Windows afterwards.')
+                       'Use the official installer defaults. Its “Detect USB 3.0” option is not yet independently qualified by this project. Reboot Windows afterwards.')
             self.button('Install USBPcap', self.install)
         elif prerequisites.reboot_required:
             self.label('Reboot this Windows VM, relaunch the app and select your source folder again. '
@@ -166,7 +172,7 @@ class App:
             return
         self.clear('Install USBPcap')
         self.label('Downloading and verifying the pinned official installer. The interactive UAC installer follows. '
-                   'Read its license pages. Install the driver and USBPcapCMD; leave “Detect USB 3.0” unchecked. '
+                   'Read and accept its license pages yourself. Keep the official installer defaults; the USB3 option remains pending live qualification. '
                    'After installation, reboot the VM and relaunch this app.')
         self.work(lambda: windows.install(self.storage), self.preflight_ready, 'USBPCAP_INSTALL_FAILED')
 
@@ -174,6 +180,7 @@ class App:
         self.clear('Guided Windows VM capture')
         self.label('The VM must already be running. Detach Goodix from the guest through the hypervisor USB menu '
                    'and prevent automatic attachment. Attach no other devices during recording.')
+        self.label(f'Initialization window: {self.settle_seconds} seconds after guest appearance. No automatic retry.')
         self.label('DO NOT TOUCH THE SENSOR.', True)
         self.choice = tk.StringVar()
         self.mapped = tk.BooleanVar(value=False)
@@ -228,18 +235,23 @@ class App:
         def update(event, value):
             self.events.put(('RUN', value) if event == 'RUN' else ('STATUS', event))
         self.work(lambda: capture_session.acquire(self.storage, self.prerequisites, chosen, mapped,
-                                                  self.cancel, update), self.diagnose, 'CAPTURE_PROCESS_FAILED')
+                                                  self.cancel, update, settle_seconds=self.settle_seconds), self.diagnose, 'CAPTURE_PROCESS_FAILED')
 
     def capture_status(self, event):
         texts = {'STARTING': 'Starting capture. Keep Goodix detached until the next instruction.',
                  'ATTACH': 'Now attach the Goodix to this Windows VM. Do not touch the sensor.',
-                 'SETTLING': 'Goodix was observed. Waiting 30 seconds for ordinary OEM initialization. Do not touch the sensor.',
+                 'SETTLING': f'Goodix was observed. Waiting {self.settle_seconds} seconds for ordinary OEM initialization. Do not touch the sensor.',
                  'ANALYZING': 'Capture stopped. Checking identity, CONFIG90 and typed responses…'}
         if event in texts:
             self.status_label.configure(text=texts[event])
 
     def diagnose(self, result):
         self.run, self.evidence = result
+        try:
+            backend.validate_available_binding(self.sources, self.evidence)
+        except Failure as failure:
+            self.failure(failure.diagnostic.code)
+            return
         self.clear('Diagnose and build')
         self.label('Capture container, target identity and APP12509 — valid')
         self.label('\n'.join(name + ' — ' + ('valid and unambiguous' if name in self.evidence.selected else 'failed')
@@ -250,12 +262,24 @@ class App:
             details.insert('1.0', '\n\n'.join(CATALOG[code].text() for code in self.evidence.codes))
             details.configure(state='disabled')
             self.button('Open retained capture folder', self.open_capture)
-            self.button('Recheck for a new capture', self.preflight)
+            if capture_session.can_extend(self.evidence, self.settle_seconds):
+                self.button('Retry with extended initialization window', self.retry_extended)
+            self.button('Recheck for a new default capture', self.retry_default)
             return
         self.label('The next step recovers the existing PSK in memory under your original Windows user, '
                    'checks the A6/cache binding and validates the complete five-file bundle.')
         self.button('Build private bundle', self.build)
         self.button('Open retained capture folder', self.open_capture)
+
+    def retry_extended(self):
+        if self.busy or not capture_session.can_extend(self.evidence, self.settle_seconds):
+            return
+        self.settle_seconds = capture_session.EXTENDED_SETTLE_SECONDS
+        self.preflight()
+
+    def retry_default(self):
+        self.settle_seconds = capture_session.SETTLE_SECONDS
+        self.preflight()
 
     def build(self):
         self.work(lambda: backend.build(self.sources, self.evidence, self.run, windows.recover_dpapi), self.success)
@@ -273,6 +297,7 @@ class App:
             os.startfile(self.run / 'raw')
 
     def failure(self, code):
+        self.settle_seconds = capture_session.SETTLE_SECONDS
         self.clear('Stopped — review the diagnostic')
         self.label(CATALOG[code].text())
         if self.run:

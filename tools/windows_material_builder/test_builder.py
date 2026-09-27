@@ -14,7 +14,7 @@ import unittest
 from unittest.mock import Mock, patch
 from deployment import test_materials as fixture
 from deployment import materials
-from . import backend, binding, capture, capture_session, diagnostics, windows
+from . import backend, binding, capture, capture_session, diagnostics, windows, gui
 from .diagnostics import Failure
 from .files import create_run, read_regular
 
@@ -59,10 +59,10 @@ def records(*, missing=(), extras=(), identity=(0x27c6, 0x5125), variant=1):
     return rows
 
 
-def pcap(rows, endian='<'):
-    result = struct.pack(endian + 'IHHIIII', 0xa1b2c3d4, 2, 4, 0, 0, 65535, 249)
+def pcap(rows, endian='<', stamps=None, nano=False):
+    result = struct.pack(endian + 'IHHIIII', 0xa1b23c4d if nano else 0xa1b2c3d4, 2, 4, 0, 0, 65535, 249)
     for i, row in enumerate(rows):
-        result += struct.pack(endian + 'IIII', 10, i, len(row), len(row)) + row
+        result += struct.pack(endian + 'IIII', *(stamps[i] if stamps else (10, i)), len(row), len(row)) + row
     return result
 
 
@@ -72,11 +72,11 @@ def block(kind, body):
     return struct.pack('<II', kind, n) + body + struct.pack('<I', n)
 
 
-def pcapng(rows):
+def pcapng(rows, stamps=None):
     result = block(0x0a0d0d0a, struct.pack('<IHHq', 0x1a2b3c4d, 1, 0, -1))
     result += block(1, struct.pack('<HHI', 249, 0, 65535))
     for i, row in enumerate(rows):
-        result += block(6, struct.pack('<IIIII', 0, 0, i, len(row), len(row)) + row)
+        result += block(6, struct.pack('<IIIII', 0, *(stamps[i] if stamps else (0, i)), len(row), len(row)) + row)
     return result
 
 
@@ -93,6 +93,42 @@ class ParserTests(Case):
             evidence = capture.analyze_bytes(encoder(records()))
             evidence.require_complete()
             self.assertEqual(len(evidence.selected), 4)
+
+    def test_nonmonotonic_classic_preserves_file_order_and_evidence(self):
+        rows = records()
+        stamps = [(20 - i, len(rows) - i) for i in range(len(rows))]
+        for endian in ('<', '>'):
+            for nano in (False, True):
+                normal = capture.analyze_bytes(pcap(rows, endian, nano=nano))
+                inverted = pcap(rows, endian, stamps, nano)
+                self.assertEqual([raw for _, raw in capture.packets(inverted)], rows)
+                result = capture.analyze_bytes(inverted)
+                self.assertEqual(result.selected, normal.selected)
+                self.assertEqual(result.codes, normal.codes)
+
+    def test_nonmonotonic_pcapng_preserves_file_order_and_evidence(self):
+        rows = records()
+        # Both halves are unsigned fields; every 64-bit tick value is valid.
+        stamps = [(0xffffffff if i % 2 == 0 else 0, 0xffffffff - i) for i in range(len(rows))]
+        normal = capture.analyze_bytes(pcapng(rows))
+        inverted = pcapng(rows, stamps)
+        self.assertEqual([raw for _, raw in capture.packets(inverted)], rows)
+        result = capture.analyze_bytes(inverted)
+        self.assertEqual(result.selected, normal.selected)
+        self.assertEqual(result.codes, normal.codes)
+
+    def test_timestamp_field_bounds_and_truncated_encoding(self):
+        rows = records()
+        for endian in ('<', '>'):
+            for nano, limit in ((False, 1000000), (True, 1000000000)):
+                stamps = [(10, i) for i in range(len(rows))]
+                stamps[0] = (0xffffffff, limit - 1)
+                capture.analyze_bytes(pcap(rows, endian, stamps, nano)).require_complete()
+                stamps[0] = (10, limit)
+                self.fails(capture.BAD, capture.analyze_bytes, pcap(rows, endian, stamps, nano))
+        # Truncated EPB timestamp (no complete fixed header), valid block envelope.
+        self.fails(capture.BAD, capture.analyze_bytes,
+                   pcapng([]) + block(6, struct.pack('<II', 0, 1)))
 
     def test_truncated_headers_records_blocks(self):
         for value in (b'x', pcap(records())[:-1], pcapng(records())[:-1], pcap(records())[:30]):
@@ -484,6 +520,160 @@ class WorkflowTests(Case):
             root, result, actual = self.workflow(counts)
             self.assertEqual(actual, code)
             self.assertEqual(len(list((root / 'runs').glob('*/raw/oem-init.pcap'))), 1)
+
+
+class CorrectiveTests(Case):
+    def app(self):
+        app = object.__new__(gui.App)
+        app.busy = False
+        app.settle_seconds = capture_session.SETTLE_SECONDS
+        app.clear = Mock(); app.label = Mock(); app.button = Mock()
+        app.preflight = Mock()
+        app.panel = None
+        app.sources = backend.Sources(b'', fixture.synthetic_files()['fdt-cache.bin'], b'')
+        return app
+
+    def test_gui_extended_choice_is_explicit_and_has_no_third_tier(self):
+        app = self.app()
+        evidence = capture.analyze_bytes(pcap(records(missing=('CONFIG90',))))
+        with patch.object(gui, 'ScrolledText'):
+            app.diagnose((Path('synthetic-run'), evidence))
+        callbacks = {call.args[0]: call.args[1] for call in app.button.call_args_list}
+        self.assertIn('Retry with extended initialization window', callbacks)
+        app.preflight.assert_not_called()
+        callbacks['Retry with extended initialization window']()
+        self.assertEqual(app.settle_seconds, 60)
+        app.preflight.assert_called_once_with()
+        app.button.reset_mock()
+        with patch.object(gui, 'ScrolledText'):
+            app.diagnose((Path('synthetic-second-run'), evidence))
+        self.assertNotIn('Retry with extended initialization window',
+                         [c.args[0] for c in app.button.call_args_list])
+        app.retry_extended()
+        app.preflight.assert_called_once_with()
+        app.retry_default()
+        self.assertEqual(app.settle_seconds, 30)
+
+    def test_only_missing_evidence_is_eligible(self):
+        for name in ('CONFIG90', 'A2', 'CHIP82', 'A6'):
+            evidence = capture.analyze_bytes(pcap(records(missing=(name,))))
+            self.assertTrue(capture_session.can_extend(evidence, 30))
+            self.assertFalse(capture_session.can_extend(evidence, 60))
+        for code in diagnostics.CATALOG:
+            if code in capture_session.MISSING_CODES:
+                continue
+            self.assertFalse(capture_session.can_extend(capture.Evidence(codes=(code,)), 30))
+            self.assertFalse(capture_session.can_extend(
+                capture.Evidence(codes=('CONFIG90_MISSING', code)), 30))
+        self.assertFalse(capture_session.can_extend(capture.analyze_bytes(pcap(records())), 30))
+        app = self.app()
+        ambiguous = capture.analyze_bytes(pcap(records(
+            missing=('CONFIG90',), extras=[('extra', 0xa2, b'abc', True)])))
+        with patch.object(gui, 'ScrolledText'):
+            app.diagnose((Path('synthetic-run'), ambiguous))
+        self.assertNotIn('Retry with extended initialization window', [c.args[0] for c in app.button.call_args_list])
+        for code in ('TARGET_WRONG_IDENTITY', capture.BAD, 'A6_FDT_MISMATCH',
+                     'DPAPI_RECOVERY_FAILED', 'DLL_NOT_QUALIFIED'):
+            app.run = app.storage = None
+            app.button.reset_mock()
+            app.failure(code)
+            self.assertNotIn('Retry with extended initialization window', [c.args[0] for c in app.button.call_args_list])
+
+    def test_missing_config_with_known_a6_mismatch_has_no_extended_retry(self):
+        app = self.app()
+        app.failure = Mock()
+        evidence = capture.analyze_bytes(pcap(records(missing=('CONFIG90',), variant=2)))
+        with patch.object(gui, 'ScrolledText'):
+            app.diagnose((Path('synthetic-run'), evidence))
+        app.failure.assert_called_once_with('A6_FDT_MISMATCH')
+        self.assertNotIn('Retry with extended initialization window', [c.args[0] for c in app.button.call_args_list])
+
+    def test_default_and_extended_runs_keep_both_raws_and_gates(self):
+        recording = pcap(records(missing=('CONFIG90',)))
+        starts, updates = [], []
+        class Process:
+            def __init__(self, exe, interface, path): self.path = path
+            def start(self, cancel):
+                starts.append(self.path)
+                self.path.write_bytes(recording)
+            def alive(self): return True
+            def stop(self): pass
+        prereq = windows.Prerequisites(Path('synthetic'), True, windows.VERSION, ('\\\\.\\USBPcap1',), False)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'runs').mkdir()
+            results = []
+            for seconds in (30, 60):
+                now = [0.0]
+                def pause(value): now[0] += value
+                def update(event, value): updates.append((event, value, now[0]))
+                with patch.object(windows, 'target_count', side_effect=[0, 0] + [1] * 130) as count:
+                    kwargs = {} if seconds == 30 else {'settle_seconds': seconds}
+                    results.append(capture_session.acquire(root, prereq, None, False, threading.Event(), update,
+                        process_type=Process, clock=lambda: now[0], pause=pause, **kwargs))
+                    self.assertGreater(count.call_count, 2)
+                self.assertEqual(now[0], seconds)
+                self.assertEqual(len(starts), len(results))  # no automatic retry
+            self.assertNotEqual(results[0][0], results[1][0])
+            self.assertEqual([p.read_bytes() for p in starts], [recording, recording])
+            self.assertEqual([v for event, v, _ in updates if event == 'SETTLING'], [30, 60])
+            self.assertEqual([event for event, _, _ in updates],
+                             ['RUN', 'STARTING', 'ATTACH', 'SETTLING', 'ANALYZING'] * 2)
+            with patch.object(windows, 'target_count', return_value=1):
+                self.fails('TARGET_PRESENT_BEFORE_CAPTURE', capture_session.acquire,
+                    root, prereq, None, False, threading.Event(), update, process_type=Process, settle_seconds=60)
+            self.fails('CAPTURE_PROCESS_FAILED', capture_session.acquire,
+                root, prereq, None, False, threading.Event(), update, process_type=Process, settle_seconds=120)
+            self.assertEqual(len(list((root / 'runs').iterdir())), 2)
+
+    def test_gui_passes_selected_interval_and_labels_it(self):
+        app = self.app()
+        app.choice = Mock(); app.mapped = Mock(); app.cancel = threading.Event()
+        app.events = Mock(); app.storage = Path('synthetic'); app.prerequisites = Mock()
+        app.work = lambda function, done, *args: function()
+        for seconds in (30, 60):
+            app.settle_seconds = seconds
+            with patch.object(capture_session, 'acquire') as acquire:
+                app.start_capture()
+                self.assertEqual(acquire.call_args.kwargs['settle_seconds'], seconds)
+            app.status_label = Mock()
+            app.capture_status('SETTLING')
+            self.assertIn(str(seconds), app.status_label.configure.call_args.kwargs['text'])
+
+    def test_installer_guidance_preserves_upstream_choices(self):
+        root = Path(__file__).parent
+        for name in ('gui.py', 'README.md', 'AUDIT.md'):
+            text = (root / name).read_text()
+            self.assertNotRegex(text.lower(), r'leave[^.]*unchecked|disable[^.]*detect usb|detect usb[^.]*disabled')
+        app = self.app()
+        app.storage = Path('synthetic'); app.work = Mock()
+        app.install()
+        text = ' '.join(c.args[0] for c in app.label.call_args_list)
+        self.assertIn('defaults', text)
+        self.assertIn('accept', text)
+        self.assertIn('pending live qualification', text)
+        for path in root.glob('*.py'):
+            if path.name.startswith('test_'): continue
+            self.assertNotRegex(path.read_text(), r"['\"]-I['\"]")
+
+    def test_windows_baseline_reports_only_requested_metadata(self):
+        data = {'Caption': 'Microsoft Windows 11 Pro', 'Version': '10.0.26100',
+                'BuildNumber': '26100', 'SerialNumber': 'NOT-FOR-REPORT'}
+        with patch.object(windows, 'powershell', return_value=json.dumps(data)) as ps, \
+                patch.object(windows.platform, 'python_version', return_value='3.12.9'):
+            report = windows.baseline_report()
+        for text in ('Microsoft Windows 11 Pro', '10.0.26100', '26100', '3.12.9', 'pending'):
+            self.assertIn(text, report)
+        self.assertNotIn('NOT-FOR-REPORT', report)
+        self.assertIn('Select-Object Caption,Version,BuildNumber', ps.call_args.args[0])
+
+    def test_windows_baseline_unavailable_or_malformed_does_not_block(self):
+        for raw in ('invalid', '[]', '{}', '{"Version": "injected\\ntext", "BuildNumber": 123}'):
+            with patch.object(windows, 'powershell', return_value=raw):
+                self.assertIn('Windows build: UNKNOWN', windows.baseline_report())
+        with patch.object(windows, 'powershell', side_effect=Failure('TARGET_QUERY_FAILED')):
+            self.assertIn('Windows product: UNKNOWN', windows.baseline_report())
+
 
 
 class PrivacyTests(Case):

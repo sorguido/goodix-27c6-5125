@@ -29,7 +29,7 @@ Python's standard library and the existing `cryptography` dependency suffice.
 
 ## Official USBPcap audit
 
-Pinned release: [USBPcap 1.5.4.0](https://github.com/desowin/usbpcap/releases/tag/1.5.4.0).
+Project-pinned release (live qualification pending for the tested Windows VM baseline): [USBPcap 1.5.4.0](https://github.com/desowin/usbpcap/releases/tag/1.5.4.0).
 Installer: `USBPcapSetup-1.5.4.0.exe`, 195040 bytes.
 SHA-256, computed from the complete official HTTPS artifact on 2026-09-27:
 `87a7edf9bbbcf07b5f4373d9a192a6770d2ff3add7aa1e276e82e38582ccb622`.
@@ -41,7 +41,11 @@ are `%ProgramFiles%\USBPcap` (native architecture) and its `USBPcapCMD.exe`.
 The [upstream site](https://desowin.org/usbpcap/) requires reboot after install.
 The GUI launches the interactive installer only on the Install action, then
 requires reboot and returns to preflight on relaunch. No silent license flags.
-Do not use the installer's optional USB 3.0 detection step for this workflow.
+The official installer presents its normal defaults and choices, including
+**Detect USB 3.0** (`USBPcapCMD.exe -I` for non-standard root-hub initialization).
+This option is not yet independently qualified by the project for the guest
+controller. Record its setting and the guest topology at the Human Gate; the
+application neither changes that setting nor executes `-I` itself.
 
 The pinned [CMD source](https://github.com/desowin/usbpcap/blob/1.5.4.0/USBPcapCMD/cmd.c)
 provides extcap discovery without Wireshark, new-device capture, its own elevated
@@ -58,6 +62,13 @@ attachment automatically.
 records. The bounded parser also reads existing EPB pcapng evidence, rejects
 truncation and separates descriptor epochs before examining A0 streams.
 
+The upstream [buffer writer](https://github.com/desowin/usbpcap/blob/1.5.4.0/USBPcapDriver/USBPcapBuffer.c)
+obtains timestamps before acquiring the serialization lock. Consequently packet
+timestamps may decrease in file order. PCAP/pcapng records retain file-order
+indices; timestamps neither reorder records nor impose monotonic acceptance.
+Classic PCAP fractional fields still obey microsecond/nanosecond bounds; EPB
+timestamps are unsigned 64-bit ticks with no comparable fractional-field bound.
+
 ## Evidence and remaining gate
 
 A read-only historical zero-finger capture audit found unique A2, chip82, A6
@@ -69,7 +80,13 @@ No private evidence paths, payloads or reader-specific hashes belong here.
 The observed typed-response window ended less than eight seconds after the first
 descriptor. The candidate allows 30 seconds after guest appearance, with a
 90-second manual-attach timeout. These are bounded engineering allowances, not
-guarantees of completeness. The historical operator also explicitly waited for
+guarantees of completeness. An explicit missing-evidence-only retry may use
+60 seconds: a bounded doubling to test possible late initialization, not a
+qualified completeness threshold. Target and APP identity must already pass;
+ambiguity or any other failure excludes this option. The existing A6/FDT
+comparison is also applied before offering a retry when A6 is available, so a
+known mismatch cannot be hidden by a simultaneous missing class. It repeats detached-first
+preflight and manual attachment in a fresh run, with no third timing tier. The historical operator also explicitly waited for
 passive initialization to settle; only complete capture evidence permits build.
 
 The candidate parser reproduces the missing-CONFIG90 outcome on that retained
@@ -80,6 +97,8 @@ identity, one target identity/attachment epoch, full packet snapshots, and
 CONFIG90's fixed DAC layout. A repeated descriptor before material traffic is
 allowed; a later descriptor or reconfiguration is an ambiguous epoch.
 
+A read-only Welcome action reports only Windows product/version/build and Python
+version for the gate; unavailable values remain UNKNOWN without a new OS gate.
 Windows DPAPI, UAC, capture lifecycle, permissions, GUI behavior and the complete
 real bundle require the operator gate. Offline success is not live qualification.
 The installer/runtime remains final authority. Raw captures remain private,
@@ -98,12 +117,18 @@ Export validation must exercise the candidate from a copy with no `.git` or
 
 ## Offline verification (2026-09-27)
 
-The 48 builder tests passed using synthetic inputs, including acceptance of
+The 59 builder tests passed using synthetic inputs, including acceptance of
 generated material by the compiled production C loader. Existing deployment
 (76), production (13) and recovery (48) Python tests passed. The C A0 (51),
 post-TLS (19) and image-device (58) suites each passed both normally and under
 ASan/UBSan using the existing Freedesktop SDK. These results do not validate
 Windows native API behavior or actual reader acquisition.
+
+The corrective pass added 11 tests for timestamp inversions/ranges, explicit
+30/60-second retries and retention, mixed missing/A6-mismatch exclusion, installer
+wording, and safe baseline metadata reporting. The read-only historical capture
+still returns CONFIG90_MISSING, with A2/chip82/A6 and APP12509 passing and raw
+size/mtime unchanged; the timestamp correction did not change its classification.
 
 A public source copy without Git history or `development` passed the builder
 tests, CLI entrypoint check and complete source-ledger hash verification.

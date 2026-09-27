@@ -61,6 +61,11 @@ official installer and USBPcap's capture worker request UAC. There is no telemet
 or upload. Explicit Install USBPcap downloads one pinned, SHA-256-checked official
 installer. Opening the guide opens a public page in the user's browser.
 Python cannot guarantee erasure of all immutable secret copies in memory.
+The read-only baseline display reports only Windows product/version/build and
+Python version; it does not collect account identifiers or send a report.
+An eligible missing-evidence result can offer one explicit 60-second retry after
+the default 30-second attempt; each requires fresh manual attachment and retains
+its own recording. No retry is automatic.
 This candidate has not yet passed real Windows VM validation.
 
 Report the software version, Fedora version, reader identity, exact command,

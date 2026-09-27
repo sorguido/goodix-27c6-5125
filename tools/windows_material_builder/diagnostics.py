@@ -108,7 +108,9 @@ for name, description in [('CONFIG90', '224-byte CONFIG90 body'), ('A2', '3-byte
                           ('CHIP82', '4-byte chip82 response'), ('A6', '64-byte A6 response')]:
     _add(name + '_MISSING', f'The target was identified, but no valid {description} was found.',
          'Capture may have started too late or ended before OEM initialization completed.',
-         RETRY + ' Allow the full initialization interval to finish.')
+         RETRY + ' If offered, choose Retry with extended initialization window, then Recheck and Start capture. '
+         'This provides one 60-second attempt, without guaranteeing that the missing evidence will appear. '
+         'If unavailable or still incomplete, stop and report the diagnostic code.')
     _add(name + '_AMBIGUOUS', f'Multiple distinct valid candidates exist for the {description}.',
          'The recording may combine incompatible initialization evidence.', RETRY)
 

@@ -4,6 +4,8 @@
 This English-language Python/Tkinter application prepares private device material
 inside the **original qualified Windows VM**, as the **original normal user**.
 It is not a supported release: real Windows validation is still required.
+USBPcap 1.5.4.0 is project-pinned; live qualification is pending for the tested
+Windows VM baseline. No generic support for all 64-bit Windows versions is claimed.
 Use the [manual walkthrough](../../docs/learning/11_building_your_device_material_bundle.md)
 as the independent acquisition reference. The Linux installer/runtime remains
 the final authority on validity.
@@ -48,15 +50,18 @@ Then launch, also from the source root:
 
 ## One operator procedure
 
-1. Continue from Welcome. Select the three-file source folder. Expect the cache
+1. On Welcome, press **Show Windows/Python baseline** and record Windows product,
+   version, build and Python version. An unavailable field is reported as UNKNOWN
+   and does not reject the VM. Continue from Welcome. Select the three-file source folder. Expect the cache
    to be structurally valid, `goodix.dat` valid, and the DLL qualified. No secret
    or reader-specific digest is displayed.
 2. Continue to prerequisites. The app checks the driver, CMD, pinned release,
    interfaces and reboot state. If absent, click **Install USBPcap**. The app
    downloads the pinned official installer, verifies its complete SHA-256, then
    opens the interactive UAC installer. Read and accept its licenses yourself.
-   Keep **USBPcap Driver** and **USBPcapCMD** selected; leave the optional
-   **Detect USB 3.0** component unchecked. No silent license acceptance occurs.
+   Use the official installer defaults and normal interactive choices. Its
+   **Detect USB 3.0** option is not yet independently qualified by this project;
+   record its actual setting and the guest controller at the Human Gate. No silent license acceptance occurs.
 3. Reboot the Windows VM after installation. Relaunch normally and select the
    source folder again. The app retains the reboot requirement across launches
    and always returns through preflight. It does not automatically run at boot.
@@ -71,11 +76,20 @@ Then launch, also from the source root:
 6. **Only when the app says “Now attach the Goodix to this Windows VM”**, attach
    that one reader manually through the hypervisor's USB menu. Attach no other
    devices. **DO NOT TOUCH THE SENSOR.** The app observes exact target appearance,
-   allows 30 seconds for OEM initialization, then stops and diagnoses the capture.
+   allows the selected interval (30 seconds by default) for OEM initialization,
+   then stops and diagnoses the capture.
 7. Review the individual CONFIG90/A2/chip82/A6 checks. **Build private bundle** is
    available only with complete evidence. It cross-checks A6/cache, uses Windows
    DPAPI in the original user context, derives the canonical transport binding,
    creates the exact manifest and validates all five files before publication.
+   If target and APP identity are correct and only required evidence is missing,
+   **Retry with extended initialization window** offers one explicit 60-second
+   attempt. Detach Goodix manually, repeat preflight/controller selection and
+   **Recheck**, then **Start capture** and wait for **Now attach…** again. The
+   retry gets a new run; both captures remain. There is no automatic retry,
+   re-attachment or third timing tier. If still incomplete, stop and report the
+   code. Ambiguous evidence, identity/container errors and material/DPAPI/source
+   failures require their specific correction path; they do not offer this option.
 8. Success lists exactly the five filenames. Open the bundle folder and transfer
    that whole `goodix-5125-materials` folder privately to Linux at
    `~/goodix-5125-materials`. Leave the raw capture outside it.
@@ -83,7 +97,10 @@ Then launch, also from the source root:
 The 30-second settle allowance exceeds the under-eight-second typed-response
 window in the read-only historical audit. It is an engineering bound, **not**
 proof of initialization completeness: that historical capture still lacks
-CONFIG90. All evidence gates remain mandatory. Attach timeout is 90 seconds;
+CONFIG90. The optional 60-second attempt doubles the observation window to test
+possible late initialization without unbounded waiting. Historical evidence does
+not establish that 60 seconds is necessary or sufficient, nor that CONFIG90 is
+impossible during attach-only capture. All evidence gates remain mandatory. Attach timeout is 90 seconds;
 capture startup timeout is 60 seconds and the independent worker has a
 240-second ceiling. No repeated initialization or hidden attach retry occurs.
 
@@ -132,8 +149,9 @@ and reboot the VM; do not remove a pre-existing installation. The Python virtual
 environment/source copy can be removed separately after exit; preserve Local
 AppData runs. There is no automatic deletion of evidence or protected material.
 
-Report only the tested commit, Windows/Python versions, PASS/FAIL, the diagnostic
-code and the point of failure. Never send the capture, caches, bundle, DLL, hashes
+Report only the tested commit, Windows product/version/build, Python version,
+USB3 installer option setting and guest controller, selected 30/60-second window,
+PASS/FAIL, the diagnostic code and the point of failure. Never send the capture, caches, bundle, DLL, hashes
 or screenshots containing protected values.
 
 ## Offline development verification

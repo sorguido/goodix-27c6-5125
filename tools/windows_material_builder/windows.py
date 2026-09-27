@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import hashlib
 import json
 import os
+import platform
 from pathlib import Path
 import re
 import subprocess
@@ -47,6 +48,27 @@ def boot_identity():
     value = powershell('(Get-CimInstance Win32_OperatingSystem).LastBootUpTime.ToUniversalTime().ToString("o")')
     require(bool(re.fullmatch(r'[0-9T:.Z+\-]{20,40}', value)), 'TARGET_QUERY_FAILED')
     return value
+
+
+def baseline_report():
+    """Read only OS product/version/build; unavailable metadata never gates capture."""
+    fields = {'Caption': 'UNKNOWN', 'Version': 'UNKNOWN', 'BuildNumber': 'UNKNOWN'}
+    try:
+        data = json.loads(powershell(
+            '[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;'
+            'Get-CimInstance Win32_OperatingSystem | '
+            'Select-Object Caption,Version,BuildNumber | ConvertTo-Json -Compress'))
+        if isinstance(data, dict):
+            for key in fields:
+                value = data.get(key)
+                pattern = r'[\w .()+-]{1,120}' if key == 'Caption' else r'[0-9.]{1,32}'
+                if isinstance(value, str) and re.fullmatch(pattern, value):
+                    fields[key] = value
+    except (Failure, OSError, ValueError):
+        pass
+    return (f'Windows product: {fields["Caption"]}\nWindows version: {fields["Version"]}\n'
+            f'Windows build: {fields["BuildNumber"]}\nPython version: {platform.python_version()}\n'
+            'USBPcap 1.5.4.0 is project-pinned; live qualification is pending for this Windows VM baseline.')
 
 
 def target_count():

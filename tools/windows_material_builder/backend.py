@@ -62,6 +62,12 @@ def validate_final(files):
             binding._zero(value)
 
 
+def validate_available_binding(sources, evidence):
+    """Do not suggest timing retries when available A6 already disproves binding."""
+    if 'A6' in evidence.selected:
+        require(hmac.compare_digest(evidence.selected['A6'], sources.fdt[:64]), 'A6_FDT_MISMATCH')
+
+
 def build(sources, evidence, run, recover):
     """Recover PSK only after all capture/cross-material gates pass.
 
@@ -70,7 +76,7 @@ def build(sources, evidence, run, recover):
     guaranteed erased; mutable native/temporary buffers are cleansed.
     """
     evidence.require_complete()
-    require(hmac.compare_digest(evidence.selected['A6'], sources.fdt[:64]), 'A6_FDT_MISMATCH')
+    validate_available_binding(sources, evidence)
     secret = a = b = validator = transport = None
     try:
         # Qualify DLL again before either producer seed or PSK is used.

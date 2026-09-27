@@ -14,6 +14,14 @@ from .files import create_run, write_new
 ROOT = Path(__file__).resolve().parents[2]
 ATTACH_SECONDS = 90
 SETTLE_SECONDS = 30
+EXTENDED_SETTLE_SECONDS = 60
+MISSING_CODES = frozenset(name + "_MISSING" for name in ("CONFIG90", "A2", "CHIP82", "A6"))
+
+
+def can_extend(evidence, settle_seconds):
+    """Only analyze() results have already passed target, APP and container gates."""
+    return (settle_seconds == SETTLE_SECONDS and bool(evidence.codes) and
+            set(evidence.codes) <= MISSING_CODES)
 
 
 class CaptureProcess:
@@ -89,7 +97,8 @@ class CaptureProcess:
 
 
 def acquire(root, prerequisites, chosen, mapped, cancel, update, *, process_type=CaptureProcess,
-            clock=time.monotonic, pause=time.sleep):
+            clock=time.monotonic, pause=time.sleep, settle_seconds=SETTLE_SECONDS):
+    require(settle_seconds in (SETTLE_SECONDS, EXTENDED_SETTLE_SECONDS), 'CAPTURE_PROCESS_FAILED')
     interface = windows.choose_interface(prerequisites, chosen, mapped)
     windows.require_detached()
     run = create_run(root / 'runs')
@@ -114,8 +123,8 @@ def acquire(root, prerequisites, chosen, mapped, cancel, update, *, process_type
                 break
             require(clock() < deadline, 'TARGET_NOT_OBSERVED')
             pause(0.5)
-        deadline = clock() + SETTLE_SECONDS
-        update('SETTLING', SETTLE_SECONDS)
+        deadline = clock() + settle_seconds
+        update('SETTLING', settle_seconds)
         while clock() < deadline:
             require(not cancel.is_set(), 'CAPTURE_CANCELLED')
             require(process.alive(), 'CAPTURE_PROCESS_FAILED')
