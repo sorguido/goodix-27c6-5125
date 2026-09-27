@@ -1,4 +1,11 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+
+> **Development candidate:** an English-language
+> [Windows VM material builder](../../tools/windows_material_builder/README.md)
+> is available as source for operator validation. It uses USBPcap directly and
+> does not require Wireshark or TShark. It is not yet a supported release.
+> The manual reference below remains the independent fallback; its native-Windows
+> steps are outside the candidate app's VM-only scope.
 # 11. 🧰 Building your device-material bundle
 
 You have the right fingerprint reader. Linux still needs a small, private

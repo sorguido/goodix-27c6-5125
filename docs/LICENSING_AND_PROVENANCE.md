@@ -16,6 +16,8 @@ change the original copyright or grant of any source file.
 | libgusb | Fedora system library | LGPL-2.1-or-later; USB dependency, not privately bundled |
 | OpenSSL | Fedora system library | Apache-2.0; TLS dependency |
 | Lifecycle and Plasma selector tools | Project source | GPL-2.0-or-later; ordinary Linux-PAM APIs, Python standard library and Fedora tools |
+| Windows VM material builder candidate | Project source; historical finalizer/parser at `fa98461` | GPL-2.0-or-later; Python/Tkinter and existing `cryptography` dependency; no live support claim |
+| USBPcap, separately downloaded by explicit action | Official pinned 1.5.4.0 | Driver GPLv2; CMD BSD-2-Clause; interactive upstream license acceptance; installer not redistributed |
 
 Fedora supplies fprintd, its PAM module, Plasma, sudo and PolicyKit. Their
 implementations are not copied into private replacement consumers by this
@@ -56,6 +58,16 @@ tools. The Plasma selector uses public Linux-PAM interfaces without copying
 PAM, fprintd or Plasma source into a private replacement component.
 
 ## Excluded material
+
+The Windows builder's [audit](../tools/windows_material_builder/AUDIT.md) records
+its exact reuse, official USBPcap release URL, installer SHA-256 and remaining
+Windows gate. No USBPcap source or binary is incorporated into the application;
+the app invokes the separately installed official program. Historical PowerShell
+DPAPI behavior (BSD-2-Clause, copyright 2026 sorguido) was inspected as a reference;
+its C# implementation and transfer-file workflow are not copied into the app.
+The new source/tests are publishable without Git history or private evidence.
+They are separate from the Linux runtime payload and do not add Windows/Python
+GUI dependencies to `production/build-public.py`.
 
 Open-source licenses in this tree do not grant rights to distribute OEM firmware
 or binaries, reader secrets, private captures, factory data, fingerprint images

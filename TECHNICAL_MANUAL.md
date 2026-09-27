@@ -1372,7 +1372,7 @@ and normal/emergency removal with substituted privileged operations.
 | Local-account qualification only | Network/LDAP/AD account behavior is not established |
 | No FAR/FRR study | Score 40 is not a universal biometric security calibration |
 | Unknown physical DPI/orientation/polarity | Do not label captures 500 DPI or promise a natural-facing or calibrated-polarity raster |
-| Device material is user-supplied | No automated acquisition tool is shipped or qualified; cross-reader interchangeability is not qualified and a different installed/staged bundle is not silently swapped |
+| Device material is user-supplied | The Windows VM acquisition tool is a development candidate pending live validation; cross-reader interchangeability is not qualified and a different installed/staged bundle is not silently swapped |
 | Secure preparation starts with the action | Plasma fingerprint selection has about one second of observed startup latency |
 | Stock policy controls most consumers | Altered authselect/PAM may not offer fingerprints; the installer does not rewrite global policy |
 | PAM layout evolves | Future Fedora changes may cause the Plasma selector to fall back to password until reviewed |

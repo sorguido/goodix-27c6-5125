@@ -26,7 +26,8 @@ reader and its qualified OEM Windows environment.
 > [beginner device-material walkthrough](learning/11_building_your_device_material_bundle.md)
 > for step-by-step Windows file collection, USB capture, local helper prompts,
 > and final bundle checks. This page remains the canonical technical contract;
-> the walkthrough does not add supported acquisition tooling to the release.
+> the walkthrough and builder candidate do not change the supported Linux release's
+> validation boundary.
 
 The reader-specific files must describe the same physical reader. `gfusb.dll`
 is different: it is the qualified OEM implementation compatibility boundary,
@@ -34,9 +35,11 @@ not a reader-identity value.
 
 ## Supported release scope
 
-The supported release **validates and consumes** an already prepared bundle. It
-does not ship acquisition, extraction, DPAPI-recovery, USBPcap parsing, or
-manifest-generation tools.
+The supported Linux release **validates and consumes** an already prepared bundle.
+A [Windows VM material builder development candidate](../tools/windows_material_builder/README.md)
+now provides acquisition, extraction, DPAPI recovery and manifest generation in
+source form. It is **not supported or live-qualified** until the Windows operator
+gate passes. The manual acquisition reference below remains available unchanged.
 
 The technical reference later in this document describes the formats,
 source locations, protocol evidence and validation rules needed to derive the
@@ -222,8 +225,8 @@ OTP A6 responses. During the secure-session path, live typed responses are
 checked against those pins. E4 and concrete DAC values are derived from the
 validated bundle rather than fixed to the development reader.
 
-These checks make the runtime device-dynamic without making acquisition tooling
-part of the release.
+These checks make the runtime device-dynamic. The acquisition candidate remains
+separately gated on Windows VM validation.
 
 ## Protected filesystem contract
 

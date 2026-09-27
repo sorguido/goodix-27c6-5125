@@ -53,6 +53,10 @@ That procedure is documented separately because it uses the reader's OEM Windows
 environment and capture evidence; the Linux installer itself does not extract
 secrets or open USB to manufacture the bundle.
 
+An English-language [Windows VM material builder candidate](../tools/windows_material_builder/README.md)
+is available separately for development validation. It does not change this Linux
+installation procedure or the five-file contract, and is not yet live-qualified.
+
 ## Install, update or reinstall
 
 Use this same block in a normal desktop terminal for first installation, update,

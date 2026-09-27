@@ -33,8 +33,10 @@ when no valid installed material exists, also needs your own
 already have that bundle, that page contains the detailed acquisition reference
 for deriving the five final files from the same reader and qualified OEM Windows
 environment. Place the finished files in `$HOME/goodix-5125-materials/`, outside
-the clone. The project does not distribute protected material or ship automated
-acquisition/extraction tooling. Fedora prerequisites are included in the
+the clone. The project does not distribute protected material. An English-language
+[Windows VM material builder candidate](tools/windows_material_builder/README.md)
+is available as source for operator validation; it is not yet a supported release.
+The manual acquisition reference remains available. Fedora prerequisites are included in the
 installation flow; separate build instructions are unnecessary. Git must be available
 to run the bootstrap block.
 

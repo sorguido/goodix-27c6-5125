@@ -54,6 +54,15 @@ administrative authentication; it cannot bypass them or repair unrelated damage.
 
 ## Reporting a problem
 
+The [Windows VM material builder candidate](../tools/windows_material_builder/README.md)
+keeps the raw USB capture on success, failure and retry, outside the five-file
+bundle. The GUI/DPAPI run as the original unelevated Windows user; only the
+official installer and USBPcap's capture worker request UAC. There is no telemetry
+or upload. Explicit Install USBPcap downloads one pinned, SHA-256-checked official
+installer. Opening the guide opens a public page in the user's browser.
+Python cannot guarantee erasure of all immutable secret copies in memory.
+This candidate has not yet passed real Windows VM validation.
+
 Report the software version, Fedora version, reader identity, exact command,
 observed behavior and non-secret error text. Share only relevant redacted logs
 when needed. Never attach device-material directories, firmware, OEM binaries,
