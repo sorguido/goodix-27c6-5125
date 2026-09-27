@@ -14,7 +14,7 @@ import sys
 import threading
 import time
 from .capture import LIMIT, pcap_header
-from .diagnostics import Failure, require
+from .diagnostics import Failure, require, safe_lifecycle_status
 from .files import real_path
 from .windows import INTERFACE, normal_user
 
@@ -70,7 +70,44 @@ def quit_console(console):
                                      1, ctypes.byref(written)) and written.value == 1, 'CAPTURE_PROCESS_FAILED')
 
 
+_REPORT_LOCK = threading.Lock()
+
+
+def report(value):
+    require(safe_lifecycle_status(value), 'CAPTURE_PROCESS_FAILED')
+    with _REPORT_LOCK:
+        print(value, flush=True)
+
+
+def stop_request(stop, received):
+    try:
+        command = sys.stdin.buffer.readline(16)
+        # The parent's text-mode pipe translates LF to CRLF on Windows.
+        if command in (b'STOP\n', b'STOP\r\n'):
+            received.set()
+            report('STOP_RECEIVED')
+        else:
+            report('CONTROL_EOF' if not command else 'CONTROL_INVALID')
+    finally:
+        stop.set()
+
+
+def orderly_stop(process, console):
+    report('Q_REQUESTED')
+    quit_console(console)
+    report('Q_INJECTED')
+    report('CHILD_WAIT')
+    try:
+        code = process.wait(timeout=15)
+    except subprocess.TimeoutExpired:
+        report('CHILD_WAIT_TIMEOUT')
+        raise Failure('CAPTURE_PROCESS_FAILED') from None
+    report('CHILD_EXIT=' + str(code))
+    require(code == 0, 'CAPTURE_PROCESS_FAILED')
+
+
 def capture(exe, interface, raw_path):
+    report('STARTING')
     normal_user()
     job = own_process_job()
     require(INTERFACE.fullmatch(interface), 'USBPCAP_INTERFACE_AMBIGUOUS')
@@ -78,7 +115,8 @@ def capture(exe, interface, raw_path):
     real_path(raw_path.parent)
     require(not raw_path.exists(), 'CAPTURE_PROCESS_FAILED')
     stop = threading.Event()
-    threading.Thread(target=lambda: (sys.stdin.buffer.readline(16), stop.set()), daemon=True).start()
+    received = threading.Event()
+    threading.Thread(target=stop_request, args=(stop, received), daemon=True).start()
     process = None
     clean, ready = False, False
     with open('CONIN$', 'r+b', buffering=0) as console, open(raw_path, 'xb', buffering=0) as raw:
@@ -98,23 +136,32 @@ def capture(exe, interface, raw_path):
                         with open(raw_path, 'rb') as check:
                             pcap_header(check.read(24))
                         ready = True
-                        print('READY', flush=True)
-            require(ready and process.poll() is None, 'CAPTURE_PROCESS_FAILED')
-            quit_console(console)
-            require(process.wait(timeout=15) == 0, 'CAPTURE_PROCESS_FAILED')
-            clean = True
+                        report('READY')
+            require(received.is_set() and ready and process.poll() is None, 'CAPTURE_PROCESS_FAILED')
+            orderly_stop(process, console)
+            report('RAW_FLUSH')
             os.fsync(raw.fileno())
+            report('RAW_FLUSHED')
+            clean = True
         finally:
             if process is not None and process.poll() is None:
                 try:
-                    quit_console(console)
-                    process.wait(timeout=5)
+                    try:
+                        report('CLEANUP_Q')
+                    finally:
+                        quit_console(console)
+                        process.wait(timeout=5)
                 except Exception:
                     # Emergency process cleanup is never accepted as success.
-                    process.terminate()
-                    process.wait(timeout=5)
+                    try:
+                        report('CLEANUP_TERMINATE')
+                    finally:
+                        process.terminate()
+                        process.wait(timeout=5)
+            if process is not None and process.returncode is not None:
+                report('CHILD_EXIT=' + str(process.returncode))
     require(clean, 'CAPTURE_PROCESS_FAILED')
-    print('STOPPED', flush=True)
+    report('STOPPED')
 
 
 def main():
@@ -123,7 +170,7 @@ def main():
         capture(Path(sys.argv[1]), sys.argv[2], Path(sys.argv[3]))
         return 0
     except Exception:
-        print('FAILED', flush=True)
+        report('FAILED')
         return 1
 
 

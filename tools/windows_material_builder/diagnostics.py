@@ -77,7 +77,9 @@ for code, observed, cause, action in [
     ('TARGET_QUERY_FAILED', 'The present-device query did not complete reliably.',
      'Windows device enumeration may be unavailable.', 'Resolve the Windows device-query error before starting another capture.'),
     ('CAPTURE_PROCESS_FAILED', 'The capture process did not start, remain ready, or stop cleanly.',
-     'UAC, capture permissions, storage or USBPcap may have failed.', RETRY),
+     'UAC, capture permissions, storage or USBPcap may have failed.',
+     'Stop and retain the raw capture. Report the safe lifecycle.txt status fields from the run diagnostics folder; '
+     'do not infer clean shutdown from a readable capture or start an automatic retry.'),
     ('CAPTURE_CANCELLED', 'Capture was cancelled; the raw recording was retained.',
      'The acquisition may be incomplete.', RETRY),
     ('CAPTURE_EMPTY', 'The capture contains no packets.',
@@ -113,6 +115,27 @@ for name, description in [('CONFIG90', '224-byte CONFIG90 body'), ('A2', '3-byte
          'If unavailable or still incomplete, stop and report the diagnostic code.')
     _add(name + '_AMBIGUOUS', f'Multiple distinct valid candidates exist for the {description}.',
          'The recording may combine incompatible initialization evidence.', RETRY)
+
+
+_add('CONFIG90_MISSING', 'The target was identified, but no valid 224-byte CONFIG90 body was found.',
+     'The required OEM trigger or state may differ from passive attachment; its provenance remains incomplete.',
+     'Stop and retain the capture. Report CONFIG90_MISSING for provenance review. '
+     'Do not repeat attachment or extend the wait to try to force CONFIG90.')
+
+
+# Closed vocabulary: never accept free-form stderr, paths or exception strings.
+LIFECYCLE_STAGES = frozenset('STARTING READY STOP_RECEIVED CONTROL_EOF CONTROL_INVALID '
+    'Q_REQUESTED Q_INJECTED CHILD_WAIT CHILD_WAIT_TIMEOUT RAW_FLUSH RAW_FLUSHED '
+    'CLEANUP_Q CLEANUP_TERMINATE STOPPED FAILED EOF STATUS_INVALID '
+    'PARENT_STOP_SENT PARENT_WAIT_TIMEOUT PARENT_STATUS_TIMEOUT PARENT_TERMINATE'.split())
+
+
+def safe_lifecycle_status(value):
+    if value in LIFECYCLE_STAGES:
+        return True
+    import re
+    match = re.fullmatch(r'(CHILD_EXIT|WORKER_EXIT)=(-?[0-9]{1,10})', value)
+    return bool(match and -2147483648 <= int(match[2]) <= 4294967295)
 
 
 class Failure(RuntimeError):

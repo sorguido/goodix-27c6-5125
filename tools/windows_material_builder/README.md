@@ -4,8 +4,9 @@
 This English-language Python/Tkinter application prepares private device material
 inside the **original qualified Windows VM**, as the **original normal user**.
 It is not a supported release: real Windows validation is still required.
-USBPcap 1.5.4.0 is project-pinned; live qualification is pending for the tested
-Windows VM baseline. No generic support for all 64-bit Windows versions is claimed.
+USBPcap 1.5.4.0 is project-pinned. The operator has confirmed source validation,
+installation/reboot, post-reboot prerequisites, UAC and capture startup on the
+existing VM. Shutdown and a complete bundle remain unqualified. No generic support for all 64-bit Windows versions is claimed.
 Use the [manual walkthrough](../../docs/learning/11_building_your_device_material_bundle.md)
 as the independent acquisition reference. The Linux installer/runtime remains
 the final authority on validity.
@@ -15,7 +16,21 @@ changes firmware or replaces a PSK. USBPcap observes ordinary OEM initialization
 **DO NOT TOUCH THE SENSOR during acquisition.** Captures can contain sensitive
 material and stay private, on failure as well as success. No upload or telemetry.
 
-## Before the Windows operator test
+## Current gate: no new capture yet
+
+The latest operator run retained a complete 174-record PCAP but reported
+CAPTURE_PROCESS_FAILED. Correcting its initial UNKNOWN-address descriptor pairing
+leads to CONFIG90_MISSING. The historical positive CONFIG90 source is identified,
+but its Windows trigger/capture mode and the historical 0x90 versus current 0x91
+wire-contract discrepancy remain unresolved. See [the provenance audit](AUDIT.md).
+
+Replace only the source copy with the reported development SHA if needed. Preserve
+the existing OEM folder, USBPcap installation and raw captures. Do not reinstall
+USBPcap or repeat capture yet. The next input is existing historical command/UI
+metadata, not a new sensor operation. The procedure below is retained as a workflow
+reference for a later explicitly defined gate; it is not the next live instruction.
+
+## Before a future Windows operator test
 
 Use the exact development commit delivered with the operator report, copied
 privately or checked out in a separate Windows source copy. Do not merge or
@@ -82,7 +97,7 @@ Then launch, also from the source root:
    available only with complete evidence. It cross-checks A6/cache, uses Windows
    DPAPI in the original user context, derives the canonical transport binding,
    creates the exact manifest and validates all five files before publication.
-   If target and APP identity are correct and only required evidence is missing,
+   If target and APP identity are correct, CONFIG90 is present, and only A2/chip82/A6 evidence is missing,
    **Retry with extended initialization window** offers one explicit 60-second
    attempt. Detach Goodix manually, repeat preflight/controller selection and
    **Recheck**, then **Start capture** and wait for **Now attach…** again. The
@@ -90,6 +105,8 @@ Then launch, also from the source root:
    re-attachment or third timing tier. If still incomplete, stop and report the
    code. Ambiguous evidence, identity/container errors and material/DPAPI/source
    failures require their specific correction path; they do not offer this option.
+   **CONFIG90_MISSING means stop:** no timed retry is offered for that result.
+   Retain the capture and report the code for provenance review.
 8. Success lists exactly the five filenames. Open the bundle folder and transfer
    that whole `goodix-5125-materials` folder privately to Linux at
    `~/goodix-5125-materials`. Leave the raw capture outside it.
@@ -97,7 +114,7 @@ Then launch, also from the source root:
 The 30-second settle allowance exceeds the under-eight-second typed-response
 window in the read-only historical audit. It is an engineering bound, **not**
 proof of initialization completeness: that historical capture still lacks
-CONFIG90. The optional 60-second attempt doubles the observation window to test
+CONFIG90. The optional 60-second attempt for other missing classes doubles the observation window to test
 possible late initialization without unbounded waiting. Historical evidence does
 not establish that 60 seconds is necessary or sufficient, nor that CONFIG90 is
 impossible during attach-only capture. All evidence gates remain mandatory. Attach timeout is 90 seconds;
@@ -134,7 +151,11 @@ accepts it. The latter is a separate operator action, not performed by this app.
 
 **FAIL_IF:** startup/stop fails, evidence is missing/ambiguous, material binding
 fails, or the final bundle cannot be published. Diagnostics distinguish observed
-facts, possible causes and actions. `CONFIG90_MISSING` is a legitimate negative
+facts, possible causes and actions. For CAPTURE_PROCESS_FAILED, the run
+`diagnostics/lifecycle.txt` contains only bounded safe lifecycle facts (STOP, q,
+child/worker exit, flush, status EOF, timeout/cleanup stages). Report those fields
+without the raw capture; a readable PCAP does not prove clean shutdown.
+`CONFIG90_MISSING` is a legitimate negative
 result; never reuse a different reader's file to bypass it.
 
 **STOP_IF:** unexpected device identity, a request to modify reader factory state,

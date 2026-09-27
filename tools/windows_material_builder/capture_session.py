@@ -8,14 +8,14 @@ import threading
 import time
 from . import windows
 from .capture import analyze
-from .diagnostics import Failure, require
+from .diagnostics import Failure, require, safe_lifecycle_status
 from .files import create_run, write_new
 
 ROOT = Path(__file__).resolve().parents[2]
 ATTACH_SECONDS = 90
 SETTLE_SECONDS = 30
 EXTENDED_SETTLE_SECONDS = 60
-MISSING_CODES = frozenset(name + "_MISSING" for name in ("CONFIG90", "A2", "CHIP82", "A6"))
+MISSING_CODES = frozenset(name + "_MISSING" for name in ("A2", "CHIP82", "A6"))
 
 
 def can_extend(evidence, settle_seconds):
@@ -29,6 +29,15 @@ class CaptureProcess:
         self.executable, self.interface, self.raw = executable, interface, raw
         self.process = None
         self.events = queue.Queue()
+        self.trace = []
+        self.trace_lock = threading.Lock()
+        self.reader = None
+
+    def note(self, value):
+        value = value if safe_lifecycle_status(value) else 'STATUS_INVALID'
+        with self.trace_lock:
+            if len(self.trace) < 64:
+                self.trace.append(value)
 
     def start(self, cancel):
         startup = subprocess.STARTUPINFO()
@@ -41,13 +50,34 @@ class CaptureProcess:
             creationflags=subprocess.CREATE_NEW_CONSOLE, startupinfo=startup, text=True)
         def read():
             process = self.process
+            ended = False
             try:
-                for line in process.stdout:
-                    self.events.put(line.strip() if line.strip() in ('READY', 'STOPPED') else 'FAILED')
+                for _ in range(64):
+                    line = process.stdout.readline(80)
+                    if not line:
+                        ended = True
+                        break
+                    value = line.strip()
+                    if not line.endswith('\n') or not safe_lifecycle_status(value):
+                        self.note('STATUS_INVALID')
+                        self.events.put('FAILED')
+                        break
+                    self.note(value)
+                    if value in ('READY', 'STOPPED', 'FAILED'):
+                        self.events.put(value)
+                else:
+                    self.note('STATUS_INVALID')
+                    self.events.put('FAILED')
+            except (OSError, ValueError):
+                self.note('STATUS_INVALID')
+                self.events.put('FAILED')
             finally:
                 process.stdout.close()
-                self.events.put('EOF')
-        threading.Thread(target=read, daemon=True).start()
+                if ended:
+                    self.note('EOF')
+                    self.events.put('EOF')
+        self.reader = threading.Thread(target=read, daemon=True)
+        self.reader.start()
         deadline = time.monotonic() + 65
         while time.monotonic() < deadline:
             require(not cancel.is_set(), 'CAPTURE_CANCELLED')
@@ -71,8 +101,15 @@ class CaptureProcess:
             require(process.poll() is None, 'CAPTURE_PROCESS_FAILED')
             process.stdin.write('STOP\n')
             process.stdin.flush()
+            self.note('PARENT_STOP_SENT')
             process.stdin.close()
-            require(process.wait(timeout=25) == 0, 'CAPTURE_PROCESS_FAILED')
+            try:
+                code = process.wait(timeout=25)
+            except subprocess.TimeoutExpired:
+                self.note('PARENT_WAIT_TIMEOUT')
+                raise Failure('CAPTURE_PROCESS_FAILED') from None
+            self.note('WORKER_EXIT=' + str(code))
+            require(code == 0, 'CAPTURE_PROCESS_FAILED')
             messages = []
             # Wait for the status reader, not merely process exit.
             deadline = time.monotonic() + 2
@@ -84,16 +121,31 @@ class CaptureProcess:
                         break
                 except queue.Empty:
                     continue
-            require('STOPPED' in messages and 'FAILED' not in messages, 'CAPTURE_PROCESS_FAILED')
+            if 'EOF' not in messages:
+                self.note('PARENT_STATUS_TIMEOUT')
+            require('STOPPED' in messages and 'EOF' in messages and 'FAILED' not in messages,
+                    'CAPTURE_PROCESS_FAILED')
         except (OSError, subprocess.SubprocessError):
             raise Failure('CAPTURE_PROCESS_FAILED') from None
         finally:
-            if process.poll() is None:
-                process.terminate()
-                process.wait(timeout=5)
-            if process.stdin and not process.stdin.closed:
-                process.stdin.close()
-            self.process = None
+            try:
+                if process.poll() is None:
+                    self.note('PARENT_TERMINATE')
+                    process.terminate()
+                    process.wait(timeout=5)
+            finally:
+                try:
+                    if process.stdin and not process.stdin.closed:
+                        process.stdin.close()
+                finally:
+                    if self.reader:
+                        self.reader.join(timeout=2)
+                    if process.returncode is not None:
+                        self.note('WORKER_EXIT=' + str(process.returncode))
+                    self.process = None
+                    with self.trace_lock:
+                        trace = '\n'.join(self.trace) + '\n'
+                    write_new(self.raw.parent.parent / 'diagnostics/lifecycle.txt', trace.encode('ascii'))
 
 
 def acquire(root, prerequisites, chosen, mapped, cancel, update, *, process_type=CaptureProcess,

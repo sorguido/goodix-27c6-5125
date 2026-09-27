@@ -345,8 +345,14 @@ Require the qualified DLL size and SHA-256 listed earlier.
 
 ## Step 3 — Capture the OEM initialization traffic
 
-Use Wireshark/TShark with USBPcap support. Capture must begin before the reader
-is initialized so that CONFIG90 and the typed A2/82/A6 responses are present.
+The manual reference uses Wireshark/TShark with USBPcap support. Capture before
+initialization can retain early traffic, but attach-once initialization has not
+been proven to yield CONFIG90 reproducibly. Two observed zero-finger recordings
+lack it. The positive historical source is known, while its OEM trigger/capture
+mode and historical wire 0x90 versus the current 0x91 acquisition rule require
+review; see the [builder provenance audit](../tools/windows_material_builder/AUDIT.md).
+CONFIG90 remains mandatory. Do not repeat or extend capture solely to force it;
+no new acquisition is prescribed while this provenance gate remains open.
 
 The extraction logic uses USBPcap link type `249` and bulk endpoints:
 

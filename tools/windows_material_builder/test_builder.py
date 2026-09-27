@@ -14,7 +14,7 @@ import unittest
 from unittest.mock import Mock, patch
 from deployment import test_materials as fixture
 from deployment import materials
-from . import backend, binding, capture, capture_session, diagnostics, windows, gui, files
+from . import backend, binding, capture, capture_session, diagnostics, windows, gui, files, capture_worker
 from .diagnostics import Failure
 from .files import create_run, read_regular
 
@@ -33,7 +33,8 @@ def usb(payload, irp, *, info=0, ep=1, transfer=3, stage=0, device=2, status=0):
 
 def descriptor(irp=1, device=2, identity=(0x27c6, 0x5125)):
     data = bytearray(18)
-    data[:2] = b'\x12\x01'
+    data[:4] = b'\x12\x01\x00\x02'
+    data[7], data[17] = 64, 1
     struct.pack_into('<HH', data, 8, *identity)
     return [usb(b'\x80\x06\x00\x01\x00\x00\x12\x00', irp, ep=128, transfer=2, device=device),
             usb(bytes(data), irp, ep=128, transfer=2, stage=3, info=1, device=device)]
@@ -223,6 +224,208 @@ class ParserTests(Case):
         e = capture.analyze_bytes(pcapng(records(missing=('CONFIG90',))))
         self.assertEqual(e.codes, ('CONFIG90_MISSING',))
         self.assertEqual(set(e.selected), {'A2', 'CHIP82', 'A6'})
+
+
+class EnumerationTests(Case):
+    def rows(self):
+        # Reproduce metadata only: UNKNOWN submit, assigned completion, URB 11 -> 8.
+        rows = records()
+        first = bytearray(rows[0]); struct.pack_into('<H', first, 19, 255)
+        struct.pack_into('<H', first, 14, 11)
+        rows[0] = bytes(first)
+        return rows
+
+    def test_initial_descriptor_transition_accepts_complete_material(self):
+        for encode in (pcap, pcapng):
+            actual = capture.analyze_bytes(encode(self.rows()))
+            expected = capture.analyze_bytes(encode(records()))
+            self.assertEqual(actual.selected, expected.selected)
+            actual.require_complete()
+
+    def test_transition_metadata_near_misses_rejected(self):
+        from dataclasses import replace
+        req, done = [capture.decode(i, 0, r) for i, r in enumerate(self.rows()[:2])]
+        for side, field, value in [(0, 'interface', 1), (0, 'bus', 2), (0, 'irp', 9),
+                (0, 'device', 0), (0, 'device', 3), (1, 'device', 0), (1, 'device', 128),
+                (1, 'device', 255), (0, 'transfer', 3), (1, 'transfer', 3),
+                (0, 'stage', 3), (1, 'stage', 0), (1, 'status', 1),
+                (0, 'endpoint', 0), (1, 'endpoint', 0x81), (0, 'info', 1), (1, 'info', 0)]:
+            with self.subTest(side=side, field=field, value=value):
+                pair = [req, done]; pair[side] = replace(pair[side], **{field: value})
+                self.assertFalse(capture.enumeration_transition(*pair))
+        for offset in range(8):
+            body = bytearray(req.payload); body[offset] ^= 1
+            self.assertFalse(capture.enumeration_transition(replace(req, payload=bytes(body)), done))
+        for body in (done.payload[:-1], done.payload + b'\0', b'\0' * 18):
+            self.assertFalse(capture.enumeration_transition(req, replace(done, payload=body)))
+        for offset, value in ((0, 17), (1, 2), (7, 0), (17, 0)):
+            body = bytearray(done.payload); body[offset] = value
+            self.assertFalse(capture.enumeration_transition(req, replace(done, payload=bytes(body))))
+
+    def test_parser_rejects_assigned_changes_wrong_target_and_late_transition(self):
+        for side, offset, fmt, value in [(0, 19, '<H', 3), (1, 19, '<H', 0),
+                (1, 19, '<H', 128), (1, 10, '<I', 1), (0, 21, '<B', 0x81),
+                (0, 27, '<B', 3), (1, 29, '<B', 2), (0, 34, '<B', 64)]:
+            rows = self.rows(); row = bytearray(rows[side]);struct.pack_into(fmt, row, offset, value);rows[side] = bytes(row)
+            self.fails(capture.BAD, capture.analyze_bytes, pcap(rows))
+        rows = self.rows(); row = bytearray(rows[1]);struct.pack_into('<H', row, 36, 0x1234);rows[1] = bytes(row)
+        self.fails('TARGET_WRONG_IDENTITY', capture.analyze_bytes, pcap(rows))
+        self.fails('TARGET_WRONG_IDENTITY', capture.analyze_bytes, pcap(records() + self.rows()[:2]))
+        self.fails('TARGET_WRONG_IDENTITY', capture.analyze_bytes,
+                   pcap(self.rows() + descriptor(99, device=3)))
+        # Bulk pairing stays strict, including function equality.
+        rows = self.rows(); row = bytearray(rows[3]);struct.pack_into('<H', row, 14, 11);rows[3] = bytes(row)
+        self.fails(capture.BAD, capture.analyze_bytes, pcap(rows))
+
+
+class LifecycleTests(Case):
+    def test_console_q_record_and_write_failure(self):
+        import ctypes
+        from types import SimpleNamespace
+        kernel = Mock()
+        def write(handle, record, count, written):
+            r = record._obj
+            self.assertEqual(r.kind, 1)
+            self.assertEqual(r.event.key.down, 1)
+            self.assertEqual(r.event.key.repeat, 1)
+            self.assertEqual(r.event.key.character, 'q')
+            self.assertEqual(count, 1)
+            written._obj.value = 1
+            return 1
+        kernel.WriteConsoleInputW.side_effect = write
+        with patch.object(ctypes, 'WinDLL', return_value=kernel, create=True), \
+                patch.dict('sys.modules', {'msvcrt': SimpleNamespace(get_osfhandle=lambda _: 123)}):
+            capture_worker.quit_console(Mock())
+            kernel.WriteConsoleInputW.side_effect = lambda *args: 0
+            self.fails('CAPTURE_PROCESS_FAILED', capture_worker.quit_console, Mock())
+
+    def test_orderly_stop_stages_and_nonzero_timeout_fail_closed(self):
+        for result in (0, 7, subprocess.TimeoutExpired('synthetic', 15)):
+            process = Mock()
+            if isinstance(result, Exception): process.wait.side_effect = result
+            else: process.wait.return_value = result
+            with patch.object(capture_worker, 'quit_console') as quit_call, \
+                    patch.object(capture_worker, 'report') as report:
+                if result == 0: capture_worker.orderly_stop(process, Mock())
+                else: self.fails('CAPTURE_PROCESS_FAILED', capture_worker.orderly_stop, process, Mock())
+                quit_call.assert_called_once()
+                stages = [c.args[0] for c in report.call_args_list]
+                self.assertEqual(stages[:3], ['Q_REQUESTED', 'Q_INJECTED', 'CHILD_WAIT'])
+                self.assertEqual(stages[-1], 'CHILD_WAIT_TIMEOUT' if isinstance(result, Exception) else f'CHILD_EXIT={result}')
+        with patch.object(capture_worker, 'quit_console', side_effect=Failure('CAPTURE_PROCESS_FAILED')), \
+                patch.object(capture_worker, 'report') as report:
+            self.fails('CAPTURE_PROCESS_FAILED', capture_worker.orderly_stop, Mock(), Mock())
+            report.assert_called_once_with('Q_REQUESTED')
+
+    def test_stop_control_eof_is_not_explicit_stop(self):
+        from types import SimpleNamespace
+        for raw, expected in [(b'STOP\n', 'STOP_RECEIVED'), (b'STOP\r\n', 'STOP_RECEIVED'),
+                              (b'', 'CONTROL_EOF'), (b'junk\n', 'CONTROL_INVALID'),
+                              (b'STOP', 'CONTROL_INVALID'), (b'STOP \n', 'CONTROL_INVALID')]:
+            stop, received = threading.Event(), threading.Event()
+            with patch.object(capture_worker.sys, 'stdin', SimpleNamespace(buffer=io.BytesIO(raw))), \
+                    patch.object(capture_worker, 'report') as report:
+                capture_worker.stop_request(stop, received)
+            self.assertTrue(stop.is_set())
+            self.assertEqual(received.is_set(), expected == 'STOP_RECEIVED')
+            report.assert_called_once_with(expected)
+
+    def test_parent_status_retention_and_failure_classification(self):
+        cases = [('STARTING\nREADY\nSTOP_RECEIVED\nQ_INJECTED\nCHILD_EXIT=0\nSTOPPED\n', 0, True),
+                 ('READY\nCHILD_WAIT_TIMEOUT\nFAILED\n', 1, False),
+                 ('READY\nSTOPPED\n', 7, False), ('READY\n', 0, False),
+                 ('READY\nprotected arbitrary text\nSTOPPED\n', 0, False),
+                 ('READY\n' + 'Q_INJECTED\n' * 70, 0, False)]
+        for output, exit_code, success in cases:
+            with self.subTest(exit_code=exit_code, success=success), tempfile.TemporaryDirectory() as tmp:
+                run = create_run(Path(tmp)); raw = run / 'raw/oem-init.pcap';raw.write_bytes(pcap(records()))
+                original = raw.read_bytes()
+                process = Mock(returncode=exit_code)
+                process.poll.return_value = None
+                process.wait.return_value = exit_code
+                process.stdout = io.StringIO(output)
+                with patch.object(capture_session.subprocess, 'STARTUPINFO', return_value=Mock(dwFlags=0), create=True), \
+                        patch.multiple(capture_session.subprocess, create=True, CREATE_NEW_CONSOLE=16, STARTF_USESHOWWINDOW=1), \
+                        patch.object(capture_session.subprocess, 'Popen', return_value=process):
+                    owner = capture_session.CaptureProcess(Path('synthetic.exe'), 'synthetic', raw)
+                    owner.start(threading.Event())
+                    if success: owner.stop()
+                    else: self.fails('CAPTURE_PROCESS_FAILED', owner.stop)
+                text = (run / 'diagnostics/lifecycle.txt').read_text()
+                self.assertLessEqual(len(text.splitlines()), 64)
+                self.assertTrue(all(diagnostics.safe_lifecycle_status(v) for v in text.splitlines()))
+                self.assertNotIn('protected', text)
+                self.assertEqual(raw.read_bytes(), original)
+                if success:
+                    self.assertIn('STOPPED', text);self.assertIn('EOF', text)
+
+    def test_stop_signal_survives_failed_status_output(self):
+        from types import SimpleNamespace
+        stop, received = threading.Event(), threading.Event()
+        with patch.object(capture_worker.sys, 'stdin', SimpleNamespace(buffer=io.BytesIO(b'STOP\n'))), \
+                patch.object(capture_worker, 'report', side_effect=BrokenPipeError):
+            with self.assertRaises(BrokenPipeError):
+                capture_worker.stop_request(stop, received)
+        self.assertTrue(stop.is_set()); self.assertTrue(received.is_set())
+        # A broken status pipe must not prevent emergency child cleanup.
+        with tempfile.TemporaryDirectory() as tmp:
+            raw = create_run(Path(tmp)) / 'raw/oem-init.pcap'
+            process = Mock(returncode=None)
+            process.poll.return_value = None
+            process.wait.side_effect = [subprocess.TimeoutExpired('synthetic', 5), 1]
+            def open_capture(path, *args, **kwargs):
+                return io.BytesIO() if path == 'CONIN$' else open(path, *args, **kwargs)
+            def status(value):
+                if value.startswith('CLEANUP_'): raise BrokenPipeError
+            with patch.object(capture_worker, 'normal_user'), patch.object(capture_worker, 'own_process_job'), \
+                    patch.object(capture_worker, 'real_path'), patch.object(capture_worker, 'open', open_capture, create=True), \
+                    patch.object(capture_worker.threading, 'Thread'), \
+                    patch.object(capture_worker.threading, 'Event', return_value=stop), \
+                    patch.object(capture_worker.subprocess, 'Popen', return_value=process), \
+                    patch.object(capture_worker, 'quit_console') as quit_call, \
+                    patch.object(capture_worker, 'report', side_effect=status):
+                with self.assertRaises(BrokenPipeError):
+                    capture_worker.capture(Path('synthetic.exe'), r'\\.\USBPcap1', raw)
+            quit_call.assert_called_once()
+            process.terminate.assert_called_once()
+            self.assertTrue(raw.exists())
+
+    def test_parent_timeout_is_retained_and_never_success(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run = create_run(Path(tmp)); raw = run / 'raw/oem-init.pcap';raw.write_bytes(pcap(records()))
+            owner = capture_session.CaptureProcess(Path('synthetic.exe'), 'synthetic', raw)
+            process = Mock(returncode=1)
+            process.poll.return_value = None
+            process.wait.side_effect = [subprocess.TimeoutExpired('synthetic', 25), 1]
+            owner.process = process
+            self.fails('CAPTURE_PROCESS_FAILED', owner.stop)
+            trace = (run / 'diagnostics/lifecycle.txt').read_text()
+            self.assertIn('PARENT_WAIT_TIMEOUT', trace)
+            self.assertIn('PARENT_TERMINATE', trace)
+            self.assertNotIn('STOPPED', trace)
+            self.assertTrue(raw.exists())
+
+    def test_parent_broken_control_pipe_still_retains_status(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run = create_run(Path(tmp)); raw = run / 'raw/oem-init.pcap';raw.write_bytes(pcap(records()))
+            owner = capture_session.CaptureProcess(Path('synthetic.exe'), 'synthetic', raw)
+            process = Mock(returncode=1)
+            process.poll.return_value = 1
+            process.stdin.closed = False
+            process.stdin.close.side_effect = BrokenPipeError
+            owner.process = process
+            with self.assertRaises(BrokenPipeError):
+                owner.stop()
+            self.assertIn('WORKER_EXIT=1', (run / 'diagnostics/lifecycle.txt').read_text())
+            self.assertTrue(raw.exists())
+            self.assertIsNone(owner.process)
+
+    def test_status_vocabulary_rejects_paths_payloads_and_unbounded_values(self):
+        for text in ('C:\\private\\secret', 'payload=abcd', 'CHILD_EXIT=0 extra',
+                     'CHILD_EXIT=4294967296', 'WORKER_EXIT=-2147483649', 'hash=' + 'a' * 64):
+            self.assertFalse(diagnostics.safe_lifecycle_status(text))
+        for text in ('CHILD_EXIT=0', 'WORKER_EXIT=-1', 'CHILD_EXIT=4294967295'):
+            self.assertTrue(diagnostics.safe_lifecycle_status(text))
 
 
 class SnapshotTests(Case):
@@ -539,7 +742,8 @@ class WorkflowTests(Case):
         flags = {'CREATE_NEW_CONSOLE': 16, 'STARTF_USESHOWWINDOW': 1}
         with patch.object(capture_session.subprocess, 'STARTUPINFO', return_value=Mock(dwFlags=0), create=True), \
                 patch.multiple(capture_session.subprocess, create=True, **flags), \
-                patch.object(capture_session.subprocess, 'Popen', return_value=process) as popen:
+                patch.object(capture_session.subprocess, 'Popen', return_value=process) as popen, \
+                patch.object(capture_session, 'write_new'):
             owner = capture_session.CaptureProcess(Path('USBPcapCMD.exe'), '\\\\.\\USBPcap1', Path('raw.pcap'))
             owner.start(threading.Event())
             self.assertTrue(owner.alive())
@@ -617,7 +821,7 @@ class CorrectiveTests(Case):
 
     def test_gui_extended_choice_is_explicit_and_has_no_third_tier(self):
         app = self.app()
-        evidence = capture.analyze_bytes(pcap(records(missing=('CONFIG90',))))
+        evidence = capture.analyze_bytes(pcap(records(missing=('A2',))))
         with patch.object(gui, 'ScrolledText'):
             app.diagnose((Path('synthetic-run'), evidence))
         callbacks = {call.args[0]: call.args[1] for call in app.button.call_args_list}
@@ -637,7 +841,7 @@ class CorrectiveTests(Case):
         self.assertEqual(app.settle_seconds, 30)
 
     def test_only_missing_evidence_is_eligible(self):
-        for name in ('CONFIG90', 'A2', 'CHIP82', 'A6'):
+        for name in ('A2', 'CHIP82', 'A6'):
             evidence = capture.analyze_bytes(pcap(records(missing=(name,))))
             self.assertTrue(capture_session.can_extend(evidence, 30))
             self.assertFalse(capture_session.can_extend(evidence, 60))
@@ -660,6 +864,18 @@ class CorrectiveTests(Case):
             app.button.reset_mock()
             app.failure(code)
             self.assertNotIn('Retry with extended initialization window', [c.args[0] for c in app.button.call_args_list])
+
+    def test_config90_missing_stops_without_timing_retry(self):
+        for missing in [('CONFIG90',), ('CONFIG90', 'A2')]:
+            evidence = capture.analyze_bytes(pcap(records(missing=missing)))
+            self.assertFalse(capture_session.can_extend(evidence, 30))
+            app = self.app()
+            with patch.object(gui, 'ScrolledText'):
+                app.diagnose((Path('synthetic-run'), evidence))
+            labels = [c.args[0] for c in app.button.call_args_list]
+            self.assertNotIn('Retry with extended initialization window', labels)
+            self.assertNotIn('Recheck for a new default capture', labels)
+        self.assertIn('Stop and retain', diagnostics.CATALOG['CONFIG90_MISSING'].action)
 
     def test_missing_config_with_known_a6_mismatch_has_no_extended_retry(self):
         app = self.app()

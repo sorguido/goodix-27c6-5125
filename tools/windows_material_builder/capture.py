@@ -134,6 +134,19 @@ def analyze(path):
     return analyze_bytes(data)
 
 
+def enumeration_transition(request, complete):
+    """USBPcap UNKNOWN -> assigned address, only for the initial full descriptor."""
+    return (request.interface == complete.interface and request.bus == complete.bus and
+            request.irp == complete.irp and request.transfer == complete.transfer == 2 and
+            request.info == 0 and complete.info == 1 and
+            request.endpoint == complete.endpoint == 0x80 and
+            request.stage == 0 and complete.stage == 3 and request.device == 255 and
+            1 <= complete.device <= 127 and complete.status == 0 and
+            request.payload == b'\x80\x06\x00\x01\x00\x00\x12\x00' and
+            len(complete.payload) == 18 and complete.payload[:2] == b'\x12\x01' and
+            complete.payload[7] in (8, 16, 32, 64) and complete.payload[17] > 0)
+
+
 def analyze_bytes(data):
     records = [decode(i, interface, raw) for i, (interface, raw) in enumerate(packets(data))]
     require(bool(records), 'CAPTURE_EMPTY')
@@ -155,7 +168,13 @@ def analyze_bytes(data):
             # devices. They cannot contribute any accepted evidence.
             if request is None:
                 continue
-            require(request.key == p.key and request.transfer == p.transfer and
+            if request.key != p.key:
+                require(enumeration_transition(request, p), BAD)
+                require(p.key not in identities and p.key not in bulk_seen and
+                        request.key not in bulk_seen, 'TARGET_WRONG_IDENTITY')
+                # No remapping of later packets or material streams. Identity
+                # below is established only on the assigned completion key.
+            require(request.transfer == p.transfer and
                     (request.endpoint & 0x7f) == (p.endpoint & 0x7f), BAD)
             if p.transfer == 3:
                 require(request.endpoint == p.endpoint and request.function == p.function, BAD)

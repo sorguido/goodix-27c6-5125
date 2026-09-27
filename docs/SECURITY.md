@@ -63,9 +63,12 @@ installer. Opening the guide opens a public page in the user's browser.
 Python cannot guarantee erasure of all immutable secret copies in memory.
 The read-only baseline display reports only Windows product/version/build and
 Python version; it does not collect account identifiers or send a report.
-An eligible missing-evidence result can offer one explicit 60-second retry after
+An eligible missing-A2/chip82/A6 result with CONFIG90 present can offer one
+explicit 60-second retry after
 the default 30-second attempt; each requires fresh manual attachment and retains
-its own recording. No retry is automatic.
+its own recording. No retry is automatic. CONFIG90_MISSING requires a stop for
+provenance review. Lifecycle diagnostics contain only allowlisted process/status
+facts; arbitrary child output and exception strings are not retained.
 This candidate has not yet passed real Windows VM validation.
 
 Report the software version, Fedora version, reader identity, exact command,

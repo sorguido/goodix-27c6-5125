@@ -4,6 +4,10 @@
 > [Windows VM material builder](../../tools/windows_material_builder/README.md)
 > is available as source for operator validation. It uses USBPcap directly and
 > does not require Wireshark or TShark. It is not yet a supported release.
+> **Current acquisition gate:** no new capture is prescribed pending
+> [CONFIG90 trigger/wire-contract review](../../tools/windows_material_builder/AUDIT.md).
+> Attach-once does not guarantee CONFIG90; the historical positive capture has
+> unknown UI/mode provenance and wire 0x90, whereas this contract requires 0x91.
 > The manual reference below remains the independent fallback; its native-Windows
 > steps are outside the candidate app's VM-only scope.
 # 11. 🧰 Building your device-material bundle
@@ -602,7 +606,9 @@ if (Test-Path -LiteralPath $CaptureFile) { throw 'STOP: capture already exists; 
 & $UsbPcap -d $CaptureInterface --capture-from-new-devices -o $CaptureFile
 ```
 
-Then manually attach only the same reader to the guest. Wait for normal OEM
+This sequence describes recording mechanics, not a proven CONFIG90 trigger.
+It is currently on hold at the provenance gate above. When a future gate explicitly
+calls for it, manually attach only the same reader to the guest. Wait for normal OEM
 initialization, do not touch it, and stop with Ctrl+C. Omitting `-A` reduces
 unrelated traffic, capture size and exposure of keyboard/storage activity
 from devices already present. The
@@ -1532,9 +1538,11 @@ OEM driver initialize the reader, or was it already initialized before the
 recording? Does the helper support the capture's packet layout? A missing
 message is not fixed by scanning arbitrary bytes for `0x90`.
 
-If a new ordinary initialization recording is justified, use a new filename,
-the same controlled workflow, and no finger contact. Do not automate repeated
-capture/reset attempts or use maintenance/firmware commands to trigger it.
+Stop and retain the recording. No timing retry is justified for CONFIG90_MISSING
+by the current evidence. The historical source is identified, but its trigger
+and wire-contract discrepancy require review before another acquisition is
+planned. Do not automate capture/reset attempts or use maintenance/firmware
+commands to trigger it.
 
 ### “I found two different CONFIG90 bodies”
 

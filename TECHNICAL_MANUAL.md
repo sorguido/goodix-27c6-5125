@@ -289,6 +289,15 @@ See [Device materials](docs/DEVICE_MATERIALS.md) for the complete public
 contract and acquisition boundary. Do not attach these files, their contents,
 raw USB captures, or derived secrets to a bug report.
 
+The Windows material builder remains a development candidate. Source validation,
+USBPcap prerequisites and capture startup have operator-reported live passes;
+clean shutdown, DPAPI and a complete bundle are still unqualified. Its
+[current audit](tools/windows_material_builder/AUDIT.md) identifies the historical
+CONFIG90 source but cannot establish a reproducible Windows trigger or capture
+mode, and records an unresolved wire 0x90/0x91 discrepancy. Missing CONFIG90 is a
+stop for provenance review, not a reason to repeat attachment or wait longer.
+The current gate prescribes no new capture.
+
 ### 5.1 TLS roles and boundaries
 
 The reader is the TLS client and the host driver is the TLS server. The session

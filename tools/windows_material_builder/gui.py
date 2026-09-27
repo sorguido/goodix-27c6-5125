@@ -264,7 +264,8 @@ class App:
             self.button('Open retained capture folder', self.open_capture)
             if capture_session.can_extend(self.evidence, self.settle_seconds):
                 self.button('Retry with extended initialization window', self.retry_extended)
-            self.button('Recheck for a new default capture', self.retry_default)
+            if 'CONFIG90_MISSING' not in self.evidence.codes:
+                self.button('Recheck for a new default capture', self.retry_default)
             return
         self.label('The next step recovers the existing PSK in memory under your original Windows user, '
                    'checks the A6/cache binding and validates the complete five-file bundle.')
