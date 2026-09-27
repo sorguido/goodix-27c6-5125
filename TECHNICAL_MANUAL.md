@@ -1382,6 +1382,16 @@ boundary before rearming. Simply skipping to `0x32` would leave those questions
 unresolved. Offline interleaving tests can verify a defined contract; the
 absence of a zero-mask capture alone does not require a new live experiment.
 
+The [late-release contract](docs/ENROLLMENT_ZERO_MASK_CONTRACT.md) now separates
+sample closure from the device boundary needed before another arm. Its isolated
+specification tests cover the local zero/release effects and the counterexample
+of identical old/current release bytes. The model intentionally cannot rearm:
+no supported device fence or receive correlator has been established. Passing
+that suite does not mean recovery is implemented; production zero rejection
+remains unchanged. The contract also distinguishes the skipped image-choice
+auxiliary acquisition from the OEM release consumer's conditional background
+refresh when its baseline-valid flag is false.
+
 ## 21. Developer invariants, licensing, and references
 
 ### 21.1 Invariants for changes

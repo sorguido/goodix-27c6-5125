@@ -31,3 +31,10 @@ materials. The enrollment suite preserves zero-mask rejection at repeated
 contacts and checks that the rejected event does not deliver the pending
 primary, send an auxiliary acquisition, or rearm. These tests do not establish
 the correct recovery sequence on hardware.
+
+The separate [zero-mask contract](../docs/ENROLLMENT_ZERO_MASK_CONTRACT.md)
+has a Python standard-library specification model under `tests/spec/`.
+Run `python3 -I -B tests/spec/test_irq0200_late_contract.py` from this directory.
+It is not linked into the driver or production tests and intentionally leaves
+rearm blocked while the device release boundary is unproved. Its passing tests
+do not change or qualify runtime acceptance of zero flags.
