@@ -280,8 +280,9 @@ checks. Symlinks, extra files, writable-by-others inputs, malformed structures,
 and a bundle belonging to another target fail closed.
 
 The installed directory is mode `0700`; its regular files are root-owned mode
-`0600`. Import uses no-replace semantics. An already installed bundle is retained
-only when the complete validated set is byte-identical; an install is not an
+`0600`. Import uses no-replace semantics. An already installed valid bundle is the
+canonical source for ordinary updates and reinstalls. An explicit external bundle
+is accepted only when byte-identical to that set; an install is not an
 implicit mechanism for swapping one reader's secrets for another's.
 
 See [Device materials](docs/DEVICE_MATERIALS.md) for the complete public
@@ -1070,21 +1071,26 @@ claim of a byte-reproducible build or an exhaustive software bill of materials.
 ## 16. Installation, update, and rollback
 
 `install.sh` is the public entry point. It must be run by a normal user, resolves
-its own source directory, checks the material staging directory, installs Fedora
-prerequisites, and invokes the build/install orchestrator. Privileged mutation
-of project-owned integration is isolated to the later apply phase; the earlier
-package-manager step also uses sudo to install Fedora prerequisites.
+its own source directory, and invokes the build/install orchestrator. A read-only
+privileged material preflight precedes package installation. The build runs as the
+normal user, then a privileged apply phase revalidates material and replaces the
+project-owned integration. Protected bytes never enter the clone or build output;
+installed material is never copied back to Home. The package-manager step also
+uses sudo to install Fedora prerequisites.
 
 ```mermaid
 flowchart TD
-    Material["Validate five staged files"] --> Build["Inventory source, build,<br/>and run offline checks"]
+    Material["Privileged read-only material selection"] --> Packages["Fedora prerequisites"]
+    Packages --> Build["Normal-user source build<br/>and offline checks"]
     Build --> Preflight["Privileged host and authentication preflight"]
-    Preflight --> Lock["Exclusive lifecycle lock"]
+    Preflight --> Existing["Validate selected material again;<br/>native binding check for installed set"]
+    Existing --> Lock["Exclusive lifecycle lock"]
     Lock --> Quiet["Temporarily inhibit and quiesce fprintd"]
-    Quiet --> Snapshot["Snapshot project-owned integration"]
+    Quiet --> Recheck["Recheck material and software state"]
+    Recheck --> Snapshot["Snapshot project-owned integration"]
     Snapshot --> Replace["If present, remove an existing<br/>valid project installation"]
     Replace --> Recovery["Install recovery tools<br/>and SELinux module"]
-    Recovery --> Native["Import material and run<br/>native binding check"]
+    Recovery --> Native["Preserve installed set, or import new<br/>material with native binding check"]
     Native --> Deploy["Labels, runtime, selector,<br/>PAM entry last"]
     Deploy --> Verify["Verify receipts and stopped service"]
     Verify --> ReleaseSuccess["Restore verified<br/>activation-mask state"]
@@ -1110,10 +1116,31 @@ Before project-owned integration mutation, the installer requires:
 - no unrecognized local fprintd drop-in or preload; and
 - either no project library setting or exactly the expected project setting.
 
-The complete staged bundle is validated before build. Inside the locked,
-quiescent apply transaction, a root-owned copy of the built native checker
-repeats the compatibility binding check without opening USB. Failure triggers
-transaction rollback rather than a successful installation. The PAM selector
+Material-source precedence is fixed:
+
+1. Any existing `/var/lib/goodix-5125-poc/` must pass installed-set validation:
+   root:root ownership, exact `0700`/`0600` permissions, directory/regular-file
+   types without links, exactly five files, manifest, hashes and cross-file bindings.
+   Valid installed material takes precedence over the default Home bundle, which
+   is not read. Missing files, corruption or metadata drift cause STOP without fallback.
+2. Only when installed material and project software are absent does the installer
+   validate the normal user's `~/goodix-5125-materials/` (or explicit `--materials`).
+3. If neither source exists, it stops with `REASON=no_device_material_available`
+   before package installation or project mutation and requires the original bundle.
+   Remaining software with lost installed material also stops for review.
+
+The preliminary privileged check is read-only and repeats at apply time. A
+root-owned copy of the built native checker validates an installed set's E4
+binding without opening USB before the lifecycle transaction. The same bytes and
+metadata are revalidated under the lock before replacement. For first import,
+native validation runs on private root-owned staging inside the transaction before
+atomic publication; failure rolls back the software transaction. No installed set
+is recreated from a stale snapshot if it disappears during preparation.
+
+`--check` remains unprivileged and does not request sudo or install packages.
+When installed material exists, its output explicitly defers protected-content
+validation to the privileged phase; it does not claim that set is valid.
+The PAM selector
 separately checks the exact vendor, `password-auth`, and `postlogin` shapes at
 authentication time before it enables the fingerprint path.
 
@@ -1159,14 +1186,27 @@ Fedora to activate it.
 
 ### 16.4 Update and material retention
 
-There is no separate binary updater. Updating means obtaining current public
-source and running the same builder/installer. A valid existing installation is
-removed and replaced transactionally while fprintd is quiescent.
+The single documented bootstrap fast-forwards an existing clone or clones it
+again when absent, then runs the same installer. The installer reports
+`GOODIX_INSTALL_MODE` automatically:
 
-Existing templates are never part of replacement. An existing valid protected
-bundle is retained byte-for-byte when it equals the staged bundle. A different
-bundle is refused: changing target secrets is a separate, explicit problem, not
-a software update side effect.
+| Valid material source | Project software | Mode |
+| --- | --- | --- |
+| Installed set | Present and passing software preflight | `UPDATE` |
+| Installed set | Absent, including after normal or emergency removal | `REINSTALL` |
+| Home or explicit bundle; installed set absent | Absent | `FIRST_INSTALL` |
+
+A valid existing installation is removed and replaced transactionally while
+fprintd is quiescent. Existing templates are never part of replacement. The
+installed material retains its bytes and file paths; default Home material is
+ignored even if different. An explicit `--materials` bundle must validate and
+match the installed set byte-for-byte, or the operation stops. There is no implicit
+reader/bundle replacement.
+
+The repository clone may be removed after successful installation; runtime and
+removal commands are independent of it. The Home staging copy is not technically
+required for ordinary updates or reinstalls with valid installed material. A
+separate secure backup remains necessary for recovery from total material loss.
 
 ### 16.5 Rollback boundary
 

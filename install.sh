@@ -3,8 +3,6 @@
 set -uo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-MATERIALS="$HOME/goodix-5125-materials"
-ARGS=("$@")
 
 stop_install() {
     local step="$1"
@@ -32,37 +30,9 @@ if [ "${EUID}" -eq 0 ]; then
     stop_install invocation 2 "run ./install.sh as your ordinary user; sudo is requested only when needed"
 fi
 
-for ((i = 0; i < ${#ARGS[@]}; i++)); do
-    case "${ARGS[i]}" in
-        --materials)
-            if (( i + 1 >= ${#ARGS[@]} )); then
-                stop_install materials 2 "missing path after --materials"
-            fi
-            MATERIALS="${ARGS[i + 1]}"
-            ((i++))
-            ;;
-        --materials=*)
-            MATERIALS="${ARGS[i]#--materials=}"
-            ;;
-    esac
-done
-
-printf '\n==> [1/3] Checking protected-material staging directory\n'
-if [ ! -d "$MATERIALS" ]; then
-    stop_install materials 10 "REASON=directory_missing PATH=$MATERIALS"
-fi
-
-printf '\n==> [2/3] Installing Fedora prerequisites\n'
-sudo dnf install git python3 gcc gcc-c++ meson ninja-build pkgconf-pkg-config \
-    glib2-devel libgusb-devel openssl-devel opencv-devel pam-devel binutils \
-    fprintd fprintd-pam policycoreutils-python-utils
-rc=$?
-if [ "$rc" -ne 0 ]; then
-    stop_install dependencies "$rc"
-fi
-
-printf '\n==> [3/3] Building and installing Goodix support\n'
-/usr/bin/python3 -I -B "$ROOT/deployment/install.py" "$@"
+# The orchestrator checks material availability in a read-only privileged phase
+# before installing packages, then builds as this ordinary user.
+/usr/bin/python3 -I -B "$ROOT/deployment/install.py" --install-dependencies "$@"
 rc=$?
 if [ "$rc" -ne 0 ]; then
     stop_install installer "$rc"

@@ -2,8 +2,8 @@
 # Device-specific material contract and acquisition reference
 
 The Goodix `27c6:5125` runtime consumes a five-file protected material bundle.
-The public installer expects the finished bundle in the standard staging
-directory:
+For the first installation, when no installed material exists, the public
+installer expects the finished bundle in the standard staging directory:
 
 ```text
 $HOME/goodix-5125-materials/
@@ -14,7 +14,9 @@ $HOME/goodix-5125-materials/
 └── fdt-cache.bin
 ```
 
-If you already have a valid five-file bundle for your reader, place those files
+If `/var/lib/goodix-5125-poc/` already contains a valid installed set, ordinary
+updates and reinstalls reuse it automatically; no Home staging copy is required.
+Otherwise, if you already have a valid five-file bundle for your reader, place those files
 there and continue with [Installation](INSTALLATION.md). If you do not yet have
 the bundle, Part II below documents how each final file is derived from the same
 reader and its qualified OEM Windows environment.
@@ -234,6 +236,20 @@ After import, runtime material is stored under:
 The directory must be root-owned mode `0700`. Material entries must be regular,
 root-owned mode-`0600` files; symlinks are rejected. The runtime checks metadata
 and content fail-closed before using sensitive material.
+
+Once imported, this set is preserved by updates and both normal and emergency
+removal. Before reuse, the privileged installer checks root ownership, exact
+permissions and file inventory, formats, manifest, hashes, cross-file bindings
+and the native USB-free E4 validator. An existing invalid or incomplete set is
+authoritative drift: installation stops without falling back to the Home bundle.
+An ordinary update ignores any Home copy and never replaces the installed reader
+identity. An explicit `--materials` path must match the installed set byte-for-byte.
+
+The Home staging copy is not technically required after a successful installation.
+Keep an independent private backup: total material loss, reformatting or a new
+machine requires the original five-file bundle for that same reader again.
+Another reader needs its own matching bundle. The installer does not regenerate
+missing material or obtain it over USB.
 
 Keep protected material out of Git repositories, cloud-synchronized folders,
 bug reports, logs, screenshots and public archives.
@@ -618,10 +634,13 @@ Once the five-file bundle is complete in:
 $HOME/goodix-5125-materials/
 ```
 
-follow [Installation](INSTALLATION.md). The public `./install.sh` validates the
+follow the single bootstrap block in [Installation](INSTALLATION.md). On a first
+installation, the public `./install.sh` validates the
 five staged files again, copies them into `/var/lib/goodix-5125-poc/` with
 root-only ownership and permissions, applies the required SELinux mapping, then
 installs the runtime, Plasma Login integration and standalone removal commands.
+Later runs reuse the validated installed set, including after removal of the
+repository clone or Home staging folder.
 
 Do not manually copy the files into `/var/lib`, do not place protected material
 inside the repository, and do not convert or use the historical

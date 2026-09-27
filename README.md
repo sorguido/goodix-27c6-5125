@@ -22,18 +22,27 @@ SELinux Enforcing. Evidence covers one reader; see
 ## Installation
 
 **[Install using the single copy-paste block](docs/INSTALLATION.md).** The root
-`install.sh` builds the runtime from this source tree, imports your materials,
+`install.sh` automatically selects first installation (`FIRST_INSTALL`), update
+(`UPDATE`) or reinstall (`REINSTALL`), builds the runtime from this source tree,
 and installs the login integration and removal commands. It requests normal
 sudo authentication when needed. The reader stays connected throughout.
 
-You need a working password login, administrative access, and your own valid
+You need a working password login and administrative access. The first installation,
+when no valid installed material exists, also needs your own
 [five-file device-material bundle](docs/DEVICE_MATERIALS.md). If you do not
-already have the bundle, that page contains the detailed acquisition reference
+already have that bundle, that page contains the detailed acquisition reference
 for deriving the five final files from the same reader and qualified OEM Windows
 environment. Place the finished files in `$HOME/goodix-5125-materials/`, outside
 the clone. The project does not distribute protected material or ship automated
 acquisition/extraction tooling. Fedora prerequisites are included in the
-installation guide's single block; separate build instructions are unnecessary.
+installation flow; separate build instructions are unnecessary. Git must be available
+to run the bootstrap block.
+
+After a successful installation, the repository clone may be removed; a later run
+of the same bootstrap block clones it again automatically. Ordinary updates and
+reinstalls reuse the validated protected set in `/var/lib/goodix-5125-poc/`, so
+the Home staging folder is not technically required. Keep an independent secure
+backup of the original bundle for material loss, reformatting or a new machine.
 
 ## Using fingerprint authentication
 
@@ -68,8 +77,10 @@ instruction. It cannot repair an independently broken Fedora authentication stac
 
 ## Device material and security
 
-The installer copies the protected bundle into `/var/lib/goodix-5125-poc/`, sets
-root-only permissions and applies the required SELinux labels. Keep materials,
+On first installation, the installer copies the protected bundle into
+`/var/lib/goodix-5125-poc/`, sets root-only permissions and applies the required
+SELinux labels. Subsequent runs validate and preserve that installed set; invalid
+installed material stops the operation without falling back to a Home copy. Keep materials,
 fingerprint images, templates and raw USB captures out of source trees and
 issue reports. [Security and privacy](docs/SECURITY.md) describes the boundary.
 

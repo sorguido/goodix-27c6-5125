@@ -329,10 +329,57 @@ def lifecycle():
             os.close(fd)
 
 
-def apply(payload, material_directory, owner_uid):
+def material_present(path):
+    # Unlike exists(), lstat distinguishes absence from inaccessible state and
+    # counts dangling links/special files as present: those must fail closed.
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        return False
+    return True
+
+
+def installed_bundle():
+    try:
+        safe_parent(r.MATERIAL)
+        return materials.validate_bundle(r.MATERIAL, source=False, owner_uid=0, owner_gid=0)
+    except (OSError, RuntimeError) as error:
+        raise RuntimeError('REASON=invalid_installed_material; installed state drift; '
+                           'no fallback to Home material: ' + str(error)) from error
+
+
+def select_materials(material_directory, owner_uid, *, explicit=False):
+    """Read-only privileged selection; never copy installed bytes to the user."""
+    require(os.geteuid() == 0, 'material selection requires the privileged phase')
+    safe_parent(r.MATERIAL)
+    software_installed = any(r.present(path) for path in software_paths())
+    if material_present(r.MATERIAL):
+        bundle = installed_bundle()
+        if explicit and material_directory != r.MATERIAL:
+            requested = source_bundle(material_directory, owner_uid)
+            require(requested.files == bundle.files,
+                    'REASON=explicit_material_mismatch; installed material differs; it was preserved')
+        return ('UPDATE' if software_installed else 'REINSTALL'), bundle, True
+    require(material_present(material_directory),
+            'REASON=no_device_material_available; first installation or total material loss: '
+            'the original five-file device bundle is required in ~/goodix-5125-materials '
+            '(or --materials PATH)')
+    require(not software_installed,
+            'REASON=installed_material_missing; project software remains; '
+            'material loss requires review before importing a bundle')
+    return 'FIRST_INSTALL', source_bundle(material_directory, owner_uid), False
+
+
+def source_bundle(directory, owner_uid):
+    require(not directory.resolve().is_relative_to(ROOT),
+            'protected material must be staged outside the repository')
+    return materials.validate_bundle(directory, source=True, owner_uid=owner_uid)
+
+
+def apply(payload, material_directory, owner_uid, *, explicit=False):
     require(os.geteuid() == 0, 'administrative installation requires sudo')
+    mode, bundle, reuse = select_materials(material_directory, owner_uid, explicit=explicit)
     host_preflight()
-    bundle = materials.validate_bundle(material_directory, source=True, owner_uid=owner_uid)
     manifest = builder.validate_payload(payload)
     for path in software_paths():
         safe_parent(path)
@@ -346,7 +393,20 @@ def apply(payload, material_directory, owner_uid):
         staged_payload = staging / 'payload'
         shutil.copytree(payload, staged_payload, symlinks=True)
         require(builder.validate_payload(staged_payload) == manifest, 'build payload changed during staging')
+        native_check = lambda directory: command(str(staged_payload / 'check-material'), str(directory))
+        if reuse:
+            native_check(r.MATERIAL)
+            require(installed_bundle().files == bundle.files, 'installed material changed during native validation')
         with lifecycle():
+            # The preliminary check is advisory: recheck under the lifecycle
+            # lock before replacement, and never recreate a lost installed set.
+            if reuse:
+                require(installed_bundle().files == bundle.files, 'installed material changed before replacement')
+            else:
+                require(not material_present(r.MATERIAL), 'installed material appeared; retry for safe selection')
+            require(any(r.present(p) for p in software_paths()) == (mode == 'UPDATE'),
+                    'project software changed during preparation; retry for safe selection')
+            print('GOODIX_INSTALL_MODE=' + mode, flush=True)
             saved = snapshot_software(staging)
             rule_before = material_rule()
             try:
@@ -355,8 +415,8 @@ def apply(payload, material_directory, owner_uid):
                         require(r.remove(force=False) == 0, 'existing installation could not be removed')
                 install_tools(manifest['source_id'])
                 install_selinux_module()
-                materials.install_materials(bundle, r.MATERIAL,
-                    native_check=lambda directory: command(str(staged_payload / 'check-material'), str(directory)))
+                if not reuse:
+                    materials.install_materials(bundle, r.MATERIAL, native_check=native_check)
                 preexisting = material_rule()
                 if not preexisting:
                     command('semanage', 'fcontext', '-a', '-f', 'a', '-t', 'fprintd_var_lib_t', '-r', 's0', r.RULE)
@@ -378,40 +438,66 @@ def apply(payload, material_directory, owner_uid):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--materials', type=Path, default=Path.home() / 'goodix-5125-materials',
-                        help='directory containing the five protected files (default: ~/goodix-5125-materials)')
-    parser.add_argument('--check', action='store_true', help='check prerequisites and material structure without installation')
+    parser.add_argument('--materials', type=Path,
+                        help='explicit five-file bundle; must match any installed set exactly '
+                             '(otherwise automatically reuse installed material or ~/goodix-5125-materials)')
+    parser.add_argument('--check', action='store_true',
+                        help='unprivileged prerequisite/structure check; installed material validation is deferred')
     parser.add_argument('--apply', type=Path, help=argparse.SUPPRESS)
     parser.add_argument('--owner-uid', type=int, help=argparse.SUPPRESS)
+    parser.add_argument('--default-materials', type=Path, help=argparse.SUPPRESS)
+    parser.add_argument('--material-preflight', action='store_true', help=argparse.SUPPRESS)
+    parser.add_argument('--install-dependencies', action='store_true', help=argparse.SUPPRESS)
     args = parser.parse_args()
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
-    material_directory = args.materials.expanduser().absolute()
-    require(not material_directory.resolve().is_relative_to(ROOT),
-            'protected material must be staged outside the repository')
+    material_directory = (args.materials if args.materials is not None else
+                          args.default_materials if args.default_materials is not None else
+                          Path.home() / 'goodix-5125-materials').expanduser().absolute()
     def interrupted(_signum, _frame):
         raise KeyboardInterrupt('installation interrupted')
     signal.signal(signal.SIGTERM, interrupted)
-    if args.apply is not None:
-        require(not args.check and args.owner_uid is not None, 'invalid administrative invocation')
-        apply(args.apply.absolute(), material_directory, args.owner_uid)
+    if args.apply is not None or args.material_preflight:
+        require(not args.check and not args.install_dependencies and args.owner_uid is not None
+                and not (args.apply is not None and args.material_preflight), 'invalid administrative invocation')
+        if args.material_preflight:
+            select_materials(material_directory, args.owner_uid, explicit=args.materials is not None)
+            print('GOODIX_MATERIAL_PREFLIGHT=PASS NATIVE_BINDING_CHECK_AT_INSTALL=true')
+        else:
+            apply(args.apply.absolute(), material_directory, args.owner_uid, explicit=args.materials is not None)
         return 0
     require(os.geteuid() != 0, 'run ./install.sh as your ordinary user; it requests sudo itself')
-    require(args.owner_uid is None, 'invalid invocation')
+    require(args.owner_uid is None and args.default_materials is None, 'invalid invocation')
     supported_system()
-    materials.validate_bundle(material_directory, source=True)
-    prerequisites()
     if args.check:
+        prerequisites()
+        if material_present(r.MATERIAL):
+            print('GOODIX_CHECK=PASS INSTALLED_MATERIAL_VALIDATION=DEFERRED_TO_PRIVILEGED_PHASE')
+            return 0
+        source_bundle(material_directory, os.getuid())
         print('GOODIX_CHECK=PASS STATIC_MATERIAL_CHECK=PASS NATIVE_BINDING_CHECK_AT_INSTALL=true')
         return 0
+    privileged = ['/usr/bin/sudo', '--', '/usr/bin/python3', '-I', '-B', str(Path(__file__).resolve())]
+    selection = ['--materials' if args.materials is not None else '--default-materials',
+                 str(material_directory), '--owner-uid', str(os.getuid())]
+    print('\n==> [1/3] Checking available protected material (read-only)', flush=True)
+    result = subprocess.run([*privileged, '--material-preflight', *selection], env=ENV)
+    if result.returncode:
+        return result.returncode
+    if args.install_dependencies:
+        print('\n==> [2/3] Installing Fedora prerequisites', flush=True)
+        result = subprocess.run(['/usr/bin/sudo', '--', '/usr/bin/dnf', 'install', 'git', 'python3',
+                                 *builder.BUILD_PACKAGES, *RUNTIME_PACKAGES], env=ENV)
+        if result.returncode:
+            return result.returncode
+    prerequisites()
+    print('\n==> [3/3] Building and installing Goodix support', flush=True)
     # Build before privileged file/service changes; never place materials in the clone.
     with tempfile.TemporaryDirectory(prefix='goodix-build-') as output:
         payload = Path(output) / 'payload'
         builder.build_payload(payload)
         manifest = builder.validate_payload(payload)
         print('GOODIX_BUILD=PASS SOURCE_ID=' + manifest['source_id'], flush=True)
-        result = subprocess.run(['/usr/bin/sudo', '--', '/usr/bin/python3', '-I', '-B',
-            str(Path(__file__).resolve()), '--apply', str(payload), '--materials', str(material_directory),
-            '--owner-uid', str(os.getuid())], env=ENV)
+        result = subprocess.run([*privileged, '--apply', str(payload), *selection], env=ENV)
         return result.returncode
 
 

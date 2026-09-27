@@ -31,6 +31,10 @@ user's five files, installs the runtime and login integration, and installs
 standalone removal commands. It is independent of clone location and private
 build outputs. The reader remains connected throughout the lifecycle.
 
+The unified bootstrap and automatic reuse of installed material are covered by
+offline synthetic tests. Live validation of that new flow, including deletion of
+the clone and Home staging folder, remains pending human testing.
+
 The complete public procedure has now been exercised successfully on a freshly
 installed and updated Fedora 44 KDE VM and on the physical Fedora 44 KDE
 qualification system. On the physical system, installation completed with SELinux
@@ -46,6 +50,9 @@ Synthetic checks exercise two distinct valid reader bundles, invalid and missing
 materials, unsafe file types, file binding errors, source/payload validation,
 service quiescence and activation inhibition, partial installation rollback,
 project ownership/drift handling and standalone normal/emergency removal.
+They also cover bootstrap clone/pull/conflict behavior, automatic installation
+modes, installed-material precedence without Home staging, explicit bundle
+mismatch rejection, and reinstall after both removal paths.
 Tests use temporary filesystem fixtures and substitute privileged host operations;
 they do not read real protected bundles, open USB or authenticate through host PAM.
 

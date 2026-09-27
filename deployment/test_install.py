@@ -65,15 +65,16 @@ class Installer(unittest.TestCase):
         self.ctx.enter_context(patch.object(m, 'safe_parent', side_effect=m.r.parents))
         self.ctx.enter_context(patch.object(m.r, 'trusted', side_effect=self.trusted))
         self.ctx.enter_context(patch.object(m, 'label_materials', side_effect=self.labels))
-        self.ctx.enter_context(contextlib.redirect_stdout(io.StringIO()))
-        self.ctx.enter_context(contextlib.redirect_stderr(io.StringIO()))
+        self.stdout, self.stderr = io.StringIO(), io.StringIO()
+        self.ctx.enter_context(contextlib.redirect_stdout(self.stdout))
+        self.ctx.enter_context(contextlib.redirect_stderr(self.stderr))
         self.source = self.base / 'goodix-5125-materials'
         self.source.mkdir(mode=0o700)
         # The full metadata/format/crypto contract is tested by test_materials;
         # this transaction fixture deliberately contains no real device data.
         for name in m.r.MATERIAL_NAMES:
             (self.source / name).write_bytes(b'SYNTHETIC ' + name.encode())
-        self.bundle = object()
+        self.bundle = SimpleNamespace(files={p.name: p.read_bytes() for p in self.source.iterdir()})
         self.ctx.enter_context(patch.object(m.materials, 'validate_bundle', side_effect=self.validate_material))
         self.ctx.enter_context(patch.object(m.materials, 'install_materials', side_effect=self.import_material))
         self.payload = self.base / 'payload'
@@ -87,13 +88,17 @@ class Installer(unittest.TestCase):
                   'synthetic project type/mode drift')
 
     def validate_material(self, path, **kwargs):
-        self.assertEqual(Path(path), self.source)
+        self.assertIn(Path(path), (self.source, m.r.MATERIAL))
+        self.assertEqual(kwargs['source'], path == self.source)
+        self.assertEqual(kwargs['owner_uid'], os.getuid() if path == self.source else 0)
+        if path == m.r.MATERIAL:
+            self.assertEqual(kwargs['owner_gid'], 0)
         m.require({p.name for p in path.iterdir()} == set(m.r.MATERIAL_NAMES), 'five files required')
         m.require(all(p.is_file() and not p.is_symlink() for p in path.iterdir()), 'material source type')
-        return self.bundle
+        return SimpleNamespace(files={p.name: p.read_bytes() for p in path.iterdir()})
 
     def import_material(self, bundle, destination, *, native_check):
-        self.assertIs(bundle, self.bundle)
+        self.assertEqual(bundle.files, self.bundle.files)
         self.assertFalse(self.active)
         self.assertTrue(m.r.MASK.is_symlink())
         if destination.exists():
@@ -185,6 +190,38 @@ class Installer(unittest.TestCase):
         with patch.object(m.os, 'geteuid', return_value=0):
             m.apply(self.payload, self.source, os.getuid())
 
+    def test_first_install_mode_and_no_protected_output(self):
+        self.apply()
+        self.assertIn('GOODIX_INSTALL_MODE=FIRST_INSTALL', self.stdout.getvalue())
+        for value in self.bundle.files.values():
+            self.assertNotIn(value.decode(), self.stdout.getvalue() + self.stderr.getvalue())
+
+    def test_update_without_home_bundle_preserves_inodes(self):
+        self.apply()
+        before = {p.name: p.stat().st_ino for p in m.r.MATERIAL.iterdir()}
+        shutil.rmtree(self.source)
+        with patch.object(m.materials, 'install_materials', side_effect=AssertionError('unexpected import')):
+            self.apply()
+        self.assertIn('GOODIX_INSTALL_MODE=UPDATE', self.stdout.getvalue())
+        self.assertEqual(before, {p.name: p.stat().st_ino for p in m.r.MATERIAL.iterdir()})
+        self.assert_preserved()
+
+    def test_reinstall_after_both_removal_paths_without_home_bundle(self):
+        self.apply()
+        before = {p.name: p.stat().st_ino for p in m.r.MATERIAL.iterdir()}
+        shutil.rmtree(self.source)
+        for force in (False, True):
+            with self.subTest(force=force):
+                self.assertEqual(m.r.remove(force=force), 0)
+                self.assertFalse(any(m.r.present(p) for p in m.software_paths()))
+                self.stdout.seek(0)
+                self.stdout.truncate()
+                with patch.object(m.materials, 'install_materials', side_effect=AssertionError('unexpected import')):
+                    self.apply()
+                self.assertIn('GOODIX_INSTALL_MODE=REINSTALL', self.stdout.getvalue())
+                self.assertEqual(before, {p.name: p.stat().st_ino for p in m.r.MATERIAL.iterdir()})
+                self.assert_preserved()
+
     def assert_preserved(self):
         self.assertEqual(self.vendor.read_text(), 'Fedora vendor sentinel\n')
         self.assertEqual(self.template.read_bytes(), b'synthetic template sentinel')
@@ -232,6 +269,7 @@ class Installer(unittest.TestCase):
 
     def test_failed_update_restores_prior_project_installation(self):
         self.apply()
+        shutil.rmtree(self.source)
         before = (m.r.RUNTIME / 'installation.json').read_bytes()
         with patch.object(m, 'install_login', side_effect=RuntimeError('synthetic failed update')):
             with self.assertRaisesRegex(RuntimeError, 'synthetic failed update'):
@@ -313,6 +351,7 @@ class Installer(unittest.TestCase):
 
     def test_native_binding_rejection_restores_previous_install(self):
         self.apply()
+        self.events.clear()
         before = (m.r.RUNTIME / 'installation.json').read_bytes()
         def reject_native(*args):
             if str(args[0]).endswith('/check-material'):
@@ -322,7 +361,42 @@ class Installer(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'synthetic native binding rejected'):
                 self.apply()
         self.assertEqual((m.r.RUNTIME / 'installation.json').read_bytes(), before)
+        self.assertFalse(any(args[:2] == ('systemctl', 'stop') for args in self.events))
         m.r.normal_preflight()
+        self.assert_preserved()
+
+    def test_explicit_mismatch_stops_before_transaction(self):
+        self.apply()
+        before = (m.r.RUNTIME / 'installation.json').read_bytes()
+        (self.source / m.r.MATERIAL_NAMES[1]).write_bytes(b'SYNTHETIC DIFFERENT READER')
+        self.events.clear()
+        with patch.object(m.os, 'geteuid', return_value=0), \
+                self.assertRaisesRegex(RuntimeError, 'REASON=explicit_material_mismatch'):
+            m.apply(self.payload, self.source, os.getuid(), explicit=True)
+        self.assertEqual(self.events, [])
+        self.assertEqual((m.r.RUNTIME / 'installation.json').read_bytes(), before)
+        self.assert_preserved()
+
+    def test_installed_material_lost_after_native_check_is_not_recreated(self):
+        self.apply()
+        before = (m.r.RUNTIME / 'installation.json').read_bytes()
+        original = m.r.inhibit_activation
+        preserved = self.base / 'preserved-material-fixture'
+
+        def lose_material():
+            result = original()
+            m.r.MATERIAL.rename(preserved)
+            return result
+
+        with patch.object(m.r, 'inhibit_activation', side_effect=lose_material), \
+                patch.object(m.materials, 'install_materials') as publish, \
+                self.assertRaisesRegex(RuntimeError, 'invalid_installed_material'):
+            self.apply()
+        publish.assert_not_called()
+        self.assertFalse(m.r.MATERIAL.exists())
+        self.assertEqual((m.r.RUNTIME / 'installation.json').read_bytes(), before)
+        self.assertFalse(m.r.MASK.is_symlink())
+        preserved.rename(m.r.MATERIAL)
         self.assert_preserved()
 
     def test_foreign_library_environment_is_rejected_before_mutation(self):
@@ -378,12 +452,14 @@ class Installer(unittest.TestCase):
     def test_default_material_path_and_sudo_arguments_in_public_main(self):
         built = []
         def build(path):
+            self.assertNotEqual(m.os.geteuid(), 0)
             built.append(path)
             shutil.copytree(self.payload, path, symlinks=True)
         def execute(argv, **kwargs):
             self.assertEqual(argv[:6], ['/usr/bin/sudo', '--', '/usr/bin/python3', '-I', '-B', str(HERE / 'install.py')])
-            self.assertEqual(argv[argv.index('--materials')+1], str(self.source))
-            self.assertTrue(built)
+            self.assertNotIn('--materials', argv)
+            self.assertEqual(argv[argv.index('--default-materials')+1], str(self.source))
+            self.assertEqual(bool(built), '--apply' in argv)
             return SimpleNamespace(returncode=0)
         with patch.object(Path, 'home', return_value=self.base), \
                 patch.object(m.os, 'geteuid', return_value=1000), \
@@ -391,6 +467,62 @@ class Installer(unittest.TestCase):
                 patch.object(m.builder, 'build_payload', side_effect=build), \
                 patch.object(m.subprocess, 'run', side_effect=execute):
             self.assertEqual(m.main(), 0)
+
+    def test_failed_material_preflight_never_installs_packages_or_builds(self):
+        for explicit in ([], ['--materials', str(self.source)]):
+            with self.subTest(explicit=bool(explicit)), \
+                    patch.object(Path, 'home', return_value=self.base), \
+                    patch.object(m.os, 'geteuid', return_value=1000), \
+                    patch.object(sys, 'argv', ['install.py', '--install-dependencies', *explicit]), \
+                    patch.object(m.builder, 'build_payload') as build, \
+                    patch.object(m.subprocess, 'run', return_value=SimpleNamespace(returncode=1)) as run:
+                self.assertEqual(m.main(), 1)
+                build.assert_not_called()
+                run.assert_called_once()
+                argv = run.call_args.args[0]
+                self.assertIn('--material-preflight', argv)
+                self.assertEqual('--materials' in argv, bool(explicit))
+
+    def test_dependencies_follow_material_preflight_and_build_remains_unprivileged(self):
+        order = []
+
+        def execute(argv, **kwargs):
+            self.assertEqual(m.os.geteuid(), 1000)
+            if '--material-preflight' in argv:
+                order.append('preflight')
+            elif '/usr/bin/dnf' in argv:
+                self.assertEqual(argv[:4], ['/usr/bin/sudo', '--', '/usr/bin/dnf', 'install'])
+                self.assertTrue(set(m.builder.BUILD_PACKAGES + m.RUNTIME_PACKAGES) <= set(argv))
+                order.append('packages')
+            else:
+                self.assertIn('--apply', argv)
+                self.assertIn('--materials', argv)
+                order.append('apply')
+            return SimpleNamespace(returncode=0)
+
+        def build(path):
+            self.assertEqual(m.os.geteuid(), 1000)
+            order.append('build')
+            shutil.copytree(self.payload, path, symlinks=True)
+
+        with patch.object(m.os, 'geteuid', return_value=1000), \
+                patch.object(sys, 'argv', ['install.py', '--install-dependencies', '--materials', str(self.source)]), \
+                patch.object(m.builder, 'build_payload', side_effect=build), \
+                patch.object(m.subprocess, 'run', side_effect=execute):
+            self.assertEqual(m.main(), 0)
+        self.assertEqual(order, ['preflight', 'packages', 'build', 'apply'])
+
+    def test_check_defers_installed_material_without_sudo_or_home(self):
+        self.apply()
+        shutil.rmtree(self.source)
+        with patch.object(m.os, 'geteuid', return_value=1000), \
+                patch.object(sys, 'argv', ['install.py', '--check']), \
+                patch.object(m.subprocess, 'run') as run, \
+                patch.object(m.materials, 'validate_bundle') as validate:
+            self.assertEqual(m.main(), 0)
+            run.assert_not_called()
+            validate.assert_not_called()
+        self.assertIn('INSTALLED_MATERIAL_VALIDATION=DEFERRED', self.stdout.getvalue())
 
 
 if __name__ == '__main__':
