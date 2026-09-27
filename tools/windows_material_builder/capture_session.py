@@ -9,7 +9,7 @@ import threading
 import time
 from . import windows
 from .capture import LIMIT, analyze
-from .capture_worker import CaptureJob, STOP_SECONDS
+from .capture_worker import STOP_SECONDS, STOP_BUDGET_SECONDS
 from .diagnostics import Failure, require, safe_lifecycle_status
 from .files import create_run, write_new
 
@@ -34,8 +34,7 @@ class CaptureProcess:
         self.trace = []
         self.trace_lock = threading.Lock()
         self.reader = None
-        self.job = None
-        self.assigned = self.ready = False
+        self.ready = False
 
     def note(self, value):
         value = value if safe_lifecycle_status(value) else 'STATUS_INVALID'
@@ -44,18 +43,11 @@ class CaptureProcess:
                 self.trace.append(value)
 
     def start(self, cancel):
-        startup = subprocess.STARTUPINFO()
-        startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        startup.wShowWindow = 0
-        self.job = CaptureJob()
         self.process = subprocess.Popen(
             [sys.executable, '-m', 'tools.windows_material_builder.capture_worker',
              str(self.executable), self.interface, str(self.raw)], cwd=ROOT,
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            creationflags=subprocess.CREATE_NEW_CONSOLE, startupinfo=startup, text=True)
-        self.job.assign(self.process)
-        self.assigned = True
-        self.note('SCOPE_ASSIGNED')
+            creationflags=0x08000000, text=True)  # CREATE_NO_WINDOW
         def read(process=self.process):
             ended = False
             try:
@@ -70,7 +62,7 @@ class CaptureProcess:
                         self.events.put('FAILED')
                         break
                     self.note(value)
-                    if value in ('READY', 'RELAY_TERMINATED', 'FAILED'):
+                    if value in ('READY', 'USBPCAP_ABSENT', 'RAW_CLOSED', 'FAILED'):
                         self.events.put(value)
                 else:
                     self.note('STATUS_INVALID')
@@ -96,38 +88,43 @@ class CaptureProcess:
             except queue.Empty:
                 continue
             require(event == 'READY', 'CAPTURE_PROCESS_FAILED')
-            # Closed pinned graph: helper + unelevated relay + elevated pipe writer.
-            # No extra process is created by this helper. Fail before attachment if
-            # UAC/job inheritance differs, a member exited, or an extra member appears.
-            self.job.verify_members(self.process.pid, self.executable)
             self.ready = True
-            self.note('SCOPE_READY')
             return
         raise Failure('CAPTURE_PROCESS_FAILED')
 
     def alive(self):
-        return (self.process is not None and self.process.poll() is None and
-                self.ready and self.job.population() == (3, 3))
+        return self.process is not None and self.process.poll() is None and self.ready
 
     def stop(self):
-        if self.process is None and self.job is None:
+        if self.process is None:
             return
-        process, job = self.process, self.job
-        valid, error = False, None
+        process, error = self.process, None
+        valid = self.alive()
         try:
-            require(self.alive(), 'CAPTURE_PROCESS_FAILED')
-            self.note('INTENTIONAL_STOP')
-            process.stdin.write('STOP\n')
-            process.stdin.flush()
-            self.note('PARENT_STOP_SENT')
-            process.stdin.close()
+            # Also send STOP before READY on cancellation/startup failure. The
+            # helper runs the same TASKKILL cleanup, but cannot accept that raw.
+            if process.poll() is None:
+                self.note('INTENTIONAL_STOP')
+                process.stdin.write('STOP\n')
+                process.stdin.flush()
+                self.note('PARENT_STOP_SENT')
+                process.stdin.close()
+        except (OSError, ValueError):
+            valid = False
+            self.note('CONTROL_INVALID')
+        try:
             try:
-                code = process.wait(timeout=10)
+                code = process.wait(timeout=STOP_BUDGET_SECONDS)
             except subprocess.TimeoutExpired:
                 self.note('PARENT_WAIT_TIMEOUT')
+                # Bounds even a blocked UAC request. This kills only our Python
+                # helper, never substitutes for TASKKILL or proves native cleanup.
+                process.terminate()
+                process.wait(timeout=STOP_SECONDS)
+                self.note('CLEANUP_UNVERIFIED')
                 raise Failure('CAPTURE_PROCESS_FAILED') from None
             self.note('WORKER_EXIT=' + str(code))
-            require(code == 0, 'CAPTURE_PROCESS_FAILED')
+            require(valid and code == 0, 'CAPTURE_PROCESS_FAILED')
             messages = []
             deadline = time.monotonic() + 2
             while time.monotonic() < deadline:
@@ -140,36 +137,19 @@ class CaptureProcess:
                     continue
             if 'EOF' not in messages:
                 self.note('PARENT_STATUS_TIMEOUT')
-            require('RELAY_TERMINATED' in messages and 'EOF' in messages and 'FAILED' not in messages,
-                    'CAPTURE_PROCESS_FAILED')
-            valid = True
-        except Exception:
-            error = Failure('CAPTURE_PROCESS_FAILED')
-        # Always retire the whole private job, also on cancel, broken pipes and
-        # worker crash. A native relay exit alone is never writer-quiescence proof.
-        try:
-            if process is not None and not self.assigned and process.poll() is None:
-                # Assignment failed: START was never sent, so only the blocked
-                # helper exists outside the job. Terminate its exact Popen handle.
-                self.note('UNASSIGNED_HELPER_TERMINATE')
-                process.terminate()
-                process.wait(timeout=STOP_SECONDS)
-            if job is not None:
-                self.note('SCOPE_TERMINATE')
-                job.terminate()
-                self.note('SCOPE_QUIESCENT')
-            if process is not None:
-                process.wait(timeout=STOP_SECONDS)
-            require(valid, 'CAPTURE_PROCESS_FAILED')
-            # All writers have exited and closed their handles. No sleep-based
-            # stability guess: flush the retained file only after job active == 0.
+            require(messages == ['USBPCAP_ABSENT', 'RAW_CLOSED', 'EOF'], 'CAPTURE_PROCESS_FAILED')
+            # Native absence and writer closure precede fsync and bounded size
+            # stability. Strict parsing is performed by acquire() only afterward.
             self.note('RAW_FLUSH')
             with open(self.raw, 'r+b', buffering=0) as raw:
                 size = os.fstat(raw.fileno()).st_size
                 require(24 <= size <= LIMIT, 'CAPTURE_PROCESS_FAILED')
+                raw.flush()
                 os.fsync(raw.fileno())
                 require(os.fstat(raw.fileno()).st_size == size, 'CAPTURE_PROCESS_FAILED')
-            require(self.raw.stat().st_size == size, 'CAPTURE_PROCESS_FAILED')
+            for _ in range(3):
+                time.sleep(0.05)
+                require(self.raw.stat().st_size == size, 'CAPTURE_PROCESS_FAILED')
             self.note('RAW_FLUSHED')
             self.note('STOPPED')
         except Exception:
@@ -177,25 +157,21 @@ class CaptureProcess:
             error = Failure('CAPTURE_PROCESS_FAILED')
         finally:
             try:
-                if job is not None:
-                    job.close()  # Last-handle-close remains the crash/failure backstop.
-            except Exception:
-                self.note('STOP_FAILED')
-                error = Failure('CAPTURE_PROCESS_FAILED')
-            try:
-                if process is not None and process.stdin and not process.stdin.closed:
+                if process.stdin and not process.stdin.closed:
                     process.stdin.close()
             except (OSError, ValueError):
                 self.note('CONTROL_INVALID')
                 error = Failure('CAPTURE_PROCESS_FAILED')
             if self.reader:
                 self.reader.join(timeout=2)
-            elif process is not None and process.stdout:
+            elif process.stdout:
                 process.stdout.close()
-            if process is not None and process.returncode is not None:
-                self.note('WORKER_EXIT=' + str(process.returncode))
-            self.process = self.job = None
-            self.ready = self.assigned = False
+            if process.returncode is not None:
+                process._handle.Close()
+            else:
+                self.note('CLEANUP_UNVERIFIED')
+            self.process = None
+            self.ready = False
             with self.trace_lock:
                 trace = '\n'.join(self.trace) + '\n'
             write_new(self.raw.parent.parent / 'diagnostics/lifecycle.txt', trace.encode('ascii'))
@@ -243,6 +219,7 @@ def acquire(root, prerequisites, chosen, mapped, cancel, update, *, process_type
         error = Failure('CAPTURE_PROCESS_FAILED')
     finally:
         try:
+            update('STOPPING', None)
             process.stop()
         except Exception:
             if error is None:

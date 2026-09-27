@@ -241,6 +241,7 @@ class App:
         texts = {'STARTING': 'Starting capture. Keep Goodix detached until the next instruction.',
                  'ATTACH': 'Now attach the Goodix to this Windows VM. Do not touch the sensor.',
                  'SETTLING': f'Goodix was observed. Waiting {self.settle_seconds} seconds for ordinary OEM initialization. Do not touch the sensor.',
+                 'STOPPING': 'Stopping capture. Accept the TASKKILL UAC prompt to finish cleanup.',
                  'ANALYZING': 'Capture stopped. Checking identity, CONFIG90 and typed responses…'}
         if event in texts:
             self.status_label.configure(text=texts[event])

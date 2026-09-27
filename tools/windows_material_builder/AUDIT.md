@@ -50,85 +50,70 @@ application neither changes that setting nor executes `-I` itself.
 The pinned [CMD source](https://github.com/desowin/usbpcap/blob/1.5.4.0/USBPcapCMD/cmd.c)
 provides interface discovery, new-device capture and its own elevated worker.
 With `-o -`, the unelevated relay creates the named pipe and writes its bytes to
-stdout; the elevated instance writes to that pipe. In an existing kill-on-close
-job, upstream creates neither a breakaway relay nor a replacement job. Its
-[read thread](https://github.com/desowin/usbpcap/blob/1.5.4.0/USBPcapCMD/thread.c)
-monitors the duplex pipe for disconnection even without new sensor traffic.
-Pipe closure can initiate worker exit, but is not used as proof that it exited.
-The direct-file worker termination branch is not used by the builder.
+stdout; the elevated instance writes to that pipe. The builder preserves
+`-d`, `--capture-from-new-devices`, `-s 65535` and `-o -`, with raw-only stdout,
+discarded stderr and no interactive stdin. Its Python helper uses CREATE_NO_WINDOW;
+no console sharing or upstream job topology is a builder prerequisite.
 
 ## Bounded stop contract
 
-The GUI owns one unnamed, non-inheritable Windows Job Object with
-KILL_ON_JOB_CLOSE and neither breakaway flag. It creates the unelevated Python
-helper, assigns its exact Popen handle to this job, then sends START. Before
-START, the helper cannot launch USBPcap. The GUI is outside this job and retains
-its sole job handle. Assignment failure terminates only the blocked helper's
-known handle. The existing hidden console and raw-only native stdout remain;
-no q injection, console probes, stderr collection or manual stop is involved.
+This is a dedicated-qualified-VM experiment. Its sole normal USBPcap stop is
+`%SystemRoot%\System32\taskkill.exe /F /T /IM USBPcapCMD.exe`, intentionally
+covering all instances of that exact executable name and their process trees.
+There is no unrelated-instance preflight, console input/probe, private stop exit
+marker, CaptureJob, member-count check or TerminateJobObject fallback.
 
-Before reporting capture readiness to the user, the owner requires three total
-and three active processes in the job: helper, relay and elevated pipe writer.
-It also reads the bounded [job member list](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_process_id_list),
-requires the helper PID and two distinct native members, and opens only those
-members with SYNCHRONIZE and PROCESS_QUERY_LIMITED_INFORMATION. Their
-[image paths](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-queryfullprocessimagenamew)
-must match the selected pinned USBPcap executable. This prevents a console host
-or unrelated job member from satisfying a count-only check. The two native
-handles remain owned until cleanup, avoiding PID reuse during the exit wait.
-IDs and image paths are never logged. No global process enumeration or
-process-name-based termination is used. Missing/extra members, denied query/wait
-rights or unexpected topology fail before the attach prompt. Population checks
-continue during acquisition and immediately before STOP.
+The unelevated helper resolves System32 through GetSystemDirectoryW, initializes
+COM and calls [ShellExecuteExW](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shellexecuteexw)
+with verb `runas`, the absolute taskkill path and fixed parameters. Its
+[SHELLEXECUTEINFOW](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/ns-shellapi-shellexecuteinfow)
+flags include NOCLOSEPROCESS, NOASYNC, FLAG_NO_UI and NO_CONSOLE, with SW_HIDE.
+Windows still shows the security consent prompt. The GUI remains unelevated;
+no PowerShell is involved in elevation and no taskkill output is captured as
+user-visible diagnostics. The returned process handle must signal within 15 s.
+Its exit code is checked and its handle is closed, including on error.
 
-The [Windows job contract](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects)
-contains descendants without breakaway; nested-job accounting is included.
-The pinned upstream source defines the expected relay/elevated-worker topology;
-runtime membership checks enforce it rather than assuming UAC inherited the job.
-An environment that cannot meet this boundary is rejected, not silently relaxed.
+After taskkill completes, [Toolhelp process enumeration](https://learn.microsoft.com/en-us/windows/win32/toolhelp/taking-a-snapshot-and-viewing-processes)
+checks exact `USBPcapCMD.exe` names, case-insensitively, under a five-second
+budget with 50 ms polling. Each snapshot closes, bounds its entry walk and
+requires NO_MORE_FILES for a complete negative result; API errors fail closed.
+Only taskkill exit zero plus verified absence permits acceptance. A successful
+exit alone never suffices. This follows the documented
+[TASKKILL switches](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/taskkill)
+without adding another executable name or stop retry.
 
-On normal completion, STOP reaches the helper through its existing private pipe.
-The helper requires the relay to be alive, calls TerminateProcess on its owned
-relay handle with the private marker `0x47584350`, and waits at most five seconds.
-Only API success and that exact resulting exit code permit RELAY_TERMINATED.
-A pre-stop exit, failed call, other exit code or timeout remains failure. The
-helper closes raw and exits zero; the owner requires both that completion marker
-and status EOF. Parent helper wait is ten seconds; status EOF wait is two seconds.
+The helper checks native relay liveness before initiating stop. Any earlier
+exit, including zero, remains failure even if raw parses. One TASKKILL cleanup
+attempt also runs on cancellation, startup timeout, invalid control/EOF or
+capture failure. It cannot clear the earlier error. After verified absence the
+helper waits up to five seconds for its relay, closes the native process handle,
+flushes/closes raw and exits. Normal acquisition requires helper exit zero,
+USBPCAP_ABSENT, RAW_CLOSED and bounded status EOF. The parent then flushes/fsyncs
+the retained file and checks unchanged bounded size at three 50 ms intervals.
+Only afterward does acquire call the unchanged strict capture.analyze.
 
-The owner then calls [TerminateJobObject](https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-terminatejobobject)
-on its private job, waits for both retained native handles to signal, and queries
-active-process accounting until zero. These waits share one five-second deadline.
-This catches a pipe worker that did not exit on disconnect. The helper's own
-process handle is also waited. Only after this verified quiescence does the
-owner open the retained raw, fsync it, check its bounded size is unchanged, close
-it, and check size again. No arbitrary stability sleep or interactive exit is
-required. Job close remains a cleanup backstop on failure or owner exit; it
-cannot turn failed quiescence verification into success.
+The parent's helper wait is 90 s, including interactive UAC; status EOF and
+reader join are each bounded by two seconds. On outer timeout it terminates
+only its own Python helper with a five-second wait, marks cleanup unverified
+and refuses the acquisition. This is not another USBPcap stop mechanism.
+Denial, taskkill timeout, abrupt helper death or delayed Windows consent can
+leave native activity unresolved. Closing handles does not prove cleanup or
+cancel the OS consent service. No automatic retry or material success follows.
 
-Only then may acquire call the existing strict parser. Fully parseable container,
-paired target transfers, exact target/APP identity and all mandatory material
-classes are required for **Diagnose and build**. Partial/ambiguous evidence shows
-**Capture incomplete**, with no Build action; existing eligible retry policy is
-unchanged. A valid PCAP never excuses process-cleanup failure. An expected native
-termination code never substitutes for container/material validation. Worker
-nonzero exits are not newly accepted.
-
-Cancel always remains CAPTURE_CANCELLED after cleanup; analysis is skipped when
-cancellation is already requested and its result is discarded if cancellation
-arrives during analysis. Early death, broken control/status, timeout, quiescence,
-flush or stability failure retains raw and cannot publish usable acquisition.
-Telemetry remains limited to 64 allowlisted lifecycle lines: ownership, explicit
-stop reason, exits, quiescence, flush, EOF and failures. No arbitrary stderr,
-exception strings, paths, process IDs, payloads or reader-specific hashes enter
-that trace. The previous q/probe code and its theory-specific tests are removed.
+Cancel uses the same stop and always ends CAPTURE_CANCELLED, including during
+UAC/stop; analysis is skipped or its result discarded. Raw is retained for all
+outcomes. Allowlisted status lines and bounded numeric exit codes exclude
+arbitrary stdout/stderr, exception text, paths, PIDs, payloads and reader hashes.
+Fully valid container, target, APP and all four unambiguous materials are still
+required for Diagnose and build. Partial evidence has no Build action.
 
 ## Material and privacy boundaries
 
-The operator's retained full captures pass normal read-only target/APP12509,
-CONFIG90/A2/chip82/A6 diagnosis. The no-reader test establishes that q remains
-pending in the shared console after successful injection; that interactive
-requirement is retired. Detailed live traces and development chronology remain
-only in the non-public development manual. This corrective opens no private
+The operator reports PASS for the retained real capture: source validation,
+container/target/APP12509, CONFIG90/A2/CHIP82/A6, A6/FDT binding, DPAPI recovery,
+five-file construction and final bundle validation, with EXIT_CODE=0. The
+remaining unqualified boundary is embedded capture lifecycle. Detailed live
+history belongs only in the ignored internal manual. This task opens no private
 capture, OEM input or bundle and performs no Windows, USB or DPAPI operation.
 
 Material extraction is unchanged: the exact initial UNKNOWN 255-to-assigned
@@ -153,13 +138,13 @@ still obey their microsecond/nanosecond bounds. No private fixture is committed.
 
 ## Verification and next operator gate
 
-Offline coverage exercises the job ownership/handshake, exact native image
-membership, retained handles, termination marker, early crashes, API failures,
-shared cleanup deadline, empty scope before fsync, EOF, file stability, raw-only
-stdout, retained failures/cancel, status privacy and post-stop strict parsing.
-The integrated workflow tests valid and truncated synthetic captures and Cancel
-during stop/analysis. Mocked Linux ctypes tests do not qualify Windows ABI,
-UAC job inheritance or cross-integrity query/wait permissions.
+Offline coverage exercises absolute path/fixed parameters/elevation, wait before
+native enumeration, denied UAC, taskkill and enumeration failures/timeouts,
+remaining USBPcap, early native exit, no console/Job path, bounded parent wait,
+raw-only stdout, handle closure, flush/stability, safe statuses and retained raw.
+Integrated acquisition covers valid/truncated PCAP and Cancel during startup,
+stop and analysis. Linux ctypes mocks do not qualify Windows ABI, consent
+service timing or native termination on the VM.
 
 Verification scope: builder with the production C material loader; deployment,
 production and recovery Python suites; A0, post-TLS and image-device C suites
@@ -169,10 +154,10 @@ production checks and CLI, and verifies every source-ledger hash. Production
 payload dependencies are unchanged. Public TECHNICAL_MANUAL.md remains untouched.
 
 The [single final Windows acquisition](README.md#current-gate-one-final-full-windows-acquisition)
-updates source only, starts detached, accepts UAC, attaches only at the prompt
-and uses the ordinary 30-second window without touching the sensor. Require
-verified shutdown plus all material checks and **Diagnose and build**. Stop
-before Build private bundle; DPAPI/bundle is not this gate. If internal stop
-still fails, do not request another equivalent capture or another console
-instrumentation cycle. Reuse the known external workflow or an already-valid
-retained capture for the next fallback decision.
+updates source only, starts detached, accepts USBPcap UAC, attaches only at the
+prompt, waits the ordinary 30 seconds without sensor contact and accepts TASKKILL
+UAC. Require verified shutdown, all material checks and **Diagnose and build**.
+Stop before Build private bundle; the backend already passed separately. If
+embedded lifecycle still fails, mark EMBEDDED_USBPCAPCMD_CAPTURE=REJECTED and
+pivot to the proven existing-capture input flow. No equivalent recapture or
+further q/console/Job Object diagnostics are authorized by this gate.

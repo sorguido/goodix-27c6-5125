@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Unelevated capture helper, assigned to the parent's private job before START.
+"""Unelevated capture helper. USBPcap and TASKKILL request their own UAC.
 
-USBPcap alone requests UAC. Its stdout is the raw PCAP file. Normal STOP uses
-an explicit termination result; the parent then empties the job and fsyncs raw.
+Raw stdout never enters the status channel. TASKKILL is attempted once, including
+on cancellation/error; the parent bounds this helper's UAC/cleanup lifetime.
 """
 import ctypes
 from ctypes import wintypes as w
-import os
+import ntpath
 from pathlib import Path
 import subprocess
 import sys
@@ -17,112 +17,113 @@ from .diagnostics import Failure, require, safe_lifecycle_status
 from .files import real_path
 from .windows import INTERFACE, normal_user
 
-STOP_EXIT_CODE = 0x47584350  # Private builder termination marker, not a native success code.
 STOP_SECONDS = 5
-
-
-class CaptureJob:
-    """Parent-owned, unnamed, non-inheritable job; never contains the GUI owner."""
-    def __init__(self):
-        self.members = []
-        class Basic(ctypes.Structure):
-            _fields_ = [('process_time', ctypes.c_int64), ('job_time', ctypes.c_int64),
-                        ('flags', w.DWORD), ('minimum', ctypes.c_size_t), ('maximum', ctypes.c_size_t),
-                        ('active', w.DWORD), ('affinity', ctypes.c_size_t), ('priority', w.DWORD), ('schedule', w.DWORD)]
-        class Extended(ctypes.Structure):
-            _fields_ = [('basic', Basic), ('io', ctypes.c_uint64 * 6),
-                        ('process_memory', ctypes.c_size_t), ('job_memory', ctypes.c_size_t),
-                        ('peak_process', ctypes.c_size_t), ('peak_job', ctypes.c_size_t)]
-        self.kernel = ctypes.WinDLL('kernel32', use_last_error=True)
-        for name, args, result in (
-                ('CreateJobObjectW', [ctypes.c_void_p, w.LPCWSTR], w.HANDLE),
-                ('SetInformationJobObject', [w.HANDLE, ctypes.c_int, ctypes.c_void_p, w.DWORD], w.BOOL),
-                ('AssignProcessToJobObject', [w.HANDLE, w.HANDLE], w.BOOL),
-                ('QueryInformationJobObject', [w.HANDLE, ctypes.c_int, ctypes.c_void_p, w.DWORD, ctypes.c_void_p], w.BOOL),
-                ('TerminateJobObject', [w.HANDLE, w.UINT], w.BOOL),
-                ('OpenProcess', [w.DWORD, w.BOOL, w.DWORD], w.HANDLE),
-                ('QueryFullProcessImageNameW', [w.HANDLE, w.DWORD, w.LPWSTR, ctypes.POINTER(w.DWORD)], w.BOOL),
-                ('WaitForSingleObject', [w.HANDLE, w.DWORD], w.DWORD),
-                ('CloseHandle', [w.HANDLE], w.BOOL)):
-            function = getattr(self.kernel, name)
-            function.argtypes, function.restype = args, result
-        self.handle = self.kernel.CreateJobObjectW(None, None)
-        require(self.handle, 'CAPTURE_PROCESS_FAILED')
-        limits = Extended()
-        limits.basic.flags = 0x2000  # KILL_ON_JOB_CLOSE; neither breakaway flag is allowed.
-        try:
-            require(self.kernel.SetInformationJobObject(self.handle, 9, ctypes.byref(limits),
-                                                       ctypes.sizeof(limits)), 'CAPTURE_PROCESS_FAILED')
-        except Exception:
-            self.close()
-            raise
-
-    def assign(self, process):
-        # The helper is blocked on START and cannot spawn USBPcap before assignment.
-        require(self.kernel.AssignProcessToJobObject(self.handle, int(process._handle)), 'CAPTURE_PROCESS_FAILED')
-
-    def population(self):
-        class Accounting(ctypes.Structure):
-            _fields_ = [('times', ctypes.c_int64 * 4), ('faults', w.DWORD),
-                        ('total', w.DWORD), ('active', w.DWORD), ('terminated', w.DWORD)]
-        info = Accounting()
-        require(self.kernel.QueryInformationJobObject(self.handle, 1, ctypes.byref(info),
-                                                      ctypes.sizeof(info), None), 'CAPTURE_PROCESS_FAILED')
-        return info.total, info.active
-
-    def verify_members(self, helper_pid, executable):
-        """Pin both native handles from this job only, before allowing attachment."""
-        class Members(ctypes.Structure):
-            _fields_ = [('assigned', w.DWORD), ('count', w.DWORD), ('ids', ctypes.c_size_t * 3)]
-        require(self.population() == (3, 3), 'CAPTURE_PROCESS_FAILED')
-        members = Members()
-        require(self.kernel.QueryInformationJobObject(self.handle, 3, ctypes.byref(members),
-                                                      ctypes.sizeof(members), None), 'CAPTURE_PROCESS_FAILED')
-        require(members.assigned == members.count == 3 and len(set(members.ids)) == 3 and
-                helper_pid in members.ids, 'CAPTURE_PROCESS_FAILED')
-        expected = os.path.normcase(os.path.abspath(executable))
-        for pid in members.ids:
-            if pid == helper_pid:
-                continue
-            # SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION. Never open by name
-            # or enumerate system processes; PIDs come exclusively from our job.
-            handle = self.kernel.OpenProcess(0x101000, False, pid)
-            require(handle, 'CAPTURE_PROCESS_FAILED')
-            self.members.append(handle)
-            name, length = ctypes.create_unicode_buffer(32768), w.DWORD(32768)
-            require(self.kernel.QueryFullProcessImageNameW(handle, 0, name, ctypes.byref(length)),
-                    'CAPTURE_PROCESS_FAILED')
-            require(os.path.normcase(os.path.abspath(name.value)) == expected, 'CAPTURE_PROCESS_FAILED')
-        require(self.population() == (3, 3), 'CAPTURE_PROCESS_FAILED')
-
-    def terminate(self):
-        require(self.kernel.TerminateJobObject(self.handle, STOP_EXIT_CODE), 'CAPTURE_PROCESS_FAILED')
-        deadline = time.monotonic() + STOP_SECONDS
-        for handle in self.members:
-            remaining_ms = max(0, int((deadline - time.monotonic()) * 1000))
-            require(self.kernel.WaitForSingleObject(handle, remaining_ms) == 0, 'CAPTURE_PROCESS_FAILED')
-        while self.population()[1] != 0:
-            require(time.monotonic() < deadline, 'CAPTURE_PROCESS_FAILED')
-            time.sleep(0.025)
-
-    def close(self):
-        handle, self.handle = self.handle, None
-        closed = True
-        for member in self.members:
-            closed = bool(self.kernel.CloseHandle(member)) and closed
-        self.members.clear()
-        if handle:
-            closed = bool(self.kernel.CloseHandle(handle)) and closed
-        require(closed, 'CAPTURE_PROCESS_FAILED')
-
-
+TASKKILL_SECONDS = 15
+STOP_BUDGET_SECONDS = 90  # Includes interactive UAC; no retry on timeout.
+TASKKILL_PARAMETERS = '/F /T /IM USBPcapCMD.exe'
 _REPORT_LOCK = threading.Lock()
 
 
 def report(value):
     require(safe_lifecycle_status(value), 'CAPTURE_PROCESS_FAILED')
     with _REPORT_LOCK:
-        print(value, flush=True)
+        try:
+            print(value, flush=True)
+            return True
+        except (OSError, ValueError):
+            # A broken status pipe must not prevent the single cleanup attempt.
+            return False
+
+
+def usbpcap_present(kernel, deadline):
+    """Toolhelp process-name comparison only; never log names, paths or PIDs."""
+    class Entry(ctypes.Structure):
+        _fields_ = [('size', w.DWORD), ('usage', w.DWORD), ('pid', w.DWORD),
+                    ('heap', ctypes.c_size_t), ('module', w.DWORD), ('threads', w.DWORD),
+                    ('parent', w.DWORD), ('priority', w.LONG), ('flags', w.DWORD),
+                    ('name', w.WCHAR * 260)]
+    kernel.CreateToolhelp32Snapshot.argtypes = [w.DWORD, w.DWORD]
+    kernel.CreateToolhelp32Snapshot.restype = w.HANDLE
+    for name in ('Process32FirstW', 'Process32NextW'):
+        function = getattr(kernel, name)
+        function.argtypes, function.restype = [w.HANDLE, ctypes.POINTER(Entry)], w.BOOL
+    snapshot = kernel.CreateToolhelp32Snapshot(2, 0)  # TH32CS_SNAPPROCESS
+    require(snapshot not in (None, 0, ctypes.c_void_p(-1).value), 'CAPTURE_PROCESS_FAILED')
+    try:
+        entry = Entry()
+        entry.size = ctypes.sizeof(entry)
+        found = kernel.Process32FirstW(snapshot, ctypes.byref(entry))
+        for _ in range(65536):
+            require(time.monotonic() < deadline, 'CAPTURE_PROCESS_FAILED')
+            if not found:
+                require(ctypes.get_last_error() == 18, 'CAPTURE_PROCESS_FAILED')  # NO_MORE_FILES
+                return False
+            if entry.name.casefold() == 'usbpcapcmd.exe':
+                return True
+            found = kernel.Process32NextW(snapshot, ctypes.byref(entry))
+        raise Failure('CAPTURE_PROCESS_FAILED')
+    finally:
+        require(kernel.CloseHandle(snapshot), 'CAPTURE_PROCESS_FAILED')
+
+
+def elevated_taskkill():
+    class ShellInfo(ctypes.Structure):
+        _fields_ = [('size', w.DWORD), ('mask', w.ULONG), ('hwnd', w.HWND), ('verb', w.LPCWSTR),
+                    ('file', w.LPCWSTR), ('parameters', w.LPCWSTR), ('directory', w.LPCWSTR),
+                    ('show', ctypes.c_int), ('instance', w.HINSTANCE), ('idlist', ctypes.c_void_p),
+                    ('class_name', w.LPCWSTR), ('class_key', w.HKEY), ('hotkey', w.DWORD),
+                    ('icon', w.HANDLE), ('process', w.HANDLE)]
+    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+    shell = ctypes.WinDLL('shell32', use_last_error=True)
+    ole = ctypes.WinDLL('ole32', use_last_error=True)
+    for name, args, result in (
+            ('GetSystemDirectoryW', [w.LPWSTR, w.UINT], w.UINT),
+            ('WaitForSingleObject', [w.HANDLE, w.DWORD], w.DWORD),
+            ('GetExitCodeProcess', [w.HANDLE, ctypes.POINTER(w.DWORD)], w.BOOL),
+            ('CloseHandle', [w.HANDLE], w.BOOL)):
+        function = getattr(kernel, name)
+        function.argtypes, function.restype = args, result
+    shell.ShellExecuteExW.argtypes, shell.ShellExecuteExW.restype = [ctypes.POINTER(ShellInfo)], w.BOOL
+    ole.CoInitializeEx.argtypes, ole.CoInitializeEx.restype = [ctypes.c_void_p, w.DWORD], ctypes.c_long
+    ole.CoUninitialize.argtypes, ole.CoUninitialize.restype = [], None
+    directory = ctypes.create_unicode_buffer(32768)
+    length = kernel.GetSystemDirectoryW(directory, len(directory))
+    require(0 < length < len(directory) and ntpath.isabs(directory.value), 'CAPTURE_PROCESS_FAILED')
+    info = ShellInfo()
+    info.size = ctypes.sizeof(info)
+    # NOCLOSEPROCESS | NOASYNC | FLAG_NO_UI | NO_CONSOLE. Security UI still appears.
+    info.mask = 0x40 | 0x100 | 0x400 | 0x8000
+    info.verb, info.file = 'runas', ntpath.join(directory.value, 'taskkill.exe')
+    info.parameters, info.directory, info.show = TASKKILL_PARAMETERS, directory.value, 0
+    require(ole.CoInitializeEx(None, 2) in (0, 1), 'CAPTURE_PROCESS_FAILED')
+    try:
+        report('TASKKILL_REQUESTED')
+        if not shell.ShellExecuteExW(ctypes.byref(info)):
+            report('TASKKILL_ELEVATION_CANCELLED' if ctypes.get_last_error() == 1223 else 'TASKKILL_LAUNCH_FAILED')
+            raise Failure('CAPTURE_PROCESS_FAILED')
+        require(info.process, 'CAPTURE_PROCESS_FAILED')
+        report('TASKKILL_STARTED')
+        if kernel.WaitForSingleObject(info.process, TASKKILL_SECONDS * 1000) != 0:
+            report('TASKKILL_WAIT_FAILED')
+            raise Failure('CAPTURE_PROCESS_FAILED')
+        code = w.DWORD()
+        require(kernel.GetExitCodeProcess(info.process, ctypes.byref(code)), 'CAPTURE_PROCESS_FAILED')
+        report('TASKKILL_EXIT=' + str(code.value))
+        report('USBPCAP_VERIFY')
+        deadline = time.monotonic() + STOP_SECONDS
+        while usbpcap_present(kernel, deadline):
+            if time.monotonic() >= deadline:
+                report('USBPCAP_REMAINS')
+                raise Failure('CAPTURE_PROCESS_FAILED')
+            time.sleep(0.05)
+        report('USBPCAP_ABSENT')
+        require(code.value == 0, 'CAPTURE_PROCESS_FAILED')
+    finally:
+        try:
+            if info.process:
+                require(kernel.CloseHandle(info.process), 'CAPTURE_PROCESS_FAILED')
+        finally:
+            ole.CoUninitialize()
 
 
 def read_command(expected):
@@ -142,24 +143,6 @@ def stop_request(stop, received):
         stop.set()
 
 
-def intentional_stop(process):
-    require(process.poll() is None, 'CAPTURE_PROCESS_FAILED')
-    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
-    kernel.TerminateProcess.argtypes = [w.HANDLE, w.UINT]
-    kernel.TerminateProcess.restype = w.BOOL
-    report('STOP_REASON_BUILDER_BOUNDED_TERMINATION')
-    require(kernel.TerminateProcess(int(process._handle), STOP_EXIT_CODE), 'CAPTURE_PROCESS_FAILED')
-    try:
-        code = process.wait(timeout=STOP_SECONDS)
-    except subprocess.TimeoutExpired:
-        report('RELAY_WAIT_TIMEOUT')
-        raise Failure('CAPTURE_PROCESS_FAILED') from None
-    report('CHILD_EXIT=' + str(code))
-    # A crash before/during the request is not accepted just because STOP was sent.
-    require(code == STOP_EXIT_CODE, 'CAPTURE_PROCESS_FAILED')
-    report('RELAY_TERMINATED')
-
-
 def capture(exe, interface, raw_path):
     normal_user()
     require(read_command(b'START')[0], 'CAPTURE_PROCESS_FAILED')
@@ -170,28 +153,39 @@ def capture(exe, interface, raw_path):
     require(not raw_path.exists(), 'CAPTURE_PROCESS_FAILED')
     stop, received = threading.Event(), threading.Event()
     threading.Thread(target=stop_request, args=(stop, received), daemon=True).start()
-    # The job owner handles cleanup on every exit, including broken control/status.
-    # No inherited job handle can keep KILL_ON_JOB_CLOSE alive after owner exit.
-    with open('CONIN$', 'r+b', buffering=0) as console, open(raw_path, 'xb', buffering=0) as raw:
+    with open(raw_path, 'xb', buffering=0) as raw:
         process = subprocess.Popen([str(exe), '-d', interface, '--capture-from-new-devices',
-                                    '-s', '65535', '-o', '-'], stdin=console, stdout=raw,
+                                    '-s', '65535', '-o', '-'], stdin=subprocess.DEVNULL, stdout=raw,
                                    stderr=subprocess.DEVNULL, close_fds=True)
-        start, ready = time.monotonic(), False
-        while not stop.wait(0.1):
-            require(process.poll() is None, 'CAPTURE_PROCESS_FAILED')
-            elapsed = time.monotonic() - start
-            size = raw_path.stat().st_size
-            require(size <= LIMIT and elapsed <= 240, 'CAPTURE_PROCESS_FAILED')
-            if not ready:
-                require(elapsed < 60, 'CAPTURE_PROCESS_FAILED')
-                if size >= 24:
-                    with open(raw_path, 'rb') as check:
-                        pcap_header(check.read(24))
-                    ready = True
-                    report('READY')
-        require(received.is_set() and ready, 'CAPTURE_PROCESS_FAILED')
-        intentional_stop(process)
-    # Raw is closed here, but the parent fsyncs only after the entire job is empty.
+        try:
+            start, ready = time.monotonic(), False
+            try:
+                while not stop.wait(0.1):
+                    require(process.poll() is None, 'CAPTURE_PROCESS_FAILED')
+                    elapsed = time.monotonic() - start
+                    size = raw_path.stat().st_size
+                    require(size <= LIMIT and elapsed <= 240, 'CAPTURE_PROCESS_FAILED')
+                    if not ready:
+                        require(elapsed < 60, 'CAPTURE_PROCESS_FAILED')
+                        if size >= 24:
+                            with open(raw_path, 'rb') as check:
+                                pcap_header(check.read(24))
+                            ready = True
+                            require(report('READY'), 'CAPTURE_PROCESS_FAILED')
+                # Check before initiating TASKKILL, including the STOP/poll race.
+                require(received.is_set() and ready and process.poll() is None, 'CAPTURE_PROCESS_FAILED')
+            finally:
+                # Same single stop for normal completion, cancel, control EOF and
+                # early native failure. Cleanup never converts an earlier error.
+                elevated_taskkill()
+                code = process.wait(timeout=STOP_SECONDS)
+                report('CHILD_EXIT=' + str(code))
+        finally:
+            # Windows Popen owns this native handle; close explicitly after wait.
+            process._handle.Close()
+        report('CAPTURE_HANDLES_CLOSED')
+        raw.flush()
+    report('RAW_CLOSED')
 
 
 def main():

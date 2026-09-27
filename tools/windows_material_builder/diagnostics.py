@@ -77,11 +77,12 @@ for code, observed, cause, action in [
     ('TARGET_QUERY_FAILED', 'The present-device query did not complete reliably.',
      'Windows device enumeration may be unavailable.', 'Resolve the Windows device-query error before starting another capture.'),
     ('CAPTURE_PROCESS_FAILED', 'The capture process did not start, remain ready, or stop cleanly.',
-     'UAC, capture permissions, storage or USBPcap may have failed.',
+     'USBPcap or TASKKILL UAC, capture permissions, storage or process cleanup may have failed.',
      'Stop and retain the raw capture. Report the safe lifecycle.txt status fields from the run diagnostics folder; '
      'do not infer clean shutdown from a readable capture or start an automatic retry.'),
     ('CAPTURE_CANCELLED', 'Capture was cancelled; the raw recording was retained.',
-     'The acquisition may be incomplete.', RETRY),
+     'The acquisition may be incomplete; cancellation alone does not prove cleanup.',
+     'Retain the raw and lifecycle diagnostics. Stop this attempt; do not repeat the embedded capture test.'),
     ('CAPTURE_EMPTY', 'The capture contains no packets.',
      'The target may not have attached to the selected controller.', RETRY),
     ('CAPTURE_TRUNCATED_OR_INVALID', 'The capture has unsupported, truncated or inconsistent records.',
@@ -124,10 +125,11 @@ _add('CONFIG90_MISSING', 'The target was identified, but no valid 224-byte CONFI
 
 
 # Closed vocabulary: never accept free-form stderr, paths or exception strings.
-LIFECYCLE_STAGES = frozenset('STARTING READY SCOPE_ASSIGNED SCOPE_READY STOP_RECEIVED '
+LIFECYCLE_STAGES = frozenset('STARTING READY STOP_RECEIVED '
     'CONTROL_EOF CONTROL_INVALID INTENTIONAL_STOP PARENT_STOP_SENT '
-    'STOP_REASON_BUILDER_BOUNDED_TERMINATION RELAY_TERMINATED RELAY_WAIT_TIMEOUT '
-    'SCOPE_TERMINATE SCOPE_QUIESCENT UNASSIGNED_HELPER_TERMINATE '
+    'TASKKILL_REQUESTED TASKKILL_STARTED TASKKILL_ELEVATION_CANCELLED TASKKILL_LAUNCH_FAILED '
+    'TASKKILL_WAIT_FAILED USBPCAP_VERIFY USBPCAP_REMAINS USBPCAP_ABSENT '
+    'CAPTURE_HANDLES_CLOSED RAW_CLOSED CLEANUP_UNVERIFIED '
     'RAW_FLUSH RAW_FLUSHED STOPPED STOP_FAILED FAILED EOF STATUS_INVALID '
     'PARENT_WAIT_TIMEOUT PARENT_STATUS_TIMEOUT'.split())
 
@@ -136,7 +138,7 @@ def safe_lifecycle_status(value):
     if value in LIFECYCLE_STAGES:
         return True
     import re
-    match = re.fullmatch(r'(CHILD_EXIT|WORKER_EXIT)=(-?[0-9]{1,10})', value)
+    match = re.fullmatch(r'(CHILD_EXIT|WORKER_EXIT|TASKKILL_EXIT)=(-?[0-9]{1,10})', value)
     return bool(match and -2147483648 <= int(match[2]) <= 4294967295)
 
 

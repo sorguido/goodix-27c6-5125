@@ -353,8 +353,9 @@ wire 0x91. This does not guarantee completeness for every reader state.
 
 For the current builder validation, follow the [single full acquisition
 procedure](../tools/windows_material_builder/README.md), starting detached and
-stopping before bundle construction. The bounded stop implementation verifies
-its private process scope and flushes the retained raw before analysis. CONFIG90
+stopping before bundle construction. After the 30-second window, accept the
+additional TASKKILL UAC prompt. The builder verifies USBPcapCMD absence and
+flushes the retained raw before analysis. CONFIG90
 and all typed responses remain mandatory from the same qualified target stream
 and recording.
 

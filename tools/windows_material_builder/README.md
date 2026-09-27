@@ -6,7 +6,10 @@ inside the **original qualified Windows VM**, as the **original normal user**.
 It is not a supported release: real Windows validation is still required.
 USBPcap 1.5.4.0 is project-pinned. The operator has confirmed source validation,
 installation/reboot, post-reboot prerequisites, UAC and capture startup on the
-existing VM. Shutdown and a complete bundle remain unqualified. No generic support for all 64-bit Windows versions is claimed.
+existing VM. The retained real capture also passed source/capture validation,
+DPAPI recovery and the complete five-file bundle build with exit code zero.
+Embedded capture shutdown remains unqualified. No generic support for all
+64-bit Windows versions is claimed.
 Use the [manual walkthrough](../../docs/learning/11_building_your_device_material_bundle.md)
 as the independent acquisition reference. The Linux installer/runtime remains
 the final authority on validity.
@@ -18,13 +21,14 @@ material and stay private, on failure as well as success. No upload or telemetry
 
 ## Current gate: one final full Windows acquisition
 
-The retained captures already pass normal read-only target/APP12509 and
-CONFIG90/A2/CHIP82/A6 diagnosis. The builder now stops its private capture scope
-with bounded intentional termination, verifies process exit, and flushes/closes
-the raw before strict analysis. It no longer depends on interactive console q.
-This architecture has offline coverage; Windows ownership and termination still
-require this one operator validation. See [the stop contract](AUDIT.md#bounded-stop-contract).
-
+The remaining experiment is embedded USBPcap lifecycle management. At stop the
+builder requests elevation for `%SystemRoot%\System32\taskkill.exe` with exactly
+`/F /T /IM USBPcapCMD.exe`. It awaits completion, verifies that no USBPcapCMD.exe
+remains, closes writer handles and flushes the retained raw before strict analysis.
+This name-based scope is intentional for the **dedicated qualified VM**; every
+USBPcapCMD.exe instance is in scope. There is no instance-count preflight, Job
+Object requirement or console input stop. The GUI remains unelevated. See
+[the stop contract](AUDIT.md#bounded-stop-contract).
 Update only the Windows source to the delivered development commit. Preserve the
 existing Python environment, installed USBPcap, OEM source folder and retained
 runs. Do not reinstall USBPcap or create a new VM. Initially detach Goodix from
@@ -44,10 +48,11 @@ if ($LASTEXITCODE -ne 0) { throw 'STOP: builder exited with an error; report the
 2. Accept USBPcap's UAC prompt. Keep Goodix detached during startup.
 3. Only at **“Now attach the Goodix to this Windows VM”**, attach that reader
    manually. Attach no other device. **DO NOT TOUCH THE SENSOR.**
-4. Wait for the normal **30-second** acquisition window and automatic analysis.
+4. Wait for the normal **30-second** acquisition window, accept the additional
+   **TASKKILL UAC** prompt, and wait for automatic analysis.
 5. Expect **Diagnose and build**, with CONFIG90/A2/CHIP82/A6 valid and unambiguous.
    **Stop before pressing Build private bundle.** DPAPI/bundle construction is a
-   separate gate; it is not approved by this procedure.
+   path already proven separately; this gate checks only embedded capture.
 
 The GUI needs no manual console stop, extra button or new timing choice. Partial
 or ambiguous material remains a failure and is shown as **Capture incomplete**,
@@ -55,22 +60,19 @@ with no Build action. Cancel remains **CAPTURE_CANCELLED**, including cancellati
 during shutdown; it never proceeds to material success.
 
 Report the tested commit, Windows/Python versions, the GUI's four material results
-and the retained safe `diagnostics\lifecycle.txt`. Successful lifecycle evidence
-includes `SCOPE_READY`, `INTENTIONAL_STOP`,
-`STOP_REASON_BUILDER_BOUNDED_TERMINATION`, `RELAY_TERMINATED`, `WORKER_EXIT=0`,
-`EOF`, `SCOPE_QUIESCENT`, `RAW_FLUSHED` and `STOPPED`, without `FAILED`,
-`STOP_FAILED`, invalid status or timeout. Native `CHILD_EXIT=1196966736`
-(`0x47584350`) is the explicitly requested stop marker; arbitrary nonzero exits
-are not accepted. No app-owned capture worker remains after scope quiescence.
-The GUI's target/APP/material results are mandatory in addition to these stages.
+and safe `diagnostics\lifecycle.txt` fields. Successful stop requires
+`TASKKILL_EXIT=0`, `USBPCAP_ABSENT`, `CAPTURE_HANDLES_CLOSED`, `RAW_CLOSED`,
+`WORKER_EXIT=0`, `EOF`, `RAW_FLUSHED` and `STOPPED`, without failure or timeout.
+The native USBPcap forced exit has no private marker and is accepted only after
+explicit stop; an earlier exit fails even if the file parses. The GUI's
+container/target/APP and four material results remain mandatory.
 
-Keep the raw and OEM inputs private. Do not share files, payloads, paths, hashes
-or arbitrary stderr. Stop after this single attempt. If ownership/shutdown fails,
-do not repeat an equivalent capture or select an extended retry: retain this run
-and report the safe result. The next fallback is the existing external acquisition
-workflow or an already-valid retained capture, not another console diagnostic loop.
-The general procedure below is reference for later bundle qualification.
-
+Keep raw and OEM inputs private. Do not share files, payloads, paths, hashes or
+arbitrary stderr. Stop after this single attempt. If the embedded lifecycle
+still fails, record **EMBEDDED_USBPCAPCMD_CAPTURE=REJECTED** and pivot to the
+already-proven existing-capture input workflow. Do not request another equivalent
+capture, extended retry or console/Job Object diagnostic pass. The general
+procedure below remains a reference outside this final gate.
 ## Before a future Windows operator test
 
 Use the exact development commit delivered with the operator report, copied
@@ -133,7 +135,7 @@ Then launch, also from the source root:
    that one reader manually through the hypervisor's USB menu. Attach no other
    devices. **DO NOT TOUCH THE SENSOR.** The app observes exact target appearance,
    allows the selected interval (30 seconds by default) for OEM initialization,
-   then stops and diagnoses the capture.
+   then requests TASKKILL UAC, verifies termination and diagnoses the capture.
 7. Review the individual CONFIG90/A2/chip82/A6 checks. **Build private bundle** is
    available only with complete evidence. It cross-checks A6/cache, uses Windows
    DPAPI in the original user context, derives the canonical transport binding,
@@ -194,9 +196,15 @@ accepts it. The latter is a separate operator action, not performed by this app.
 fails, or the final bundle cannot be published. Diagnostics distinguish observed
 facts, possible causes and actions. For CAPTURE_PROCESS_FAILED, the run
 `diagnostics/lifecycle.txt` contains only bounded safe lifecycle facts: explicit
-stop reason, relay/worker exit, scope quiescence, raw flush, EOF and failure/timeout
+TASKKILL request/result, USBPcap absence, relay/helper exit, raw flush, EOF and failure/timeout
 stages. Report those fields without the raw capture. A readable PCAP alone does
 not prove verified process cleanup, and termination alone does not prove valid material.
+TASKKILL gets a 15-second process wait and a five-second absence-verification
+window; the capture helper gets a 90-second stop budget including UAC. On that
+outer timeout only the Python helper is terminated: cleanup is unverified, raw
+is retained, and no result is accepted. Denied UAC, a hung elevated process or a
+late OS consent response can leave native activity unresolved; the app does not
+claim cancellation of Windows consent or retry TASKKILL.
 `CONFIG90_MISSING` is a legitimate negative
 result; never reuse a different reader's file to bypass it.
 

@@ -7,8 +7,9 @@
 > **Current builder validation:** update only the source and follow the
 > [single full acquisition procedure](../../tools/windows_material_builder/README.md).
 > Begin with Goodix detached, attach only at the prompt, and use the normal
-> 30-second window. Stop at Diagnose and build, before bundle/DPAPI construction.
-> The bounded stop architecture still requires Windows validation.
+> 30-second window, then accept TASKKILL UAC. Stop at Diagnose and build, before
+> bundle construction. The backend already passed with retained input; this
+> final gate qualifies only embedded capture shutdown.
 > The manual reference below remains the independent fallback; its native-Windows
 > steps are outside the candidate app's VM-only scope.
 # 11. 🧰 Building your device-material bundle
