@@ -351,9 +351,10 @@ Windows VM capture contains a valid CONFIG90; it was previously rejected by an
 incorrect exact-wire filter. Extraction selects logical control 0x90, not only
 wire 0x91. This does not guarantee completeness for every reader state.
 
-For the current builder validation, use the [read-only retained-capture
-procedure](../tools/windows_material_builder/README.md) before considering a new
-acquisition. CONFIG90 and all typed responses remain mandatory from the same
+For the current builder validation, use the [capture shutdown diagnostic with
+Goodix detached](../tools/windows_material_builder/README.md) before considering
+a new material acquisition. Normal read-only diagnosis has passed; clean
+shutdown remains unqualified. CONFIG90 and all typed responses remain mandatory from the same
 qualified target stream and recording.
 
 The extraction logic uses USBPcap link type `249` and bulk endpoints:

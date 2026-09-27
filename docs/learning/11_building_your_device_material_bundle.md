@@ -4,11 +4,11 @@
 > [Windows VM material builder](../../tools/windows_material_builder/README.md)
 > is available as source for operator validation. It uses USBPcap directly and
 > does not require Wireshark or TShark. It is not yet a supported release.
-> **Current builder validation:** update only the source and use the
-> [read-only retained-capture procedure](../../tools/windows_material_builder/README.md).
-> Valid CONFIG90 wire 0x90 is already present in the retained attach-once capture;
-> extraction accepts logical 0x90 (wire 0x90 or 0x91). No new capture is needed
-> to check this parser correction.
+> **Current builder validation:** update only the source and follow the
+> [capture shutdown diagnostic](../../tools/windows_material_builder/README.md),
+> keeping Goodix detached throughout Start/READY/Cancel. Normal read-only material
+> diagnosis has passed; clean capture shutdown remains unqualified. Do not start
+> another full Goodix capture before this lifecycle gate is reviewed.
 > The manual reference below remains the independent fallback; its native-Windows
 > steps are outside the candidate app's VM-only scope.
 # 11. 🧰 Building your device-material bundle

@@ -116,9 +116,9 @@ USBPcap installer to that payload would be an unnecessary dependency change.
 Export validation must exercise the candidate from a copy with no `.git` or
 `development` directory, including its tests and command-line entrypoint.
 
-## Offline verification (2026-09-27)
+## Offline verification (2026-09-28)
 
-The 87 builder tests passed using synthetic inputs, including acceptance of
+The 93 builder tests passed using synthetic inputs, including acceptance of
 generated material by the compiled production C loader. Existing deployment
 (76), production (16) and recovery (48) Python tests passed. The C A0 (51),
 post-TLS (19) and image-device (58) suites each passed both normally and under
@@ -153,7 +153,9 @@ policy. Console-event tests on Fedora use mocks, not a Windows ABI qualification
 
 ## Live corrective pass 2: enumeration and stop observability
 
-Operator-supplied evidence (not a new live run by the agent):
+Historical first-capture evidence supplied by the operator (not an agent run).
+The second capture's normal diagnosis and current shutdown boundary are described
+in the console review below; the historical pending status here is superseded:
 
 ```text
 WINDOWS_SOURCE_CTIME_FIX=LIVE_PASS
@@ -198,24 +200,87 @@ key must have no previous identity/material traffic; identity binds to that key.
 Other address changes fail. Control URB function equality is deliberately not
 required (observed 11 -> 8); bulk pairing and all material gates remain strict.
 
-`CAPTURE_STOP_ROOT_CAUSE=UNRESOLVED`. Static inspection corroborates the intended
-console key-down ASCII q path in the pinned CMD source and pipe-close termination
-in its read thread. The Windows INPUT_RECORD layout, inherited stdin, actual q
-receipt, exit status, flush and status-pipe timing were not observed individually
-in the failed run. Neither a complete PCAP nor an absent process proves clean
-shutdown. No exit code is newly accepted and no timeout is relaxed.
+## Shutdown console review
 
-The worker now emits only a bounded lifecycle vocabulary: explicit STOP versus
-control EOF, q requested/injected, child wait/timeout/exit, raw flush and STOPPED.
-The parent records STOP sent, worker exit, status EOF, timeout and forced cleanup
-in the private run's `diagnostics/lifecycle.txt` (maximum 64 allowlisted lines).
-Unknown/overlong status output fails closed; arbitrary stderr and exception text
-are never copied. Success still needs exit zero and STOPPED, now with observed
-status EOF; control EOF alone cannot claim an explicit clean stop. The external
-failure code remains CAPTURE_PROCESS_FAILED and raw retention is unchanged.
-STOP accepts both LF and Windows text-pipe CRLF. Status writes are serialized;
-failed status/control pipes cannot skip process cleanup or retained diagnostics.
-This is instrumentation, not a claimed fix for the unproven live shutdown cause.
+`CAPTURE_STOP_ROOT_CAUSE=UNRESOLVED`. The operator reports that the second
+capture's normal read-only diagnosis passes CONFIG90/A2/CHIP82/A6, exact
+identity and exit zero. Its lifecycle localizes failure after STOP receipt and
+successful `WriteConsoleInputW`: the child does not exit within 15 seconds,
+emergency q is ineffective, and forced termination produces exit 1. This proves
+API-level injection, not consumption. The agent performed no Windows/USB action
+and opened no private recording, OEM input or bundle. The full live chronology
+belongs in the non-public development manual, not the public technical manual.
+
+The reviewed [pinned cmd.c](https://github.com/desowin/usbpcap/blob/1.5.4.0/USBPcapCMD/cmd.c)
+uses `GetFileInformationByHandle` success as `IsHandleRedirected`, not merely a
+non-console destination. `attach_parent_console` skips attachment only when both
+stdout/stderr predicates succeed. Otherwise it attempts `AttachConsole`, restores
+inherited stdin if changed, preserves redirected stdout and reopens
+non-redirected stderr as `CONOUT$`. With usable stdin, `wait_for_exit_signal`
+looks for a KEY_EVENT with key-down and ASCII q. After it returns, `start_capture`
+signals its read thread, joins it, closes handles, then waits for the elevated
+worker. The `-o -` branch relays the named pipe to stdout; direct-file worker
+termination is a different branch. The [pinned read thread](https://github.com/desowin/usbpcap/blob/1.5.4.0/USBPcapCMD/thread.c)
+handles exit/broken-pipe conditions and cancels outstanding I/O.
+
+The proposed “raw file plus DEVNULL necessarily skips attachment” explanation
+is **not established**. NUL is a character device; Python's
+[Windows file-query investigation](https://bugs.python.org/issue37074#msg343781)
+reports `GetFileInformationByHandle` failure for NUL. The [API's documented
+success/failure result](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfileinformationbyhandle)
+is what matters to upstream. We have not measured that predicate or console
+association on this VM.
+Replacing stderr with CONOUT$ without that evidence would be speculative.
+Wrong console/input binding, a skipped/unusable stdin wait, and blocking after
+q consumption in the thread/pipe/elevated-worker teardown remain distinguishable
+possibilities, not established causes. The event fields match upstream's
+predicate; Windows INPUT_RECORD layout and actual inherited handles still need
+native observation. Linux ctypes mocks cannot qualify the Windows ABI.
+
+The launch strategy stays the same: hidden private worker console, inherited
+CONIN$ stdin, raw-file stdout, NUL stderr, unelevated Python and USBPcap's own UAC.
+The NUL file is now opened explicitly with the same read/write access so its
+actual launch handle can be queried; no arbitrary stderr is read or retained.
+Only these additional closed-vocabulary observations are emitted:
+
+| Field | Observation and limit |
+| --- | --- |
+| LAUNCH_STDOUT/STDERR_REDIRECTED, NOT_REDIRECTED or UNKNOWN | Upstream's file-query boolean on each actual parent-side launch handle, before child creation; not proof of its later handle state. No file metadata is exported. |
+| STOP_CONSOLE_CHECK / TIMEOUT_CONSOLE_CHECK | Marks snapshots before q and after the existing 15-second timeout. |
+| CHILD_CONSOLE_SHARED, NOT_SHARED or UNKNOWN | Child membership in the worker's console, using a bounded 32-entry process list; IDs are never logged. Failure/overflow stays UNKNOWN. |
+| CONSOLE_Q_PENDING, NOT_PENDING or UNKNOWN | Presence of key-down q in at most 32 input records, without removing events. A full snapshot lacking q or a failed read stays UNKNOWN. No characters are logged. |
+
+[GetConsoleProcessList](https://learn.microsoft.com/en-us/windows/console/getconsoleprocesslist)
+provides console membership;
+[PeekConsoleInput](https://learn.microsoft.com/en-us/windows/console/peekconsoleinput)
+is non-consuming and non-blocking. Compare the pre-q baseline to the timeout
+snapshot. A shared console with q still pending points toward an input-consumption
+problem. A newly absent q narrows that hypothesis but cannot identify its consumer
+or prove the child progressed past its exit wait. Missing console membership
+supports reviewing attachment/inheritance. UNKNOWN is never interpreted as PASS.
+
+The existing 64-line private lifecycle allowlist remains bounded, with explicit
+STOP versus control EOF, q, exit, flush, status EOF and cleanup stages. Probe
+failure emits UNKNOWN without changing shutdown acceptance. Unknown/overlong
+status text fails closed; neither paths, payloads, hashes, exception messages
+nor arbitrary stderr are copied. Success still requires child/worker exit zero,
+raw flush, STOPPED and status EOF. All timeouts, nonzero exits, broken control/status
+paths and forced cleanup remain failures; raw retention is unchanged. No parser,
+CONFIG90 timing policy, DPAPI, bundle, USB command or Linux runtime changed.
+
+Six added synthetic groups cover launch predicates, bounded console snapshots,
+probe errors/privacy, raw-only stdout and NUL launch/retention across clean and
+failed stops, exit-zero/STOPPED without EOF, and Cancel after READY with no target.
+Existing q tests now check all key fields and a successful API return with zero
+events written. The suite also preserves LF/CRLF control and broken-pipe coverage.
+The Cancel test confirms that the GUI can show CAPTURE_CANCELLED even when stop
+fails: only retained lifecycle evidence can qualify this gate.
+
+**Next gate is diagnostic:** use the existing GUI's Start/READY/Cancel path with
+Goodix detached for the entire test, as specified in [README](README.md).
+Require STOP_RECEIVED, q, child exit zero, RAW_FLUSHED, STOPPED, EOF and worker
+exit zero without emergency cleanup. Do not request another full material
+capture until that lifecycle is reviewed. TECHNICAL_MANUAL.md is unchanged.
 
 ## CONFIG90 logical contract and historical trigger provenance
 
@@ -227,7 +292,7 @@ CONFIG90_WIRE_CONTRACT=CLOSED_LOGICAL_0x90
 CONFIG90_REAL_OBSERVED_WIRE=0x90
 CONFIG90_LATENESS_EVIDENCE=NONE_FOUND
 CONFIG90_60S_POLICY=DISABLED_WHEN_CONFIG90_MISSING
-NEXT_GATE=SOURCE_ONLY_UPDATE_AND_READ_ONLY_REANALYSIS_OF_RETAINED_RAW
+NEXT_GATE=NO_GOODIX_CAPTURE_LIFECYCLE_DIAGNOSTIC_CANCEL
 ```
 
 The retained D232 material-provenance report (C3) and D233 runtime-boundary report
@@ -281,14 +346,10 @@ or extended retry and remains mandatory/fail-closed. The bounded 30 -> 60 option
 remains only for missing A2/chip82/A6 with CONFIG90 present and all other gates
 passing; it is an engineering allowance, not a completeness guarantee.
 
-**Next human gate:** update only the Windows source and run the existing
-`--diagnose` path against the already-retained current raw. The self-contained
-PowerShell command in README prompts for the source folder and raw path. Expected
-output is CONFIG90/A2/CHIP82/A6 PASS, exit zero; exact target/APP identity is an
-implicit prerequisite. No USB access, new capture, DPAPI, bundle build or raw
-modification occurs. Preserve OEM inputs, USBPcap and retained runs. Only after
-that passes should a separate step define live shutdown validation and eventual
-bundle construction. Shutdown root cause remains UNRESOLVED.
+The normal read-only diagnosis is now reported PASS on the second capture,
+including target/APP identity and all four material classes. No parser changes
+are needed for the shutdown diagnostic gate described above. DPAPI and complete
+bundle construction remain unqualified.
 
 ## Post-0c809 verification and public-manual sanitation
 
