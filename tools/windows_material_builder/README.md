@@ -16,23 +16,22 @@ changes firmware or replaces a PSK. USBPcap observes ordinary OEM initialization
 **DO NOT TOUCH THE SENSOR during acquisition.** Captures can contain sensitive
 material and stay private, on failure as well as success. No upload or telemetry.
 
-## Current gate: diagnose capture shutdown with Goodix detached
+## Current gate: one final full Windows acquisition
 
-The operator reports that normal `--diagnose` on the second retained capture
-passes CONFIG90/A2/CHIP82/A6 and exact target/APP identity with exit zero.
-Material parsing is no longer the blocker. The GUI still fails because USBPcap
-requires forced cleanup after its 15-second orderly-stop timeout. Successful
-`q` injection does not establish that USBPcap read it. The cause remains
-**UNRESOLVED**; this candidate adds bounded console diagnostics, not a claimed
-shutdown fix. See [the upstream review and diagnostic limits](AUDIT.md#shutdown-console-review).
+The retained captures already pass normal read-only target/APP12509 and
+CONFIG90/A2/CHIP82/A6 diagnosis. The builder now stops its private capture scope
+with bounded intentional termination, verifies process exit, and flushes/closes
+the raw before strict analysis. It no longer depends on interactive console q.
+This architecture has offline coverage; Windows ownership and termination still
+require this one operator validation. See [the stop contract](AUDIT.md#bounded-stop-contract).
 
-Update only the Windows source to the delivered development commit. Preserve
-installed USBPcap, the existing Python environment, OEM inputs and retained runs.
-Do not reinstall USBPcap. Keep **Goodix detached from the guest throughout this
-entire test**, with automatic USB attachment disabled. Attach no other device.
-Do not open fingerprint/enrollment settings or touch the sensor.
+Update only the Windows source to the delivered development commit. Preserve the
+existing Python environment, installed USBPcap, OEM source folder and retained
+runs. Do not reinstall USBPcap or create a new VM. Initially detach Goodix from
+the guest and disable automatic attachment. Close fingerprint/enrollment settings.
+Use the controller mapping already established in this qualified VM.
 
-From a normal, unelevated PowerShell session, launch the existing GUI:
+From a normal, unelevated PowerShell session:
 
 ```powershell
 Set-Location -ErrorAction Stop -LiteralPath (Read-Host 'Full path to the updated Goodix source folder')
@@ -40,39 +39,37 @@ Set-Location -ErrorAction Stop -LiteralPath (Read-Host 'Full path to the updated
 if ($LASTEXITCODE -ne 0) { throw 'STOP: builder exited with an error; report the safe diagnostic code.' }
 ```
 
-1. Use the existing three-file source folder and pass the usual preflight.
-   Use the controller mapping already established in this VM; if ambiguous,
-   stop rather than attaching Goodix to remap it during this test.
-2. Press **Recheck**, then **Start capture**. Complete USBPcap's normal UAC prompt.
-   The GUI and Python app remain unelevated.
-3. Wait for **“Now attach the Goodix to this Windows VM”**. **Do not attach it.**
-   Press the existing **Cancel capture** button and wait for the result.
-4. `CAPTURE_CANCELLED` is expected, but is **not proof of clean shutdown**:
-   cancellation can remain the displayed result even if stopping failed.
-   Use **Open retained capture folder**, then open the sibling
-   `diagnostics\lifecycle.txt` for this run. Retain the raw locally; do not share it.
+1. Select the existing three-file source folder and pass the usual preflight.
+   With Goodix detached, press **Recheck**, then **Start capture**.
+2. Accept USBPcap's UAC prompt. Keep Goodix detached during startup.
+3. Only at **“Now attach the Goodix to this Windows VM”**, attach that reader
+   manually. Attach no other device. **DO NOT TOUCH THE SENSOR.**
+4. Wait for the normal **30-second** acquisition window and automatic analysis.
+5. Expect **Diagnose and build**, with CONFIG90/A2/CHIP82/A6 valid and unambiguous.
+   **Stop before pressing Build private bundle.** DPAPI/bundle construction is a
+   separate gate; it is not approved by this procedure.
 
-A lifecycle pass requires READY, `PARENT_STOP_SENT`, `STOP_RECEIVED`,
-`Q_REQUESTED`, `Q_INJECTED`, `CHILD_EXIT=0`, `RAW_FLUSHED`, `STOPPED`, `EOF` and
-`WORKER_EXIT=0`, without a timeout, `FAILED`, invalid status or forced cleanup.
-Worker-exit and EOF ordering can vary; repeated exit lines are permitted. Any
-`CLEANUP_Q`, `CLEANUP_TERMINATE` or `PARENT_TERMINATE` prevents this gate passing.
-The retained raw may contain only its header; no material analysis or bundle
-build is expected after cancellation.
+The GUI needs no manual console stop, extra button or new timing choice. Partial
+or ambiguous material remains a failure and is shown as **Capture incomplete**,
+with no Build action. Cancel remains **CAPTURE_CANCELLED**, including cancellation
+during shutdown; it never proceeds to material success.
 
-Report the tested commit, Windows/Python versions, safe GUI result and the
-complete allowlisted lifecycle text (at most 64 lines). The new
-`LAUNCH_STDOUT_*`/`LAUNCH_STDERR_*` fields record upstream's file-query predicate.
-Between `STOP_CONSOLE_CHECK` or `TIMEOUT_CONSOLE_CHECK` and the next stage,
-`CHILD_CONSOLE_*` reports console membership and `CONSOLE_Q_*` reports whether a
-key-down `q` remains in a bounded, non-consuming input snapshot. UNKNOWN stays
-unknown. These snapshots do not prove which process consumed an event.
-Never send raw captures, OEM files, paths, payloads, hashes or arbitrary stderr.
+Report the tested commit, Windows/Python versions, the GUI's four material results
+and the retained safe `diagnostics\lifecycle.txt`. Successful lifecycle evidence
+includes `SCOPE_READY`, `INTENTIONAL_STOP`,
+`STOP_REASON_BUILDER_BOUNDED_TERMINATION`, `RELAY_TERMINATED`, `WORKER_EXIT=0`,
+`EOF`, `SCOPE_QUIESCENT`, `RAW_FLUSHED` and `STOPPED`, without `FAILED`,
+`STOP_FAILED`, invalid status or timeout. Native `CHILD_EXIT=1196966736`
+(`0x47584350`) is the explicitly requested stop marker; arbitrary nonzero exits
+are not accepted. No app-owned capture worker remains after scope quiescence.
+The GUI's target/APP/material results are mandatory in addition to these stages.
 
-Stop after this single diagnostic attempt, including on success. Only after its
-clean lifecycle is reviewed should a full material capture be considered.
-The general acquisition procedure below is reference for that later step,
-**not an instruction to attach Goodix during this gate**.
+Keep the raw and OEM inputs private. Do not share files, payloads, paths, hashes
+or arbitrary stderr. Stop after this single attempt. If ownership/shutdown fails,
+do not repeat an equivalent capture or select an extended retry: retain this run
+and report the safe result. The next fallback is the existing external acquisition
+workflow or an already-valid retained capture, not another console diagnostic loop.
+The general procedure below is reference for later bundle qualification.
 
 ## Before a future Windows operator test
 
@@ -196,10 +193,10 @@ accepts it. The latter is a separate operator action, not performed by this app.
 **FAIL_IF:** startup/stop fails, evidence is missing/ambiguous, material binding
 fails, or the final bundle cannot be published. Diagnostics distinguish observed
 facts, possible causes and actions. For CAPTURE_PROCESS_FAILED, the run
-`diagnostics/lifecycle.txt` contains only bounded safe lifecycle facts (STOP, q,
-child/worker exit, flush, status EOF, timeout/cleanup stages and bounded
-console/redirection predicates). Report those fields
-without the raw capture; a readable PCAP does not prove clean shutdown.
+`diagnostics/lifecycle.txt` contains only bounded safe lifecycle facts: explicit
+stop reason, relay/worker exit, scope quiescence, raw flush, EOF and failure/timeout
+stages. Report those fields without the raw capture. A readable PCAP alone does
+not prove verified process cleanup, and termination alone does not prove valid material.
 `CONFIG90_MISSING` is a legitimate negative
 result; never reuse a different reader's file to bypass it.
 

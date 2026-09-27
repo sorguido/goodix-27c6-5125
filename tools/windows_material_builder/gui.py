@@ -252,7 +252,7 @@ class App:
         except Failure as failure:
             self.failure(failure.diagnostic.code)
             return
-        self.clear('Diagnose and build')
+        self.clear('Capture incomplete' if self.evidence.codes else 'Diagnose and build')
         self.label('Capture container, target identity and APP12509 — valid')
         self.label('\n'.join(name + ' — ' + ('valid and unambiguous' if name in self.evidence.selected else 'failed')
                              for name in ('CONFIG90', 'A2', 'CHIP82', 'A6')))

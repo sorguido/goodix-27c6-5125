@@ -354,169 +354,194 @@ class EnumerationTests(Case):
 
 
 class LifecycleTests(Case):
-    def test_console_q_record_and_write_failure(self):
-        import ctypes
-        from types import SimpleNamespace
+    """Mock Win32 decisions and ownership; these do not qualify the native ABI."""
+    def kernel_job(self):
         kernel = Mock()
-        def write(handle, record, count, written):
-            r = record._obj
-            self.assertEqual(r.kind, 1)
-            self.assertEqual(r.event.key.down, 1)
-            self.assertEqual(r.event.key.repeat, 1)
-            self.assertEqual(r.event.key.key, ord('Q'))
-            self.assertEqual(r.event.key.scan, 0)
-            self.assertEqual(r.event.key.character, 'q')
-            self.assertEqual(r.event.key.state, 0)
-            self.assertEqual(handle, 123)
-            self.assertEqual(count, 1)
-            written._obj.value = 1
+        kernel.CreateJobObjectW.return_value = 123
+        with patch.object(capture_worker.ctypes, 'WinDLL', return_value=kernel, create=True):
+            job = capture_worker.CaptureJob()
+        return kernel, job
+
+    def test_private_job_assignment_limits_and_quiescence(self):
+        kernel, job = self.kernel_job()
+        kernel.CreateJobObjectW.assert_called_once_with(None, None)
+        limits = kernel.SetInformationJobObject.call_args.args[2]._obj
+        self.assertEqual(limits.basic.flags, 0x2000)  # No breakaway, kill on owner close.
+        job.assign(Mock(_handle=456))
+        kernel.AssignProcessToJobObject.assert_called_once_with(123, 456)
+        populations = iter([(3, 3), (3, 1), (3, 0)])
+        def query(handle, kind, data, size, returned):
+            self.assertEqual((handle, kind), (123, 1))
+            data._obj.total, data._obj.active = next(populations)
             return 1
-        kernel.WriteConsoleInputW.side_effect = write
-        with patch.object(ctypes, 'WinDLL', return_value=kernel, create=True), \
-                patch.dict('sys.modules', {'msvcrt': SimpleNamespace(get_osfhandle=lambda _: 123)}):
-            capture_worker.quit_console(Mock())
-            kernel.WriteConsoleInputW.side_effect = lambda *args: 0
-            self.fails('CAPTURE_PROCESS_FAILED', capture_worker.quit_console, Mock())
-            kernel.WriteConsoleInputW.side_effect = lambda *args: 1  # No event written.
-            self.fails('CAPTURE_PROCESS_FAILED', capture_worker.quit_console, Mock())
+        kernel.QueryInformationJobObject.side_effect = query
+        self.assertEqual(job.population(), (3, 3))
+        with patch.object(capture_worker.time, 'sleep') as sleep:
+            job.terminate()
+        kernel.TerminateJobObject.assert_called_once_with(123, capture_worker.STOP_EXIT_CODE)
+        sleep.assert_called_once_with(0.025)
+        job.close()
+        kernel.CloseHandle.assert_called_once_with(123)
+        self.assertIsNone(job.handle)
+        # Operations target only the created job/known process, with no global scan.
+        self.assertEqual({call[0] for call in kernel.method_calls},
+                         {'CreateJobObjectW', 'SetInformationJobObject', 'AssignProcessToJobObject',
+                          'QueryInformationJobObject', 'TerminateJobObject', 'CloseHandle'})
 
-    def test_launch_probes_use_actual_handles_and_only_report_predicates(self):
-        import ctypes
-        from types import SimpleNamespace
-        raw, stderr, kernel = Mock(), Mock(), Mock()
-        raw.fileno.return_value, stderr.fileno.return_value = 101, 102
-        for results, expected in [([1, 0], ['REDIRECTED', 'NOT_REDIRECTED']),
-                                  ([1, 1], ['REDIRECTED', 'REDIRECTED']),
-                                  ([OSError('private path'), 0], ['UNKNOWN', 'NOT_REDIRECTED'])]:
-            kernel.GetFileInformationByHandle.reset_mock()
-            kernel.GetFileInformationByHandle.side_effect = results
-            with patch.object(ctypes, 'WinDLL', return_value=kernel, create=True), \
-                    patch.dict('sys.modules', {'msvcrt': SimpleNamespace(get_osfhandle=lambda fd: fd + 10)}), \
-                    patch.object(capture_worker, 'report') as report:
-                capture_worker.probe_launch_handles(raw, stderr)
-            self.assertEqual([c.args[0] for c in kernel.GetFileInformationByHandle.call_args_list], [111, 112])
-            stages = [c.args[0] for c in report.call_args_list]
-            self.assertEqual(stages, ['LAUNCH_STDOUT_' + expected[0], 'LAUNCH_STDERR_' + expected[1]])
-            self.assertTrue(all(diagnostics.safe_lifecycle_status(s) for s in stages))
+    def test_job_pins_only_two_native_members_and_waits_for_both_handles(self):
+        for mode in ('valid', 'wrong_image', 'access_denied', 'missing_helper', 'duplicate',
+                     'overflow', 'query_error', 'wait_timeout', 'wait_error'):
+            with self.subTest(mode=mode):
+                kernel, job = self.kernel_job()
+                stopped = False
+                def query(handle, kind, data, size, returned):
+                    self.assertEqual(handle, 123)
+                    if kind == 1:
+                        data._obj.total, data._obj.active = 3, 0 if stopped else 3
+                    else:
+                        self.assertEqual(kind, 3)
+                        if mode == 'query_error': return 0
+                        data._obj.assigned, data._obj.count = (4 if mode == 'overflow' else 3), 3
+                        ids = [101 if mode == 'missing_helper' else 100, 200,
+                               200 if mode == 'duplicate' else 300]
+                        for i, pid in enumerate(ids): data._obj.ids[i] = pid
+                    return 1
+                def open_process(rights, inherit, pid):
+                    self.assertEqual((rights, inherit), (0x101000, False))
+                    self.assertIn(pid, (200, 300))
+                    return 0 if mode == 'access_denied' else pid + 500
+                def image_name(handle, flags, name, length):
+                    self.assertIn(handle, (700, 800)); self.assertEqual(flags, 0)
+                    name.value = '/synthetic/' + ('conhost.exe' if mode == 'wrong_image' else 'USBPcapCMD.exe')
+                    return 1
+                def terminate(handle, code):
+                    nonlocal stopped
+                    self.assertEqual((handle, code), (123, capture_worker.STOP_EXIT_CODE))
+                    stopped = True
+                    return 1
+                def wait(handle, milliseconds):
+                    self.assertTrue(stopped); self.assertIn(handle, (700, 800))
+                    self.assertTrue(0 <= milliseconds <= 5000)
+                    return 258 if mode == 'wait_timeout' else 0xffffffff if mode == 'wait_error' else 0
+                kernel.QueryInformationJobObject.side_effect = query
+                kernel.OpenProcess.side_effect = open_process
+                kernel.QueryFullProcessImageNameW.side_effect = image_name
+                kernel.TerminateJobObject.side_effect = terminate
+                kernel.WaitForSingleObject.side_effect = wait
+                if mode in ('valid', 'wait_timeout', 'wait_error'):
+                    job.verify_members(100, Path('/synthetic/USBPcapCMD.exe'))
+                    self.assertEqual(job.members, [700, 800])
+                    if mode == 'valid':
+                        job.terminate()
+                        self.assertEqual(kernel.WaitForSingleObject.call_count, 2)
+                    else: self.fails('CAPTURE_PROCESS_FAILED', job.terminate)
+                else: self.fails('CAPTURE_PROCESS_FAILED', job.verify_members, 100, Path('/synthetic/USBPcapCMD.exe'))
+                held = job.members.copy()
+                job.close()
+                self.assertEqual([c.args[0] for c in kernel.CloseHandle.call_args_list], held + [123])
 
-    def test_console_probes_are_bounded_read_only_and_do_not_claim_consumption(self):
-        import ctypes
-        from types import SimpleNamespace
-        # Mocked fields/logic only: Linux ctypes sizes do not validate Windows ABI.
-        for members, events, success, shared, pending in [
-                ([123, 456], [(1, True, 'q')], 1, 'SHARED', 'PENDING'),
-                ([456], [], 1, 'NOT_SHARED', 'NOT_PENDING'),
-                ([], [], 1, 'UNKNOWN', 'NOT_PENDING'),
-                (list(range(33)), [], 1, 'UNKNOWN', 'NOT_PENDING'),
-                ([123], [(1, False, 'q'), (1, True, 'x'), (2, True, 'q')], 1, 'SHARED', 'NOT_PENDING'),
-                ([123], [(1, True, 'x')] * 32, 1, 'SHARED', 'UNKNOWN'),
-                ([123], [(1, True, 'x')] * 33, 1, 'SHARED', 'UNKNOWN'),
-                ([123], [], 0, 'SHARED', 'UNKNOWN')]:
-            kernel = Mock()
-            def processes(buffer, limit):
-                self.assertEqual(limit, 32)
-                for i, pid in enumerate(members[:limit]): buffer[i] = pid
-                return len(members)
-            def peek(handle, buffer, limit, count):
-                self.assertEqual(handle, 789); self.assertEqual(limit, 32)
-                for i, (kind, down, char) in enumerate(events[:limit]):
-                    buffer[i].kind = kind
-                    buffer[i].event.key = capture_worker.Key(down, 1, 0, 0, char, 0)
-                count._obj.value = len(events)
-                return success
-            kernel.GetConsoleProcessList.side_effect = processes
-            kernel.PeekConsoleInputW.side_effect = peek
-            with patch.object(ctypes, 'WinDLL', return_value=kernel, create=True), \
-                    patch.dict('sys.modules', {'msvcrt': SimpleNamespace(get_osfhandle=lambda _: 789)}), \
-                    patch.object(capture_worker, 'report') as report:
-                capture_worker.probe_console(Mock(pid=123), Mock())
-            self.assertEqual([c.args[0] for c in report.call_args_list],
-                             ['CHILD_CONSOLE_' + shared, 'CONSOLE_Q_' + pending])
-            self.assertEqual([c[0] for c in kernel.method_calls], ['GetConsoleProcessList', 'PeekConsoleInputW'])
+    def test_job_api_errors_and_cleanup_timeout_fail_closed(self):
+        for failing in ('AssignProcessToJobObject', 'QueryInformationJobObject', 'TerminateJobObject'):
+            kernel, job = self.kernel_job()
+            getattr(kernel, failing).return_value = 0
+            call = {'AssignProcessToJobObject': lambda: job.assign(Mock(_handle=456)),
+                    'QueryInformationJobObject': job.population, 'TerminateJobObject': job.terminate}[failing]
+            self.fails('CAPTURE_PROCESS_FAILED', call)
+            job.close()
+        kernel, job = self.kernel_job()
+        with patch.object(job, 'population', return_value=(3, 1)), \
+                patch.object(capture_worker.time, 'monotonic', side_effect=[0, 6]):
+            self.fails('CAPTURE_PROCESS_FAILED', job.terminate)
+        job.close()
+        kernel.CloseHandle.assert_called_once_with(123)
 
-    def test_failed_probes_report_unknown_without_disclosing_exceptions(self):
-        with patch.object(capture_worker.ctypes, 'WinDLL', side_effect=OSError('private path'), create=True), \
-                patch.dict('sys.modules', {'msvcrt': Mock()}), \
-                patch.object(capture_worker, 'report') as report:
-            capture_worker.probe_launch_handles(Mock(), Mock())
-            capture_worker.probe_console(Mock(), Mock())
-        self.assertEqual([c.args[0] for c in report.call_args_list],
-                         ['LAUNCH_STDOUT_UNKNOWN', 'LAUNCH_STDERR_UNKNOWN',
-                          'CHILD_CONSOLE_UNKNOWN', 'CONSOLE_Q_UNKNOWN'])
+    def test_job_limit_failure_closes_noninherited_handle(self):
+        kernel = Mock()
+        kernel.CreateJobObjectW.return_value = 123
+        kernel.SetInformationJobObject.return_value = 0
+        with patch.object(capture_worker.ctypes, 'WinDLL', return_value=kernel, create=True):
+            self.fails('CAPTURE_PROCESS_FAILED', capture_worker.CaptureJob)
+        kernel.CloseHandle.assert_called_once_with(123)
+        kernel.AssignProcessToJobObject.assert_not_called()
 
-    def test_orderly_stop_stages_and_nonzero_timeout_fail_closed(self):
-        for result in (0, 7, subprocess.TimeoutExpired('synthetic', 15)):
-            process = Mock()
-            if isinstance(result, Exception): process.wait.side_effect = result
-            else: process.wait.return_value = result
-            with patch.object(capture_worker, 'quit_console') as quit_call, \
-                    patch.object(capture_worker, 'probe_console') as probe, \
-                    patch.object(capture_worker, 'report') as report:
-                if result == 0: capture_worker.orderly_stop(process, Mock())
-                else: self.fails('CAPTURE_PROCESS_FAILED', capture_worker.orderly_stop, process, Mock())
-                quit_call.assert_called_once()
-                stages = [c.args[0] for c in report.call_args_list]
-                self.assertEqual(stages[:4], ['STOP_CONSOLE_CHECK', 'Q_REQUESTED', 'Q_INJECTED', 'CHILD_WAIT'])
-                self.assertEqual(stages[4:], ['CHILD_WAIT_TIMEOUT', 'TIMEOUT_CONSOLE_CHECK']
-                                 if isinstance(result, Exception) else [f'CHILD_EXIT={result}'])
-                self.assertEqual(probe.call_count, 2 if isinstance(result, Exception) else 1)
-                process.wait.assert_called_once_with(timeout=15)
-        with patch.object(capture_worker, 'quit_console', side_effect=Failure('CAPTURE_PROCESS_FAILED')), \
-                patch.object(capture_worker, 'probe_console'), \
-                patch.object(capture_worker, 'report') as report:
-            self.fails('CAPTURE_PROCESS_FAILED', capture_worker.orderly_stop, Mock(), Mock())
-            self.assertEqual([c.args[0] for c in report.call_args_list], ['STOP_CONSOLE_CHECK', 'Q_REQUESTED'])
+    def test_intentional_exit_marker_distinguishes_early_crash_and_native_exits(self):
+        marker = capture_worker.STOP_EXIT_CODE
+        for before, api, result, success in [(None, 1, marker, True),
+                (0, 1, marker, False), (1, 1, marker, False), (7, 1, marker, False),
+                (None, 0, marker, False), (None, 1, 0, False), (None, 1, 1, False),
+                (None, 1, subprocess.TimeoutExpired('synthetic', 5), False)]:
+            with self.subTest(before=before, api=api, result=result):
+                kernel, process = Mock(), Mock(_handle=456)
+                kernel.TerminateProcess.return_value = api
+                process.poll.return_value = before
+                if isinstance(result, Exception): process.wait.side_effect = result
+                else: process.wait.return_value = result
+                with patch.object(capture_worker.ctypes, 'WinDLL', return_value=kernel, create=True), \
+                        patch.object(capture_worker, 'report') as report:
+                    if success: capture_worker.intentional_stop(process)
+                    else: self.fails('CAPTURE_PROCESS_FAILED', capture_worker.intentional_stop, process)
+                stages = [call.args[0] for call in report.call_args_list]
+                self.assertEqual('RELAY_TERMINATED' in stages, success)
+                if before is not None: kernel.TerminateProcess.assert_not_called()
+                else: kernel.TerminateProcess.assert_called_once_with(456, marker)
+                if before is None and api: process.wait.assert_called_once_with(timeout=5)
+                self.assertTrue(all(diagnostics.safe_lifecycle_status(s) for s in stages))
 
-    def test_worker_stdout_raw_only_and_retention_after_clean_nonzero_and_forced_exit(self):
-        for outcome in ('clean', 'nonzero', 'timeout'):
-            with self.subTest(outcome=outcome), tempfile.TemporaryDirectory() as tmp:
+    def test_worker_raw_only_launch_retains_output_on_success_and_failure(self):
+        for failure in (False, True):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as tmp:
                 raw = create_run(Path(tmp)) / 'raw/oem-init.pcap'
                 console, stop, received = io.BytesIO(), Mock(), Mock()
                 stop.wait.side_effect = [False, True]
                 received.is_set.return_value = True
-                process = Mock(returncode=None)
-                process.poll.side_effect = lambda: process.returncode
-                def wait(timeout):
-                    if outcome == 'timeout' and not process.terminate.called:
-                        raise subprocess.TimeoutExpired('synthetic', timeout)
-                    process.returncode = 0 if outcome == 'clean' else 1
-                    return process.returncode
-                process.wait.side_effect = wait
+                process = Mock()
+                process.poll.return_value = None
+                recording = pcap(records())
                 def launch(args, **kwargs):
                     self.assertEqual(args, ['synthetic.exe', '-d', r'\\.\USBPcap1',
                                           '--capture-from-new-devices', '-s', '65535', '-o', '-'])
                     self.assertEqual(set(kwargs), {'stdin', 'stdout', 'stderr', 'close_fds'})
                     self.assertIs(kwargs['stdin'], console)
                     self.assertEqual(Path(kwargs['stdout'].name), raw)
-                    self.assertEqual(kwargs['stderr'].name, os.devnull)
+                    self.assertEqual(kwargs['stderr'], subprocess.DEVNULL)
                     self.assertTrue(kwargs['close_fds'])
-                    kwargs['stdout'].write(pcap([]))
+                    kwargs['stdout'].write(recording)
                     return process
                 def open_capture(path, *args, **kwargs):
                     return console if path == 'CONIN$' else open(path, *args, **kwargs)
                 with patch.object(capture_worker, 'normal_user') as normal, \
-                        patch.object(capture_worker, 'own_process_job'), patch.object(capture_worker, 'real_path'), \
+                        patch.object(capture_worker, 'read_command', return_value=(True, b'START\n')) as command, \
+                        patch.object(capture_worker, 'real_path'), \
                         patch.object(capture_worker, 'open', open_capture, create=True), \
                         patch.object(capture_worker.threading, 'Thread'), \
                         patch.object(capture_worker.threading, 'Event', side_effect=[stop, received]), \
                         patch.object(capture_worker.subprocess, 'Popen', side_effect=launch), \
-                        patch.object(capture_worker, 'probe_launch_handles'), \
-                        patch.object(capture_worker, 'probe_console'), \
-                        patch.object(capture_worker, 'quit_console'), \
+                        patch.object(capture_worker, 'intentional_stop',
+                                     side_effect=Failure('CAPTURE_PROCESS_FAILED') if failure else None) as terminate, \
                         patch.object(capture_worker, 'report') as report:
-                    if outcome == 'clean': capture_worker.capture(Path('synthetic.exe'), r'\\.\USBPcap1', raw)
-                    else: self.fails('CAPTURE_PROCESS_FAILED', capture_worker.capture,
-                                     Path('synthetic.exe'), r'\\.\USBPcap1', raw)
-                normal.assert_called_once()
-                self.assertEqual(raw.read_bytes(), pcap([]))
-                stages = [c.args[0] for c in report.call_args_list]
-                self.assertIn('READY', stages)
-                self.assertEqual('STOPPED' in stages, outcome == 'clean')
-                self.assertEqual('RAW_FLUSHED' in stages, outcome == 'clean')
-                self.assertEqual(process.terminate.called, outcome == 'timeout')
-                self.assertTrue(all(diagnostics.safe_lifecycle_status(s) for s in stages))
+                    if failure: self.fails('CAPTURE_PROCESS_FAILED', capture_worker.capture,
+                                           Path('synthetic.exe'), r'\\.\USBPcap1', raw)
+                    else: capture_worker.capture(Path('synthetic.exe'), r'\\.\USBPcap1', raw)
+                command.assert_called_once_with(b'START')
+                normal.assert_called_once(); terminate.assert_called_once_with(process)
+                self.assertEqual(raw.read_bytes(), recording)
+                self.assertTrue(console.closed)
+                self.assertIn('READY', [call.args[0] for call in report.call_args_list])
 
-    def test_stop_control_eof_is_not_explicit_stop(self):
+    def test_start_handshake_is_required_before_native_launch(self):
+        from types import SimpleNamespace
+        for command in (b'', b'STOP\n', b'START', b'private path\n'):
+            with patch.object(capture_worker, 'normal_user'), \
+                    patch.object(capture_worker.sys, 'stdin', SimpleNamespace(buffer=io.BytesIO(command))), \
+                    patch.object(capture_worker.subprocess, 'Popen') as launch:
+                self.fails('CAPTURE_PROCESS_FAILED', capture_worker.capture,
+                           Path('synthetic.exe'), r'\\.\USBPcap1', Path('unused'))
+                launch.assert_not_called()
+        for command in (b'START\n', b'START\r\n'):
+            with patch.object(capture_worker.sys, 'stdin', SimpleNamespace(buffer=io.BytesIO(command))):
+                self.assertTrue(capture_worker.read_command(b'START')[0])
+
+    def test_stop_control_eof_is_not_explicit_stop_and_broken_status_signals_stop(self):
         from types import SimpleNamespace
         for raw, expected in [(b'STOP\n', 'STOP_RECEIVED'), (b'STOP\r\n', 'STOP_RECEIVED'),
                               (b'', 'CONTROL_EOF'), (b'junk\n', 'CONTROL_INVALID'),
@@ -528,121 +553,150 @@ class LifecycleTests(Case):
             self.assertTrue(stop.is_set())
             self.assertEqual(received.is_set(), expected == 'STOP_RECEIVED')
             report.assert_called_once_with(expected)
-
-    def test_parent_status_retention_and_failure_classification(self):
-        cases = [('STARTING\nLAUNCH_STDOUT_REDIRECTED\nLAUNCH_STDERR_NOT_REDIRECTED\nREADY\n'
-                  'STOP_RECEIVED\nSTOP_CONSOLE_CHECK\nCHILD_CONSOLE_SHARED\nCONSOLE_Q_NOT_PENDING\n'
-                  'Q_INJECTED\nCHILD_EXIT=0\nRAW_FLUSHED\nSTOPPED\n', 0, True),
-                 ('READY\nCHILD_WAIT_TIMEOUT\nFAILED\n', 1, False),
-                 ('READY\nSTOPPED\n', 7, False), ('READY\n', 0, False),
-                 ('READY\nprotected arbitrary text\nSTOPPED\n', 0, False),
-                 ('READY\n' + 'Q_INJECTED\n' * 70, 0, False)]
-        for output, exit_code, success in cases:
-            with self.subTest(exit_code=exit_code, success=success), tempfile.TemporaryDirectory() as tmp:
-                run = create_run(Path(tmp)); raw = run / 'raw/oem-init.pcap';raw.write_bytes(pcap(records()))
-                original = raw.read_bytes()
-                process = Mock(returncode=exit_code)
-                process.poll.return_value = None
-                process.wait.return_value = exit_code
-                process.stdout = io.StringIO(output)
-                with patch.object(capture_session.subprocess, 'STARTUPINFO', return_value=Mock(dwFlags=0), create=True), \
-                        patch.multiple(capture_session.subprocess, create=True, CREATE_NEW_CONSOLE=16, STARTF_USESHOWWINDOW=1), \
-                        patch.object(capture_session.subprocess, 'Popen', return_value=process):
-                    owner = capture_session.CaptureProcess(Path('synthetic.exe'), 'synthetic', raw)
-                    owner.start(threading.Event())
-                    if success: owner.stop()
-                    else: self.fails('CAPTURE_PROCESS_FAILED', owner.stop)
-                text = (run / 'diagnostics/lifecycle.txt').read_text()
-                self.assertLessEqual(len(text.splitlines()), 64)
-                self.assertTrue(all(diagnostics.safe_lifecycle_status(v) for v in text.splitlines()))
-                self.assertNotIn('protected', text)
-                self.assertEqual(raw.read_bytes(), original)
-                if success:
-                    self.assertIn('STOPPED', text);self.assertIn('EOF', text)
-
-    def test_stop_signal_survives_failed_status_output(self):
-        from types import SimpleNamespace
         stop, received = threading.Event(), threading.Event()
         with patch.object(capture_worker.sys, 'stdin', SimpleNamespace(buffer=io.BytesIO(b'STOP\n'))), \
                 patch.object(capture_worker, 'report', side_effect=BrokenPipeError):
-            with self.assertRaises(BrokenPipeError):
-                capture_worker.stop_request(stop, received)
+            with self.assertRaises(BrokenPipeError): capture_worker.stop_request(stop, received)
         self.assertTrue(stop.is_set()); self.assertTrue(received.is_set())
-        # A broken status pipe must not prevent emergency child cleanup.
-        with tempfile.TemporaryDirectory() as tmp:
-            raw = create_run(Path(tmp)) / 'raw/oem-init.pcap'
-            process = Mock(returncode=None)
-            process.poll.return_value = None
-            process.wait.side_effect = [subprocess.TimeoutExpired('synthetic', 5), 1]
-            def open_capture(path, *args, **kwargs):
-                return io.BytesIO() if path == 'CONIN$' else open(path, *args, **kwargs)
-            def status(value):
-                if value.startswith('CLEANUP_'): raise BrokenPipeError
-            with patch.object(capture_worker, 'normal_user'), patch.object(capture_worker, 'own_process_job'), \
-                    patch.object(capture_worker, 'real_path'), patch.object(capture_worker, 'open', open_capture, create=True), \
-                    patch.object(capture_worker.threading, 'Thread'), \
-                    patch.object(capture_worker.threading, 'Event', return_value=stop), \
-                    patch.object(capture_worker.subprocess, 'Popen', return_value=process), \
-                    patch.object(capture_worker, 'quit_console') as quit_call, \
-                    patch.object(capture_worker, 'report', side_effect=status):
-                with self.assertRaises(BrokenPipeError):
-                    capture_worker.capture(Path('synthetic.exe'), r'\\.\USBPcap1', raw)
-            quit_call.assert_called_once()
-            process.terminate.assert_called_once()
-            self.assertTrue(raw.exists())
 
-    def test_parent_timeout_is_retained_and_never_success(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            run = create_run(Path(tmp)); raw = run / 'raw/oem-init.pcap';raw.write_bytes(pcap(records()))
-            owner = capture_session.CaptureProcess(Path('synthetic.exe'), 'synthetic', raw)
-            process = Mock(returncode=1)
-            process.poll.return_value = None
-            process.wait.side_effect = [subprocess.TimeoutExpired('synthetic', 25), 1]
-            owner.process = process
-            self.fails('CAPTURE_PROCESS_FAILED', owner.stop)
-            trace = (run / 'diagnostics/lifecycle.txt').read_text()
-            self.assertIn('PARENT_WAIT_TIMEOUT', trace)
-            self.assertIn('PARENT_TERMINATE', trace)
-            self.assertNotIn('STOPPED', trace)
-            self.assertTrue(raw.exists())
+    def owner(self, raw, code=0):
+        owner = capture_session.CaptureProcess(Path('synthetic.exe'), r'\\.\USBPcap1', raw)
+        process, job = Mock(returncode=None), Mock()
+        process.poll.side_effect = lambda: process.returncode
+        def wait(timeout):
+            process.returncode = code
+            return code
+        process.wait.side_effect = wait
+        process.stdin.closed = False
+        job.population.return_value = (3, 3)
+        owner.process, owner.job = process, job
+        owner.assigned = owner.ready = True
+        owner.events.put('RELAY_TERMINATED'); owner.events.put('EOF')
+        return owner, process, job
 
-    def test_parent_broken_control_pipe_still_retains_status(self):
+    def test_parent_flush_only_after_whole_scope_quiescence_and_worker_exit(self):
         with tempfile.TemporaryDirectory() as tmp:
-            run = create_run(Path(tmp)); raw = run / 'raw/oem-init.pcap';raw.write_bytes(pcap(records()))
-            owner = capture_session.CaptureProcess(Path('synthetic.exe'), 'synthetic', raw)
-            process = Mock(returncode=1)
-            process.poll.return_value = 1
-            process.stdin.closed = False
-            process.stdin.close.side_effect = BrokenPipeError
-            owner.process = process
-            with self.assertRaises(BrokenPipeError):
+            raw = create_run(Path(tmp)) / 'raw/oem-init.pcap'; raw.write_bytes(pcap(records()))
+            original = raw.read_bytes()
+            owner, process, job = self.owner(raw)
+            def flush(fd):
+                job.terminate.assert_called_once()
+                self.assertEqual(process.returncode, 0)
+                self.assertIn('SCOPE_QUIESCENT', owner.trace)
+            with patch.object(capture_session, 'os', Mock(wraps=os, fsync=Mock(side_effect=flush))) as raw_os:
                 owner.stop()
-            self.assertIn('WORKER_EXIT=1', (run / 'diagnostics/lifecycle.txt').read_text())
-            self.assertTrue(raw.exists())
-            self.assertIsNone(owner.process)
-
-    def test_parent_exit_zero_and_stopped_without_eof_still_fail(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            run = create_run(Path(tmp)); raw = run / 'raw/oem-init.pcap'; raw.write_bytes(pcap([]))
-            owner = capture_session.CaptureProcess(Path('synthetic.exe'), 'synthetic', raw)
-            process = Mock(returncode=0)
-            process.poll.side_effect = [None, 0]
-            process.wait.return_value = 0
-            owner.process = process
-            owner.events.put('STOPPED')
-            with patch.object(capture_session.time, 'monotonic', side_effect=[0, 0, 3]):
-                self.fails('CAPTURE_PROCESS_FAILED', owner.stop)
-            trace = (run / 'diagnostics/lifecycle.txt').read_text()
-            self.assertIn('PARENT_STATUS_TIMEOUT', trace)
+            raw_os.fsync.assert_called_once(); job.close.assert_called_once()
             process.terminate.assert_not_called()
-            self.assertEqual(raw.read_bytes(), pcap([]))
+            self.assertEqual(raw.read_bytes(), original)
+            trace = (raw.parent.parent / 'diagnostics/lifecycle.txt').read_text().splitlines()
+            self.assertLess(trace.index('SCOPE_QUIESCENT'), trace.index('RAW_FLUSH'))
+            self.assertLess(trace.index('RAW_FLUSHED'), trace.index('STOPPED'))
+            self.assertIsNone(owner.job); self.assertIsNone(owner.process)
 
-    def test_status_vocabulary_rejects_paths_payloads_and_unbounded_values(self):
+    def test_parent_failures_never_flush_or_accept_even_valid_raw(self):
+        for failure in ('early_exit', 'missing_member', 'extra_member', 'worker_nonzero',
+                        'worker_timeout', 'scope_timeout', 'scope_error', 'control_write', 'control_close',
+                        'status_failed', 'no_relay_marker', 'no_eof'):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as tmp:
+                raw = create_run(Path(tmp)) / 'raw/oem-init.pcap'; raw.write_bytes(pcap(records()))
+                original = raw.read_bytes()
+                owner, process, job = self.owner(raw, code=1 if failure == 'worker_nonzero' else 0)
+                if failure == 'early_exit': process.returncode = 1
+                if failure == 'missing_member': job.population.return_value = (3, 2)
+                if failure == 'extra_member': job.population.return_value = (4, 4)
+                if failure == 'worker_timeout': process.wait.side_effect = [subprocess.TimeoutExpired('synthetic', 10), 0]
+                if failure.startswith('scope_'): job.terminate.side_effect = Failure('CAPTURE_PROCESS_FAILED')
+                if failure == 'control_write': process.stdin.write.side_effect = BrokenPipeError('private')
+                if failure == 'control_close': process.stdin.close.side_effect = BrokenPipeError('private')
+                if failure in ('status_failed', 'no_relay_marker', 'no_eof'):
+                    owner.events = __import__('queue').Queue()
+                    if failure != 'no_relay_marker': owner.events.put('RELAY_TERMINATED')
+                    if failure == 'status_failed': owner.events.put('FAILED')
+                    if failure != 'no_eof': owner.events.put('EOF')
+                with contextlib.ExitStack() as stack:
+                    raw_os = stack.enter_context(patch.object(capture_session, 'os', Mock(wraps=os)))
+                    fsync = raw_os.fsync
+                    if failure == 'no_eof':
+                        stack.enter_context(patch.object(capture_session.time, 'monotonic', side_effect=[0, 0, 3]))
+                    self.fails('CAPTURE_PROCESS_FAILED', owner.stop)
+                fsync.assert_not_called(); job.terminate.assert_called_once(); job.close.assert_called_once()
+                self.assertEqual(raw.read_bytes(), original)
+                trace = (raw.parent.parent / 'diagnostics/lifecycle.txt').read_text()
+                self.assertNotIn('STOPPED', trace); self.assertNotIn('private', trace)
+                self.assertIsNone(owner.process); self.assertIsNone(owner.job)
+
+    def test_flush_failure_or_file_growth_prevents_success(self):
+        for mode in ('error', 'growth'):
+            with tempfile.TemporaryDirectory() as tmp:
+                raw = create_run(Path(tmp)) / 'raw/oem-init.pcap'; raw.write_bytes(pcap(records()))
+                owner, process, job = self.owner(raw)
+                def flush(fd):
+                    if mode == 'error': raise OSError('private path')
+                    with raw.open('ab') as extra: extra.write(b'bad')
+                with patch.object(capture_session, 'os', Mock(wraps=os, fsync=Mock(side_effect=flush))):
+                    self.fails('CAPTURE_PROCESS_FAILED', owner.stop)
+                self.assertTrue(raw.exists())
+                self.assertNotIn('STOPPED', owner.trace)
+                job.terminate.assert_called_once(); job.close.assert_called_once()
+
+    def test_parent_assignment_precedes_start_and_checks_pinned_scope(self):
+        for population, assign_error in [((3, 3), False), ((2, 2), False), ((4, 4), False), ((3, 3), True)]:
+            with self.subTest(population=population, assign_error=assign_error), tempfile.TemporaryDirectory() as tmp:
+                raw = create_run(Path(tmp)) / 'raw/oem-init.pcap'; raw.write_bytes(pcap([]))
+                owner, process, job = self.owner(raw)
+                owner.ready = owner.assigned = False
+                owner.events = __import__('queue').Queue()
+                process.stdout = io.StringIO('STARTING\nREADY\nRELAY_TERMINATED\n')
+                job.population.return_value = population
+                if population != (3, 3): job.verify_members.side_effect = Failure('CAPTURE_PROCESS_FAILED')
+                if assign_error: job.assign.side_effect = Failure('CAPTURE_PROCESS_FAILED')
+                def send(command):
+                    self.assertTrue(owner.assigned)
+                    job.assign.assert_called_once_with(process)
+                process.stdin.write.side_effect = send
+                with patch.object(capture_session, 'CaptureJob', return_value=job), \
+                        patch.object(capture_session.subprocess, 'STARTUPINFO', return_value=Mock(dwFlags=0), create=True), \
+                        patch.multiple(capture_session.subprocess, create=True, CREATE_NEW_CONSOLE=16, STARTF_USESHOWWINDOW=1), \
+                        patch.object(capture_session.subprocess, 'Popen', return_value=process):
+                    if population == (3, 3) and not assign_error:
+                        owner.start(threading.Event()); self.assertTrue(owner.alive()); owner.stop()
+                    else:
+                        self.fails('CAPTURE_PROCESS_FAILED', owner.start, threading.Event())
+                        self.fails('CAPTURE_PROCESS_FAILED', owner.stop)
+                if assign_error:
+                    process.stdin.write.assert_not_called(); process.terminate.assert_called_once()
+                    self.assertTrue(process.stdout.closed)
+                else: process.terminate.assert_not_called()
+                job.terminate.assert_called_once(); job.close.assert_called_once()
+
+    def test_status_reader_bounds_and_rejects_untrusted_output(self):
+        for output in ('READY\nprotected arbitrary text\n', 'READY\n' + 'STARTING\n' * 70,
+                       'READY\n' + 'x' * 100 + '\n'):
+            with tempfile.TemporaryDirectory() as tmp:
+                raw = create_run(Path(tmp)) / 'raw/oem-init.pcap'; raw.write_bytes(pcap(records()))
+                owner, process, job = self.owner(raw)
+                owner.events = __import__('queue').Queue()
+                process.stdout = io.StringIO(output)
+                with patch.object(capture_session, 'CaptureJob', return_value=job), \
+                        patch.object(capture_session.subprocess, 'STARTUPINFO', return_value=Mock(dwFlags=0), create=True), \
+                        patch.multiple(capture_session.subprocess, create=True, CREATE_NEW_CONSOLE=16, STARTF_USESHOWWINDOW=1), \
+                        patch.object(capture_session.subprocess, 'Popen', return_value=process), \
+                        patch.object(capture_session.time, 'monotonic', side_effect=[0, 0, 0, 3]):
+                    owner.start(threading.Event())
+                    self.fails('CAPTURE_PROCESS_FAILED', owner.stop)
+                text = (raw.parent.parent / 'diagnostics/lifecycle.txt').read_text()
+                self.assertLessEqual(len(text.splitlines()), 64)
+                self.assertTrue(all(diagnostics.safe_lifecycle_status(v) for v in text.splitlines()))
+                self.assertNotIn('protected', text)
+                self.assertTrue(raw.exists())
+
+    def test_status_vocabulary_rejects_old_probes_paths_payloads_and_unbounded_values(self):
         for text in ('C:\\private\\secret', 'payload=abcd', 'CHILD_EXIT=0 extra',
                      'CHILD_EXIT=4294967296', 'WORKER_EXIT=-2147483649', 'hash=' + 'a' * 64,
-                     'CHILD_CONSOLE_PID=123', 'CONSOLE_Q_PENDING q', 'LAUNCH_STDERR_UNKNOWN private'):
+                     'Q_INJECTED', 'CHILD_CONSOLE_SHARED', 'CONSOLE_Q_PENDING', 'LAUNCH_STDERR_UNKNOWN'):
             self.assertFalse(diagnostics.safe_lifecycle_status(text))
-        for text in ('CHILD_EXIT=0', 'WORKER_EXIT=-1', 'CHILD_EXIT=4294967295'):
+        for text in ('CHILD_EXIT=0', 'WORKER_EXIT=-1', 'CHILD_EXIT=4294967295',
+                     'STOP_REASON_BUILDER_BOUNDED_TERMINATION', 'SCOPE_QUIESCENT'):
             self.assertTrue(diagnostics.safe_lifecycle_status(text))
 
 
@@ -952,6 +1006,68 @@ class WindowsTests(Case):
 
 
 class WorkflowTests(Case):
+    def test_bounded_acquisition_validates_only_after_quiescence_flush_and_close(self):
+        for outcome in ('valid', 'truncated', 'scope_failure', 'early_exit', 'cancel_stop', 'cancel_analysis'):
+            with self.subTest(outcome=outcome), tempfile.TemporaryDirectory() as tmp:
+                root, cancel = Path(tmp), threading.Event()
+                (root / 'runs').mkdir()
+                state = {'empty': False, 'flushed': False}
+                recording = pcap(records())
+                if outcome == 'truncated': recording = recording[:-1]
+                process, job = Mock(returncode=None), Mock()
+                process.poll.side_effect = lambda: process.returncode
+                process.stdout = io.StringIO('STARTING\nREADY\nSTOP_RECEIVED\n'
+                    'STOP_REASON_BUILDER_BOUNDED_TERMINATION\nRELAY_TERMINATED\n')
+                def launch(args, **kwargs):
+                    Path(args[-1]).write_bytes(recording)
+                    self.assertEqual(kwargs['stderr'], subprocess.DEVNULL)
+                    self.assertEqual(kwargs['stdin'], subprocess.PIPE)
+                    return process
+                def wait(timeout):
+                    process.returncode = 0
+                    if outcome == 'cancel_stop': cancel.set()
+                    return 0
+                process.wait.side_effect = wait
+                job.population.return_value = (3, 3)
+                def terminate():
+                    if outcome == 'scope_failure': raise Failure('CAPTURE_PROCESS_FAILED')
+                    state['empty'] = True
+                job.terminate.side_effect = terminate
+                def flush(fd):
+                    self.assertTrue(state['empty'])
+                    state['flushed'] = True
+                    os.fsync(fd)
+                def analyze(raw):
+                    self.assertTrue(state['empty'] and state['flushed'])
+                    self.assertEqual(raw.read_bytes(), recording)
+                    if outcome == 'cancel_analysis': cancel.set()
+                    return capture.analyze(raw)
+                def update(stage, value):
+                    if stage == 'SETTLING' and outcome == 'early_exit': process.returncode = 1
+                now = iter(range(0, 1000, 10))
+                prereq = windows.Prerequisites(Path('synthetic'), True, windows.VERSION, (r'\\.\USBPcap1',), False)
+                with patch.object(windows, 'target_count', side_effect=[0, 0, 1, 1, 1]), \
+                        patch.object(capture_session, 'CaptureJob', return_value=job), \
+                        patch.object(capture_session.subprocess, 'STARTUPINFO', return_value=Mock(dwFlags=0), create=True), \
+                        patch.multiple(capture_session.subprocess, create=True, CREATE_NEW_CONSOLE=16, STARTF_USESHOWWINDOW=1), \
+                        patch.object(capture_session.subprocess, 'Popen', side_effect=launch), \
+                        patch.object(capture_session, 'os', Mock(wraps=os, fsync=Mock(side_effect=flush))), \
+                        patch.object(capture_session, 'analyze', side_effect=analyze) as parser:
+                    args = (root, prereq, None, False, cancel, update)
+                    kwargs = dict(clock=lambda: next(now), pause=lambda _: None)
+                    if outcome == 'valid':
+                        run, evidence = capture_session.acquire(*args, **kwargs)
+                        evidence.require_complete()
+                    else:
+                        code = (capture.BAD if outcome == 'truncated' else
+                                'CAPTURE_CANCELLED' if outcome.startswith('cancel') else 'CAPTURE_PROCESS_FAILED')
+                        self.fails(code, capture_session.acquire, *args, **kwargs)
+                self.assertEqual(parser.call_count, int(outcome in ('valid', 'truncated', 'cancel_analysis')))
+                job.terminate.assert_called_once(); job.close.assert_called_once()
+                raw = next(root.glob('runs/*/raw/oem-init.pcap'))
+                self.assertEqual(raw.read_bytes(), recording)
+                self.assertFalse(list(root.glob('runs/*/goodix-5125-materials')))
+
     def test_cancel_after_ready_with_reader_detached_stops_without_analysis(self):
         for stop_failed in (False, True):
             with self.subTest(stop_failed=stop_failed), tempfile.TemporaryDirectory() as tmp:
@@ -977,27 +1093,6 @@ class WorkflowTests(Case):
                 self.assertEqual(next(root.glob('runs/*/raw/oem-init.pcap')).read_bytes(), pcap([]))
                 # Cancellation alone cannot prove the child stopped cleanly.
                 self.assertIn('CAPTURE_CANCELLED', next(root.glob('runs/*/diagnostics/result.txt')).read_text())
-
-    def test_capture_subprocess_start_stop_and_error(self):
-        process = Mock()
-        process.poll.return_value = None
-        process.wait.return_value = 0
-        process.stdout = io.StringIO('READY\nSTOPPED\n')
-        flags = {'CREATE_NEW_CONSOLE': 16, 'STARTF_USESHOWWINDOW': 1}
-        with patch.object(capture_session.subprocess, 'STARTUPINFO', return_value=Mock(dwFlags=0), create=True), \
-                patch.multiple(capture_session.subprocess, create=True, **flags), \
-                patch.object(capture_session.subprocess, 'Popen', return_value=process) as popen, \
-                patch.object(capture_session, 'write_new'):
-            owner = capture_session.CaptureProcess(Path('USBPcapCMD.exe'), '\\\\.\\USBPcap1', Path('raw.pcap'))
-            owner.start(threading.Event())
-            self.assertTrue(owner.alive())
-            owner.stop()
-            process.stdin.write.assert_called_once_with('STOP\n')
-            self.assertIn('tools.windows_material_builder.capture_worker', popen.call_args.args[0])
-            self.assertNotIn('-A', popen.call_args.args[0])
-            process.stdout = io.StringIO('FAILED\n')
-            other = capture_session.CaptureProcess(Path('USBPcapCMD.exe'), '\\\\.\\USBPcap1', Path('raw.pcap'))
-            self.fails('CAPTURE_PROCESS_FAILED', other.start, threading.Event())
 
     def workflow(self, counts, *, missing=(), cancel=False, fail_start=False, fail_stop=False):
         temp = tempfile.TemporaryDirectory(); self.addCleanup(temp.cleanup)
@@ -1068,7 +1163,9 @@ class CorrectiveTests(Case):
         evidence = capture.analyze_bytes(pcap(records(missing=('A2',))))
         with patch.object(gui, 'ScrolledText'):
             app.diagnose((Path('synthetic-run'), evidence))
+        app.clear.assert_called_once_with('Capture incomplete')
         callbacks = {call.args[0]: call.args[1] for call in app.button.call_args_list}
+        self.assertNotIn('Build private bundle', callbacks)
         self.assertIn('Retry with extended initialization window', callbacks)
         app.preflight.assert_not_called()
         callbacks['Retry with extended initialization window']()

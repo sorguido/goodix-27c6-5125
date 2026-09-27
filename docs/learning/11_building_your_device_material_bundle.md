@@ -5,10 +5,10 @@
 > is available as source for operator validation. It uses USBPcap directly and
 > does not require Wireshark or TShark. It is not yet a supported release.
 > **Current builder validation:** update only the source and follow the
-> [capture shutdown diagnostic](../../tools/windows_material_builder/README.md),
-> keeping Goodix detached throughout Start/READY/Cancel. Normal read-only material
-> diagnosis has passed; clean capture shutdown remains unqualified. Do not start
-> another full Goodix capture before this lifecycle gate is reviewed.
+> [single full acquisition procedure](../../tools/windows_material_builder/README.md).
+> Begin with Goodix detached, attach only at the prompt, and use the normal
+> 30-second window. Stop at Diagnose and build, before bundle/DPAPI construction.
+> The bounded stop architecture still requires Windows validation.
 > The manual reference below remains the independent fallback; its native-Windows
 > steps are outside the candidate app's VM-only scope.
 # 11. 🧰 Building your device-material bundle

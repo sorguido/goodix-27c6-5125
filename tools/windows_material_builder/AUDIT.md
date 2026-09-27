@@ -48,329 +48,131 @@ controller. Record its setting and the guest topology at the Human Gate; the
 application neither changes that setting nor executes `-I` itself.
 
 The pinned [CMD source](https://github.com/desowin/usbpcap/blob/1.5.4.0/USBPcapCMD/cmd.c)
-provides extcap discovery without Wireshark, new-device capture, its own elevated
-capture worker, and console `q` shutdown. Stdout mode keeps a pipe to that worker
-so closing capture does not use its direct-file TerminateProcess path.
-The GUI and DPAPI never elevate. Capture readiness requires both a live process
-and the emitted PCAP header. New-device capture omits `-A` and descriptor
-injection. Controller selection must use the manual mapping in the learning
-guide; unresolved multiple interfaces fail closed. A capture never retries an
-attachment automatically.
+provides interface discovery, new-device capture and its own elevated worker.
+With `-o -`, the unelevated relay creates the named pipe and writes its bytes to
+stdout; the elevated instance writes to that pipe. In an existing kill-on-close
+job, upstream creates neither a breakaway relay nor a replacement job. Its
+[read thread](https://github.com/desowin/usbpcap/blob/1.5.4.0/USBPcapCMD/thread.c)
+monitors the duplex pipe for disconnection even without new sensor traffic.
+Pipe closure can initiate worker exit, but is not used as proof that it exited.
+The direct-file worker termination branch is not used by the builder.
 
-[USBPcap headers](https://desowin.org/usbpcap/captureformat.html) use link type
-249 and little-endian metadata. Version 1.5.4.0 uses SETUP/COMPLETE control
-records. The bounded parser also reads existing EPB pcapng evidence, rejects
-truncation and separates descriptor epochs before examining A0 streams.
+## Bounded stop contract
 
-The upstream [buffer writer](https://github.com/desowin/usbpcap/blob/1.5.4.0/USBPcapDriver/USBPcapBuffer.c)
-obtains timestamps before acquiring the serialization lock. Consequently packet
-timestamps may decrease in file order. PCAP/pcapng records retain file-order
-indices; timestamps neither reorder records nor impose monotonic acceptance.
-Classic PCAP fractional fields still obey microsecond/nanosecond bounds; EPB
-timestamps are unsigned 64-bit ticks with no comparable fractional-field bound.
+The GUI owns one unnamed, non-inheritable Windows Job Object with
+KILL_ON_JOB_CLOSE and neither breakaway flag. It creates the unelevated Python
+helper, assigns its exact Popen handle to this job, then sends START. Before
+START, the helper cannot launch USBPcap. The GUI is outside this job and retains
+its sole job handle. Assignment failure terminates only the blocked helper's
+known handle. The existing hidden console and raw-only native stdout remain;
+no q injection, console probes, stderr collection or manual stop is involved.
 
-## Evidence and remaining gate
+Before reporting capture readiness to the user, the owner requires three total
+and three active processes in the job: helper, relay and elevated pipe writer.
+It also reads the bounded [job member list](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_process_id_list),
+requires the helper PID and two distinct native members, and opens only those
+members with SYNCHRONIZE and PROCESS_QUERY_LIMITED_INFORMATION. Their
+[image paths](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-queryfullprocessimagenamew)
+must match the selected pinned USBPcap executable. This prevents a console host
+or unrelated job member from satisfying a count-only check. The two native
+handles remain owned until cleanup, avoiding PID reuse during the exit wait.
+IDs and image paths are never logged. No global process enumeration or
+process-name-based termination is used. Missing/extra members, denied query/wait
+rights or unexpected topology fail before the attach prompt. Population checks
+continue during acquisition and immediately before STOP.
 
-A read-only historical zero-finger capture audit found unique A2, chip82, A6
-and APP12509, but no valid CONFIG90. Size and modification time were unchanged.
-This is a negative feasibility result, not a five-file golden fixture. Synthetic
-missing-CONFIG90 coverage represents that failure without copying private data.
-No private evidence paths, payloads or reader-specific hashes belong here.
+The [Windows job contract](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects)
+contains descendants without breakaway; nested-job accounting is included.
+The pinned upstream source defines the expected relay/elevated-worker topology;
+runtime membership checks enforce it rather than assuming UAC inherited the job.
+An environment that cannot meet this boundary is rejected, not silently relaxed.
 
-The observed typed-response window ended less than eight seconds after the first
-descriptor. The candidate allows 30 seconds after guest appearance, with a
-90-second manual-attach timeout. These are bounded engineering allowances, not
-guarantees of completeness. An explicit retry for missing A2/chip82/A6, with CONFIG90 present, may use
-60 seconds: a bounded doubling to test possible late initialization, not a
-qualified completeness threshold. Target and APP identity must already pass;
-ambiguity or any other failure excludes this option. The existing A6/FDT
-comparison is also applied before offering a retry when A6 is available, so a
-known mismatch cannot be hidden by a simultaneous missing class. It repeats detached-first
-preflight and manual attachment in a fresh run, with no third timing tier. The historical operator also explicitly waited for
-passive initialization to settle; only complete capture evidence permits build.
+On normal completion, STOP reaches the helper through its existing private pipe.
+The helper requires the relay to be alive, calls TerminateProcess on its owned
+relay handle with the private marker `0x47584350`, and waits at most five seconds.
+Only API success and that exact resulting exit code permit RELAY_TERMINATED.
+A pre-stop exit, failed call, other exit code or timeout remains failure. The
+helper closes raw and exits zero; the owner requires both that completion marker
+and status EOF. Parent helper wait is ten seconds; status EOF wait is two seconds.
 
-The earlier exact-wire parser reported missing CONFIG90 on that historical
-capture; this is not a logical-control reanalysis of that recording. Like the historical parser, it never scans opaque traffic or physical
-tails for a body; only framed A0 candidates are eligible. It additionally requires
-successful USB submission/completion pairing, an exact NUL-terminated runtime A8
-identity, one target identity/attachment epoch, full packet snapshots, and
-CONFIG90's fixed DAC layout. A repeated descriptor before material traffic is
-allowed; a later descriptor or reconfiguration is an ambiguous epoch.
+The owner then calls [TerminateJobObject](https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-terminatejobobject)
+on its private job, waits for both retained native handles to signal, and queries
+active-process accounting until zero. These waits share one five-second deadline.
+This catches a pipe worker that did not exit on disconnect. The helper's own
+process handle is also waited. Only after this verified quiescence does the
+owner open the retained raw, fsync it, check its bounded size is unchanged, close
+it, and check size again. No arbitrary stability sleep or interactive exit is
+required. Job close remains a cleanup backstop on failure or owner exit; it
+cannot turn failed quiescence verification into success.
 
-A read-only Welcome action reports only Windows product/version/build and Python
-version for the gate; unavailable values remain UNKNOWN without a new OS gate.
-Windows DPAPI/build, complete capture shutdown, remaining GUI/permission behavior
-and the real bundle still require qualification. Installation/UAC/startup and
-source checks have the operator-reported live results below. Offline success is not live qualification.
-The installer/runtime remains final authority. Raw captures remain private,
-outside the final bundle, on success, failure and retry.
+Only then may acquire call the existing strict parser. Fully parseable container,
+paired target transfers, exact target/APP identity and all mandatory material
+classes are required for **Diagnose and build**. Partial/ambiguous evidence shows
+**Capture incomplete**, with no Build action; existing eligible retry policy is
+unchanged. A valid PCAP never excuses process-cleanup failure. An expected native
+termination code never substitutes for container/material validation. Worker
+nonzero exits are not newly accepted.
 
-## Public export boundary
+Cancel always remains CAPTURE_CANCELLED after cleanup; analysis is skipped when
+cancellation is already requested and its result is discarded if cancellation
+arrives during analysis. Early death, broken control/status, timeout, quiescence,
+flush or stability failure retains raw and cannot publish usable acquisition.
+Telemetry remains limited to 64 allowlisted lifecycle lines: ownership, explicit
+stop reason, exits, quiescence, flush, EOF and failures. No arbitrary stderr,
+exception strings, paths, process IDs, payloads or reader-specific hashes enter
+that trace. The previous q/probe code and its theory-specific tests are removed.
 
-The candidate lives entirely under `tools/windows_material_builder`, with a
-dependency only on the public `deployment/materials.py` content validator.
-Tests use the public synthetic generator in `deployment/test_materials.py`.
-The public-source ledger includes the candidate; `production/build-public.py`
-continues to build only the Linux payload. Adding Tkinter/cryptography or the
-USBPcap installer to that payload would be an unnecessary dependency change.
-Export validation must exercise the candidate from a copy with no `.git` or
-`development` directory, including its tests and command-line entrypoint.
+## Material and privacy boundaries
 
-## Offline verification (2026-09-28)
+The operator's retained full captures pass normal read-only target/APP12509,
+CONFIG90/A2/chip82/A6 diagnosis. The no-reader test establishes that q remains
+pending in the shared console after successful injection; that interactive
+requirement is retired. Detailed live traces and development chronology remain
+only in the non-public development manual. This corrective opens no private
+capture, OEM input or bundle and performs no Windows, USB or DPAPI operation.
 
-The 93 builder tests passed using synthetic inputs, including acceptance of
-generated material by the compiled production C loader. Existing deployment
-(76), production (16) and recovery (48) Python tests passed. The C A0 (51),
-post-TLS (19) and image-device (58) suites each passed both normally and under
-ASan/UBSan using the existing Freedesktop SDK. These results do not validate
-Windows native API behavior or actual reader acquisition.
+Material extraction is unchanged: the exact initial UNKNOWN 255-to-assigned
+CONTROL descriptor transition, one target/epoch, strict USB pairing, framed A0
+checksums and exact APP12509 remain mandatory. CONFIG90 uses logical control
+0x90, admitting observed wire 0x90 and compatible wire 0x91, with its 224-byte
+body, DAC layout and finalizer checks. Typed A2/chip82/A6, ambiguity checks and
+A6/FDT binding remain intact. The shared parse_a0 implementation, source-ctime
+compatibility, DPAPI, five-file bundle and Linux runtime are unchanged.
 
-The corrective pass added 11 tests for timestamp inversions/ranges, explicit
-30/60-second retries and retention, mixed missing/A6-mismatch exclusion, installer
-wording, and safe baseline metadata reporting. The read-only historical capture
-then returned CONFIG90_MISSING, with A2/chip82/A6 and APP12509 passing and raw
-size/mtime unchanged. That result predates the logical-control correction below
-and must not be used to classify the current operator recording.
+CONFIG90_MISSING still offers no timed retry. Only otherwise qualified missing
+A2/chip82/A6 evidence can offer the existing explicit 30-to-60-second allowance.
+These are engineering bounds, not completeness guarantees. Historical positive
+capture UI/trigger provenance remains unknown; it does not invalidate currently
+accepted same-recording material. Never combine readers or recordings.
 
-A public source copy without Git history or `development` passed the builder
-tests, CLI entrypoint check and complete source-ledger hash verification.
-Its inventory excludes raw captures, OEM binaries and material bundles.
+The bounded parser handles classic PCAP and supported EPB pcapng, rejects
+truncation and retains file order even when timestamps decrease. The upstream
+[buffer writer](https://github.com/desowin/usbpcap/blob/1.5.4.0/USBPcapDriver/USBPcapBuffer.c)
+obtains timestamps before its serialization lock. Fractional classic timestamps
+still obey their microsecond/nanosecond bounds. No private fixture is committed.
 
-The first operator Windows run stopped at source validation with SOURCE_UNSAFE,
-before USBPcap or reader interaction. Reported stable handle snapshots differed
-from pathname metadata only in ctime. The fix retains strict handle-before/after
-checks and excludes ctime only from Windows handle/path identity, retaining
-device, inode, link count, size, mtime and file-type/reparse checks. POSIX checks
-are unchanged. Seven focused synthetic tests cover this compatibility case and
-rejection boundaries; the operator subsequently confirmed source validation PASS.
+## Verification and next operator gate
 
-Live corrective pass 2 adds 12 tests: three enumeration groups (including full
-synthetic PCAP/pcapng success and rejected near-misses), eight lifecycle groups
-(console-event fields, explicit LF/Windows CRLF STOP, EOF, nonzero exits, timeouts,
-broken pipes, status bounds/privacy and raw retention), and the CONFIG90 stop UI
-policy. Console-event tests on Fedora use mocks, not a Windows ABI qualification.
+Offline coverage exercises the job ownership/handshake, exact native image
+membership, retained handles, termination marker, early crashes, API failures,
+shared cleanup deadline, empty scope before fsync, EOF, file stability, raw-only
+stdout, retained failures/cancel, status privacy and post-stop strict parsing.
+The integrated workflow tests valid and truncated synthetic captures and Cancel
+during stop/analysis. Mocked Linux ctypes tests do not qualify Windows ABI,
+UAC job inheritance or cross-integrity query/wait permissions.
 
+Verification scope: builder with the production C material loader; deployment,
+production and recovery Python suites; A0, post-TLS and image-device C suites
+both normally and with ASan/UBSan in the existing network/device-disabled SDK.
+The public source copy excludes .git and development, exercises the builder,
+production checks and CLI, and verifies every source-ledger hash. Production
+payload dependencies are unchanged. Public TECHNICAL_MANUAL.md remains untouched.
 
-## Live corrective pass 2: enumeration and stop observability
-
-Historical first-capture evidence supplied by the operator (not an agent run).
-The second capture's normal diagnosis and current shutdown boundary are described
-in the console review below; the historical pending status here is superseded:
-
-```text
-WINDOWS_SOURCE_CTIME_FIX=LIVE_PASS
-USBPCAP_1_5_4_INSTALL_AND_REBOOT=LIVE_PASS
-USBPCAP_POST_REBOOT_PREREQUISITES=LIVE_PASS
-CAPTURE_START_AND_MANUAL_ATTACH_GATE=LIVE_PASS
-PCAP_CONTAINER=LIVE_PASS_174_COMPLETE_RECORDS
-USBPCAP_DECODE=LIVE_PASS
-ENUMERATION_255_TO_ASSIGNED_TRANSITION=REAL_OBSERVED
-ENUMERATION_POLICY=CORRECTED_OFFLINE_PENDING_LIVE_REANALYSIS
-CAPTURE_STOP_STATUS=LIVE_FAILURE_DESPITE_COMPLETE_PCAP
-APP12509=PASS
-A2=PASS
-CHIP82=PASS
-A6=PASS
-CONFIG90=PASS_BY_READ_ONLY_LOGICAL_CONTROL_AUDIT
-CONFIG90_WIRE=0x90
-CONFIG90_LOGICAL=0x90
-CONFIG90_BODY_LENGTH=224
-CONFIG90_FINALIZER=PASS
-BUNDLE_BUILD=NOT_REACHED
-DPAPI_LIVE_BUILD=NOT_REACHED
-```
-
-The reported PCAP is 20,959 bytes with no trailing data. UAC and READY worked;
-attachment occurred only after the prompt, without sensor contact. The operator's
-read-only in-memory normalization of the single UNKNOWN-address descriptor pair
-allowed the old parser to reach its CONFIG90 false negative. A subsequent
-operator read-only audit found one valid logical CONFIG90 candidate, wire 0x90,
-224-byte body and valid finalizer in that same recording. The current private
-capture and OEM material were not opened by the agent in either corrective pass.
-
-[USBPcap allocation](https://github.com/desowin/usbpcap/blob/1.5.4.0/USBPcapDriver/USBPcapFilterManager.c)
-starts the address at 255; its
-[device-information query](https://github.com/desowin/usbpcap/blob/1.5.4.0/USBPcapDriver/USBPcapHelperFunctions.c)
-assigns the actual address. The parser now permits this only for matching
-interface/bus/IRP, CONTROL SETUP/COMPLETE on endpoint 0x80, UNKNOWN submit,
-assigned address 1..127, successful completion, and the exact standard 18-byte
-device-descriptor request. The response must have the full descriptor header,
-legal USB2 endpoint-zero packet size and nonzero configuration count. The assigned
-key must have no previous identity/material traffic; identity binds to that key.
-Other address changes fail. Control URB function equality is deliberately not
-required (observed 11 -> 8); bulk pairing and all material gates remain strict.
-
-## Shutdown console review
-
-`CAPTURE_STOP_ROOT_CAUSE=UNRESOLVED`. The operator reports that the second
-capture's normal read-only diagnosis passes CONFIG90/A2/CHIP82/A6, exact
-identity and exit zero. Its lifecycle localizes failure after STOP receipt and
-successful `WriteConsoleInputW`: the child does not exit within 15 seconds,
-emergency q is ineffective, and forced termination produces exit 1. This proves
-API-level injection, not consumption. The agent performed no Windows/USB action
-and opened no private recording, OEM input or bundle. The full live chronology
-belongs in the non-public development manual, not the public technical manual.
-
-The reviewed [pinned cmd.c](https://github.com/desowin/usbpcap/blob/1.5.4.0/USBPcapCMD/cmd.c)
-uses `GetFileInformationByHandle` success as `IsHandleRedirected`, not merely a
-non-console destination. `attach_parent_console` skips attachment only when both
-stdout/stderr predicates succeed. Otherwise it attempts `AttachConsole`, restores
-inherited stdin if changed, preserves redirected stdout and reopens
-non-redirected stderr as `CONOUT$`. With usable stdin, `wait_for_exit_signal`
-looks for a KEY_EVENT with key-down and ASCII q. After it returns, `start_capture`
-signals its read thread, joins it, closes handles, then waits for the elevated
-worker. The `-o -` branch relays the named pipe to stdout; direct-file worker
-termination is a different branch. The [pinned read thread](https://github.com/desowin/usbpcap/blob/1.5.4.0/USBPcapCMD/thread.c)
-handles exit/broken-pipe conditions and cancels outstanding I/O.
-
-The proposed “raw file plus DEVNULL necessarily skips attachment” explanation
-is **not established**. NUL is a character device; Python's
-[Windows file-query investigation](https://bugs.python.org/issue37074#msg343781)
-reports `GetFileInformationByHandle` failure for NUL. The [API's documented
-success/failure result](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfileinformationbyhandle)
-is what matters to upstream. We have not measured that predicate or console
-association on this VM.
-Replacing stderr with CONOUT$ without that evidence would be speculative.
-Wrong console/input binding, a skipped/unusable stdin wait, and blocking after
-q consumption in the thread/pipe/elevated-worker teardown remain distinguishable
-possibilities, not established causes. The event fields match upstream's
-predicate; Windows INPUT_RECORD layout and actual inherited handles still need
-native observation. Linux ctypes mocks cannot qualify the Windows ABI.
-
-The launch strategy stays the same: hidden private worker console, inherited
-CONIN$ stdin, raw-file stdout, NUL stderr, unelevated Python and USBPcap's own UAC.
-The NUL file is now opened explicitly with the same read/write access so its
-actual launch handle can be queried; no arbitrary stderr is read or retained.
-Only these additional closed-vocabulary observations are emitted:
-
-| Field | Observation and limit |
-| --- | --- |
-| LAUNCH_STDOUT/STDERR_REDIRECTED, NOT_REDIRECTED or UNKNOWN | Upstream's file-query boolean on each actual parent-side launch handle, before child creation; not proof of its later handle state. No file metadata is exported. |
-| STOP_CONSOLE_CHECK / TIMEOUT_CONSOLE_CHECK | Marks snapshots before q and after the existing 15-second timeout. |
-| CHILD_CONSOLE_SHARED, NOT_SHARED or UNKNOWN | Child membership in the worker's console, using a bounded 32-entry process list; IDs are never logged. Failure/overflow stays UNKNOWN. |
-| CONSOLE_Q_PENDING, NOT_PENDING or UNKNOWN | Presence of key-down q in at most 32 input records, without removing events. A full snapshot lacking q or a failed read stays UNKNOWN. No characters are logged. |
-
-[GetConsoleProcessList](https://learn.microsoft.com/en-us/windows/console/getconsoleprocesslist)
-provides console membership;
-[PeekConsoleInput](https://learn.microsoft.com/en-us/windows/console/peekconsoleinput)
-is non-consuming and non-blocking. Compare the pre-q baseline to the timeout
-snapshot. A shared console with q still pending points toward an input-consumption
-problem. A newly absent q narrows that hypothesis but cannot identify its consumer
-or prove the child progressed past its exit wait. Missing console membership
-supports reviewing attachment/inheritance. UNKNOWN is never interpreted as PASS.
-
-The existing 64-line private lifecycle allowlist remains bounded, with explicit
-STOP versus control EOF, q, exit, flush, status EOF and cleanup stages. Probe
-failure emits UNKNOWN without changing shutdown acceptance. Unknown/overlong
-status text fails closed; neither paths, payloads, hashes, exception messages
-nor arbitrary stderr are copied. Success still requires child/worker exit zero,
-raw flush, STOPPED and status EOF. All timeouts, nonzero exits, broken control/status
-paths and forced cleanup remain failures; raw retention is unchanged. No parser,
-CONFIG90 timing policy, DPAPI, bundle, USB command or Linux runtime changed.
-
-Six added synthetic groups cover launch predicates, bounded console snapshots,
-probe errors/privacy, raw-only stdout and NUL launch/retention across clean and
-failed stops, exit-zero/STOPPED without EOF, and Cancel after READY with no target.
-Existing q tests now check all key fields and a successful API return with zero
-events written. The suite also preserves LF/CRLF control and broken-pipe coverage.
-The Cancel test confirms that the GUI can show CAPTURE_CANCELLED even when stop
-fails: only retained lifecycle evidence can qualify this gate.
-
-**Next gate is diagnostic:** use the existing GUI's Start/READY/Cancel path with
-Goodix detached for the entire test, as specified in [README](README.md).
-Require STOP_RECEIVED, q, child exit zero, RAW_FLUSHED, STOPPED, EOF and worker
-exit zero without emergency cleanup. Do not request another full material
-capture until that lifecycle is reviewed. TECHNICAL_MANUAL.md is unchanged.
-
-## CONFIG90 logical contract and historical trigger provenance
-
-```text
-CONFIG90_HISTORICAL_TRIGGER_PROVENANCE=PARTIAL
-CONFIG90_HISTORICAL_WORKFLOW=UNKNOWN
-CONFIG90_HISTORICAL_CAPTURE_MODE=UNKNOWN
-CONFIG90_WIRE_CONTRACT=CLOSED_LOGICAL_0x90
-CONFIG90_REAL_OBSERVED_WIRE=0x90
-CONFIG90_LATENESS_EVIDENCE=NONE_FOUND
-CONFIG90_60S_POLICY=DISABLED_WHEN_CONFIG90_MISSING
-NEXT_GATE=NO_GOODIX_CAPTURE_LIFECYCLE_DIAGNOSTIC_CANCEL
-```
-
-The retained D232 material-provenance report (C3) and D233 runtime-boundary report
-attribute the qualified 224-byte body to the recovered Windows capture in the
-D230 corpus, later reused by D263. This identifies the historical source, not a
-new comparison against the protected installed bundle. The earlier original
-capture is recorded as lost. No private filename, path, digest or body is exported
-here. The historical raw source still exists; only container/USB headers and its
-single command-control byte at the documented boundary were read during the
-preceding 0c809 pass. No historical raw was reopened for this correction.
-Raw size and modification time were unchanged. No OEM file, PSK, current capture
-or private bundle was read.
-
-The retained census and those reports establish these zero-based packet indices:
-
-| Event | Packet(s) | Safe metadata |
-| --- | --- | --- |
-| Last of four preceding DAC writes | 99 | OUT logical 0x80; its ACK follows at 101 |
-| CONFIG90 | 103, 105, 107, 109 | OUT A0, logical frame 232 bytes, body 224 bytes |
-| CONFIG acknowledgement/response | 111, 113 | IN A0 ACK, then logical 0x90 response |
-| Next request | 114 | OUT D1; B0 TLS ClientHello follows at 117 |
-
-**Resolved parser false negative:** historical census, D233 and the header-only
-recheck agree on wire 0x90. The old extractor selected logical
-`wire & 0xfe == 0x90`; its synthetic example used 0x91. The new builder's exact
-`wire == 0x91` restriction confused that example with the canonical acceptance
-contract. The current operator audit independently confirms a valid wire 0x90
-CONFIG90 in the retained attach-once recording. Selection now uses logical 0x90,
-with unchanged target/OUT pairing, A0 checksum, 224-byte body, layout/finalizer,
-repeat and ambiguity gates. `parse_a0()` is unchanged. Wire 0x91 is compatible
-with this contract and tested synthetically; this audit does not claim it was
-observed in the real recording.
-
-The canonical D274 workflow audit explicitly records that the recovered positive
-capture lacks the acquisition command, UI markers and OEM workflow. Fresh attach,
-already-attached state, re-enumeration, service restart and Windows Hello/enrollment
-trigger are therefore UNKNOWN for this exact source. The later image-bearing
-traffic in that historical recording does not prove what triggered its earlier
-CONFIG90. Neither its capture-all/new-device/list/injected-descriptor settings nor
-Wireshark/TShark options can be recovered from those reports. Historical D255 used
-a separate TShark-controlled zero-finger workflow and cannot fill this gap.
-
-The current attach-once recording contains valid CONFIG90. Unknown historical
-UI/mode provenance does not block its read-only analysis and does not justify a
-new acquisition. The earlier claim that both that recording and D255 lacked
-CONFIG90 is withdrawn. No new claim about D255's logical candidates is made here.
-
-CONFIG90 was already present during the retained 30-second acquisition; this is
-not lateness evidence. A future genuine CONFIG90_MISSING still offers no default
-or extended retry and remains mandatory/fail-closed. The bounded 30 -> 60 option
-remains only for missing A2/chip82/A6 with CONFIG90 present and all other gates
-passing; it is an engineering allowance, not a completeness guarantee.
-
-The normal read-only diagnosis is now reported PASS on the second capture,
-including target/APP identity and all four material classes. No parser changes
-are needed for the shutdown diagnostic gate described above. DPAPI and complete
-bundle construction remain unqualified.
-
-## Post-0c809 verification and public-manual sanitation
-
-Nine new synthetic CONFIG90 groups cover both wire variants, unrelated controls,
-direction/endpoint/device binding, invalid frame/checksum/length/layout/finalizer,
-identical and distinct repetitions, unpaired USB and a complete wire-0x90 stream
-behind the accepted 255-to-assigned enumeration. No private fixture was added.
-The enumeration and lifecycle implementation from 0c809 is preserved.
-
-The entire public TECHNICAL_MANUAL.md, including all 14 fenced blocks, was reviewed.
-Internal qualification-session recaps and the temporary builder gate/history were
-removed. Protocol/state/architecture diagrams, public path layouts and the stable
-service-quiescence predicate remain because they explain operational contracts.
-No implementation/test bodies, debug scripts, private evidence or internal report
-blocks remain. Stable diagnostic field semantics are retained for troubleshooting,
-not as a transcript. The non-public development manual retains useful chronology;
-Git ignores it and source export excludes the whole top-level development tree.
-A compact rule was added to its canonical AGENTS.md documentation section.
-
-The existing production unittest suite now checks exact report-key leakage,
-HEAD=SHA and obvious test-count recap patterns, with positive/negative examples.
-It does not ban ordinary technical vocabulary or protocol hexadecimal values;
-semantic full-file review remains authoritative. Verification uses the same
-normal/sanitizer/native-C/public-copy scope described above.
+The [single final Windows acquisition](README.md#current-gate-one-final-full-windows-acquisition)
+updates source only, starts detached, accepts UAC, attaches only at the prompt
+and uses the ordinary 30-second window without touching the sensor. Require
+verified shutdown plus all material checks and **Diagnose and build**. Stop
+before Build private bundle; DPAPI/bundle is not this gate. If internal stop
+still fails, do not request another equivalent capture or another console
+instrumentation cycle. Reuse the known external workflow or an already-valid
+retained capture for the next fallback decision.
