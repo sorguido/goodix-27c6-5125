@@ -1367,8 +1367,9 @@ The preserved APP12509 capture corpus contains zero IRQ0100 masks in bootstrap
 and nonzero masks in repeated enrollment; it does not contain an OEM enrollment
 zero-mask recovery trace. A related APP12508 source implementation corroborates
 per-channel FDT semantics but cannot fill that target-specific gap. The Linux
-driver therefore retains its current rejection behavior pending a complete
-transition review.
+driver continues to terminate this enrollment action. Phase D adds a specific
+diagnostic for a valid unusable-contact signature, as described in 20.6; it does
+not implement the OEM primary-preservation or rearm behavior.
 
 The remaining integration issue is specific: the first `0x34` is already armed
 when manual `0x36` runs. The OEM host resets and waits for the manual-sample
@@ -1387,8 +1388,8 @@ sample closure from the device boundary needed before another arm. Its isolated
 specification tests cover the local zero/release effects and the counterexample
 of identical old/current release bytes. The model intentionally cannot rearm:
 no supported device fence or receive correlator has been established. Passing
-that suite does not mean recovery is implemented; production zero rejection
-remains unchanged. The contract also distinguishes the skipped image-choice
+that suite does not mean recovery is implemented; production still terminates
+the action at zero. The contract also distinguishes the skipped image-choice
 auxiliary acquisition from the OEM release consumer's conditional background
 refresh when its baseline-valid flag is false.
 
@@ -1398,8 +1399,9 @@ The [manual operator kit](operator_kit/phase-c-zero-mask/README.md) builds a
 separate diagnostic library with `GOODIX_ENABLE_ZERO_MASK_PROBE`. Its device
 API must be explicitly enabled before open, and is consumed by one action;
 only ENROLL can enable the binding interception. Production builds omit this
-code and retain zero-mask rejection. No normal KDE/fprintd configuration
-activates the probe.
+observation code and terminate zero-mask through their ordinary error path,
+with the Phase D classification described below. No normal KDE/fprintd
+configuration activates the probe.
 
 At the repeated-contact IRQ0100 slot, a checksum-valid control36/body16 with
 flags zero and all six `(word >> 1)` values in1–254 freezes the enrollment
@@ -1422,6 +1424,84 @@ It runs normal and ASan/UBSan variants using synthetic USB, the actual libfprint
 core, parser/graph entry checks and mocked deployment operations. LeakSanitizer
 is disabled in the SDK sandbox; object drain/free and action isolation are
 asserted directly. Live cancellation latency remains to be measured.
+
+Two human-operated runs subsequently reached valid `36/0100/0000`, body length
+16, `out_pending=0` and `generation=1`, with `raw_valid=1` and
+`fdt_candidate_valid=1`. Run 1
+reached the signature after two accepted stages and three acquired contacts;
+run 2 reached it after one accepted stage and two acquired contacts. Both probe
+audits recorded no subsequent A0 in the configured 3000 ms observation window,
+no IRQ0200 or other IRQ, and zero new OUT, 0x20, 0x32, rearm or contact. Both
+closed with `outstanding=0`, `drained=1`, `context_closed=1` and close success.
+The diagnostic action
+itself failed intentionally; this was not successful enrollment. Cumulative
+rearm counts from earlier ordinary contacts are distinct from the zero
+after-zero counts.
+
+Run 1's evidence archive is the supplied original collection with a payload
+manifest. It also contains a run 2 log, contrary to its description as collected
+immediately after run 1; the exact collection chronology is unresolved. The
+separate run 2 archive explicitly declares reconstruction from terminal output
+and remains secondary corroborating evidence. Its process/probe records match
+the run 2 log in the original archive. Only their final wrapper records differ:
+the original file records process exit 0, whereas the reconstructed terminal
+output includes the wrapper's stop/path lines. The manifest matches the
+retained Phase C payload and all 327 source-inventory entries at the Phase C
+commit. No raw biometric, frame or material data is needed for this comparison.
+
+These audits establish clean closure for the two observed runs, not a general
+latency bound or independent wire-level verification. They report a configured
+three-second window without a separate timestamp on zero entry. Silence during
+either window is not a firmware release barrier and does not qualify a new 0x32.
+
+### 20.6 Valid zero-mask diagnosis and separate release issue
+
+Phase D addresses the reproducible repeated-contact `36/0100/0000` failure with
+a minimal diagnostic change. Entry requires the expected repeated enrollment
+IRQ0100 slot, no pending OUT, valid frame/control/body length 16/checksum, and
+six raw words whose shifted values are each in 1–254. The signature is classified as an
+unusable contact; it is not accepted as a stage, proof of physical finger-up or
+proof of a particular placement mistake. Other phases and malformed, reserved,
+wrong-control or wrong-IRQ events retain fail-closed behavior. VERIFY, IDENTIFY,
+duplicate precheck, bootstrap and global FDT policy are outside this change.
+
+The driver closes the action with `FP_DEVICE_ERROR_GENERAL` and an explicit
+contact diagnostic, then follows terminal fence, cancellation and drain. It
+discards the held primary without delivery or stage increment. It issues no
+new OUT, 0x20, 0x32, auxiliary acquisition, rearm, automatic contact or hidden retry
+after zero. There is no observation timer or quiet-window dependency. The
+improvement is a precise driver diagnosis, not functional recovery of the
+interrupted enrollment.
+
+The [consumer review](docs/ENROLLMENT_ZERO_MASK_UX.md) explains why this does
+not use `FP_DEVICE_RETRY`. The ordinary libfprint enrollment retry reports
+progress and continues the same action. A terminal retry ends libfprint's
+action but is rendered by the examined KDE consumer as another scan request:
+that consumer ignores the completion flag. Selecting it would leave a pending
+UI for an action that has already stopped. With the chosen terminal error,
+fprintd reports `enroll-unknown-error`, done=true, and KDE shows its failure
+state. The driver diagnostic is available to direct libfprint clients/logs;
+stock fprintd does not transmit that text as its enrollment status. No improved
+KDE error wording or in-place UI retry is claimed.
+
+```text
+DRIVER_RESULT=terminal FP_DEVICE_ERROR_GENERAL; explicit unusable-contact diagnostic
+FPRINTD_RESULT=enroll-unknown-error; done=true
+KDE_EXPECTED_BEHAVIOR=existing failure state; no automatic retry
+SEPARATE_PROTOCOL_ISSUE=OPEN
+FUNCTIONAL_RECOVERY_BLOCKED_BY_SEPARATE_IRQ0200_ISSUE=YES
+```
+
+The separate [late/stale IRQ0200 issue](docs/ENROLLMENT_ZERO_MASK_CONTRACT.md#8-separate-issue-latestale-irq0200-before-the-next-0x32)
+retains the Phase B contract and H_old/H_new counterexample. No demonstrated
+wire correlator or firmware separation permits a new contact in the interrupted
+action. Terminal closure can be corrected independently because it emits no
+further command and never needs to attribute a late release. A later manual
+attempt uses the existing close/open, bootstrap and receive-synchronization
+lifecycle; Phase D introduces no automatic reopen or new permission to arm.
+Host drain, fresh objects and that existing lifecycle are not a newly proved
+late IRQ0200 barrier. Live validation of the Phase D diagnostic remains separate
+from the two Phase C observation runs.
 
 ## 21. Developer invariants, licensing, and references
 

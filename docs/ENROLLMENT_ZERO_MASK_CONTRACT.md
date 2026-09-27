@@ -1,16 +1,20 @@
 <!-- SPDX-License-Identifier: LGPL-2.1-or-later -->
 # Enrollment zero-mask and late-release contract
 
-Status: **partial specification, not implemented in the driver**. The executable
-model checks local safety constraints and demonstrates the missing information.
-It has no successful rearm transition. Green specification tests do not mean
-that zero-mask enrollment recovery works. The production parser still rejects
-`36/0100/0000` during repeated enrollment.
+Status: **partial continuation specification, not implemented in the driver**.
+The executable model checks local safety constraints and demonstrates the
+missing information. It has no successful rearm transition. Green specification
+tests do not mean that zero-mask enrollment recovery works. Phase D separately
+classifies a valid repeated-contact `36/0100/0000` as an unusable contact and
+terminates the action with a specific diagnostic; it does not deliver that
+primary, retry the stage or implement this candidate continuation contract.
 
 ```text
 FUNCTIONAL_PATCH_READY_FOR_APPROVAL=NO
 RUNTIME_ZERO_MASK_RECOVERY_IMPLEMENTED=0
 DEVICE_RELEASE_BARRIER_PROVEN=0
+SEPARATE_PROTOCOL_ISSUE=OPEN
+FUNCTIONAL_RECOVERY_BLOCKED_BY_SEPARATE_IRQ0200_ISSUE=YES
 ```
 
 ## 1. Scope and observation boundary
@@ -78,6 +82,34 @@ Consequently, **skip20 here refers to the optional image-choice branch**; it is
 not a claim that every OEM consumer of0200 can never send20. That background
 path is not imported into this Linux candidate and does not redeliver primary.
 
+### 2.1 Bounded Linux observations
+
+Two human-operated Phase C runs reached the exact expected signature
+`36/0100/0000`, body length 16, with valid framing and a valid conservative FDT
+candidate. Run 1 had two accepted stages and three acquired contacts; run 2 had
+one accepted stage and two acquired contacts. In each configured 3000 ms window,
+the probe recorded no subsequent A0, no IRQ0200 or other IRQ, and no new OUT,
+0x20, 0x32, rearm or contact. Both reported `outstanding=0`, `drained=1`,
+`context_closed=1` and
+successful close. These are driver/probe audits, not an independent USB trace;
+the zero event has no separate timestamp from which to reconstruct duration.
+
+The original evidence archive contains both run logs and the payload manifest,
+although it was described as collected immediately after run 1. That chronology
+cannot be reconciled from the archive alone. The separately recovered run 2
+archive declares reconstruction from terminal output and remains secondary
+evidence. Its probe and action records match the run 2 log in the original
+archive; the latter has a process-exit record, while the reconstruction instead
+has the wrapper's terminal-only stop/path lines. Do not silently assign the two
+archives identical provenance. The original manifest matches the retained
+Phase C payload and its source inventory; this supports payload consistency,
+not independent attestation of live execution.
+
+The observations confirm the signature at different enrollment stages and the
+absence of recorded spontaneous A0 during these bounded observations. They do
+not show that a late IRQ0200 is impossible, that a monitor was flushed, or that
+a new 0x32 is safe. The H_old/H_new counterexample below therefore remains open.
+
 ## 3. Two different closure conditions
 
 **Sample closure:** valid zero IRQ0100 is sufficient evidence, within the OEM
@@ -95,8 +127,9 @@ The candidate can define local sample/release handling while **leaving rearm
 blocked**. `BLOCKED_UNPROVEN` in the model is a specification result, not a
 proposed production wait state. It must not become an infinite wait, a hidden
 timeout, an automatic retry or a runtime flag that tests set to bypass evidence.
-The existing runtime continues to fail closed at zero until the full contract
-is approved and implemented.
+The runtime continues to close the action at zero. Phase D distinguishes the
+valid unusable-contact signature from malformed protocol input, but does not
+approve or implement continuation of the same action.
 
 ## 4. Explicit candidate contract
 
@@ -236,3 +269,40 @@ case against that contract. A new live experiment is not automatically required
 by the absence of an old zero-mask trace; a sufficient static/protocol proof may
 close it. No functional implementation, install, privileged operation or sensor
 test is authorized by this specification.
+
+## 8. Separate issue: late/stale IRQ0200 before the next 0x32
+
+```text
+SEPARATE_PROTOCOL_ISSUE=OPEN
+ISSUE=late/stale IRQ0200 release separation before next 0x32
+DEVICE_RELEASE_BARRIER_PROVEN=0
+```
+
+This issue owns the missing device-side separation before continuation into
+another contact: identical H_old/H_new observations, no demonstrated wire
+correlator, and no qualified replacement/flush guarantee. The two silent Phase C
+windows add evidence about those runs without closing this issue. No sleep,
+quiet window, timeout, host generation or drained callback queue grants a 0x32.
+
+Phase D's independent change is strictly diagnostic. An exact valid zero
+signature closes the action through the existing terminal fence, cancellation
+and drain path; the held primary is discarded. It adds no OUT, auxiliary
+acquisition, FDT update, stage advancement, rearm or hidden retry, and has no
+observation timer. Malformed, reserved, wrong-control and wrong-IRQ input still
+fails closed. The global FDT acceptance policy remains unchanged.
+
+The driver uses a terminal `FP_DEVICE_ERROR_GENERAL` with an explicit contact
+diagnostic. It deliberately does not emit an enrollment retry: the ordinary
+retry API continues the action, while a terminal retry maps poorly to the
+examined stock KDE consumer. fprintd still reports `enroll-unknown-error` with
+`done=true`; KDE still shows its failure state. The
+[consumer review](ENROLLMENT_ZERO_MASK_UX.md) records the API and UI limitations.
+This improves diagnosis, not successful enrollment recovery or the stock UI's
+error text.
+
+A later user-requested attempt must use the existing close/open and bootstrap
+lifecycle. Phase D adds no automatic action, reopen or alternate synchronization
+sequence. Closing host state is not proof of firmware release separation; the
+existing bootstrap/receive synchronization is not promoted to a newly proved
+late IRQ0200 barrier. Functional continuation of the interrupted enrollment remains
+blocked by this separate issue.

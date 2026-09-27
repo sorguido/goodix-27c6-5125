@@ -651,7 +651,23 @@ static void context_a0_consumer (guint8 type, GBytes *frame, gpointer user_data)
 #endif
       if (!goodix_enrollment_fpi_usb_binding_handle_a0 (
             ctx->enrollment_binding, frame, &error))
-        context_protocol_failure (ctx, error);
+        {
+          if (fpi_device_get_current_action (FP_DEVICE (ctx->device)) ==
+                FPI_DEVICE_ACTION_ENROLL &&
+              goodix_enrollment_post_tls_events_error_is_unusable_contact (error))
+            {
+              g_autoptr(GError) contact_error = g_error_new_literal (
+                FP_DEVICE_ERROR, FP_DEVICE_ERROR_GENERAL, error->message);
+              /* A terminal RETRY is not a usable stock KDE outcome: that
+               * consumer ignores done=true for retry statuses. Do not emit
+               * progress/retry, release the primary, or rearm the graph. */
+              context_protocol_failure (ctx, contact_error);
+              g_message ("GOODIX_ENROLLMENT_CONTACT_UNUSABLE reason=zero-mask "
+                         "outcome=action-aborted primary_delivered=0 retry=0 rearm=0");
+            }
+          else
+            context_protocol_failure (ctx, error);
+        }
       else if (ctx->terminal_enroll_completion_held &&
                ctx->runtime_enrollment_events_audit.lifecycle.plan.pipeline.protocol.complete)
         {

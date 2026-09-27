@@ -2281,7 +2281,7 @@ test_d279_24_context_first_arm_enrollment_handoff (gconstpointer probe_case)
   g_autoptr(GBytes) baseline = d279_25_build_primary_plaintext (0u);
 
 #ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-  if (probe_case != NULL)
+  if (probe_case != NULL && GPOINTER_TO_UINT (probe_case) < 100u)
     g_assert_true (goodix_fpimage_device_enable_zero_mask_probe (FP_DEVICE (f->device)));
 #else
   (void) probe_case;
@@ -2448,8 +2448,84 @@ test_d279_24_context_first_arm_enrollment_handoff (gconstpointer probe_case)
             0x34, 0x0200, 0x0000, (guint16) (0x40u + stage * 8u));
 
           d279_25_complete_and_ack (f->ctx, generation, 0x36);
+          guint contact_case = GPOINTER_TO_UINT (probe_case);
+          if (contact_case >= 100u && stage == contact_case % 100u)
+            {
+              guint kind = contact_case / 100u;
+              guint64 out_before = goodix_fpi_usb_backend_get_out_submit_count (backend);
+              guint images_before = events_audit.lifecycle.plan.pipeline.fpimage_delivery_count;
+              guint primary_before = events_audit.primary_b0_count;
+              guint auxiliary_before = auxiliary_count;
+              g_autoptr(GBytes) zero = d279_24_build_event (
+                kind == 7u ? 0x34 : 0x36,
+                kind == 5u ? 0x0200 : 0x0100,
+                kind == 6u ? 0x0040 : 0, 0x88);
+              gsize length;
+              const guint8 *bytes = g_bytes_get_data (zero, &length);
+              g_autofree guint8 *copy = g_memdup2 (bytes, length);
+              if (kind == 4u) copy[length - 1u] ^= 1u;
+              if (kind == 3u)
+                {
+                  g_cancellable_cancel (cancellable);
+                  gint64 deadline = g_get_monotonic_time () + TEST_TIMEOUT_MS * 1000;
+                  while (!goodix_device_context_get_terminal_fence (f->ctx) &&
+                         g_get_monotonic_time () < deadline)
+                    g_main_context_iteration (NULL, FALSE);
+                }
+              goodix_device_context_complete_receive (f->ctx, generation, copy, length, NULL);
+              g_assert_true (goodix_device_context_get_terminal_fence (f->ctx));
+              if (kind == 2u) g_cancellable_cancel (cancellable);
+              /* No direct OUT or duplicate zero can revive the terminated graph. */
+              for (guint command = 0; command < 256u; command++)
+                {
+                  g_autoptr(GBytes) out = d279_24_build_response ((guint8) command, NULL, 0);
+                  g_autoptr(GError) blocked = NULL;
+                  g_assert_false (goodix_fpi_usb_backend_submit_out (backend, generation, out, &blocked));
+                }
+              goodix_device_context_complete_receive (f->ctx, generation, copy, length, NULL);
+              test_wait (f);
+              g_assert_false (f->success);
+              g_assert_null (f->enroll_print);
+              g_assert_cmpuint (f->completion_count, ==, 1u);
+              g_assert_cmpuint (events_audit.rejected_inbound_count, ==, kind <= 3u ? 0u : 1u);
+              if (kind == 1u)
+                {
+                  g_assert_error (f->error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_GENERAL);
+                  g_assert_nonnull (strstr (f->error->message, "zero-mask contact unusable"));
+                  g_assert_nonnull (strstr (f->error->message, "new enrollment manually"));
+                }
+              else if (kind <= 3u)
+                g_assert_error (f->error, G_IO_ERROR, G_IO_ERROR_CANCELLED);
+              else
+                {
+                  g_assert_false (goodix_enrollment_post_tls_events_error_is_unusable_contact (f->error));
+                  g_assert_cmpuint (events_audit.rejected_inbound_count, ==, 1u);
+                }
+              g_assert_cmpuint (events_audit.lifecycle.plan.pipeline.fpimage_delivery_count, ==, images_before);
+              g_assert_cmpuint (events_audit.primary_b0_count, ==, primary_before);
+              g_assert_cmpuint (auxiliary_count, ==, auxiliary_before);
+              g_assert_cmpuint (binding_audit.retry_count, ==, 0u);
+              g_assert_cmpuint (events_audit.lifecycle.plan.pipeline.protocol.retry_stage_count, ==, 0u);
+              g_assert_cmpuint (goodix_fpi_usb_backend_get_out_submit_count (backend), ==, out_before);
+              g_assert_true (goodix_fpi_usb_backend_is_drained (backend));
+              g_assert_cmpuint (goodix_fpi_usb_backend_get_outstanding (backend), ==, 0u);
+              g_assert_cmpuint (goodix_fpi_usb_backend_get_out_outstanding (backend), ==, 0u);
+              g_assert_cmpuint (goodix_fpi_usb_backend_get_real_submit_count (backend), ==, 0u);
+              g_clear_error (&f->error);
+              fixture_close (f);
+              g_assert_null (goodix_fpimage_device_get_context (f->device));
+              GoodixProductionEnrollmentAudit closed;
+              goodix_fpimage_device_get_production_enrollment_audit (f->device, &closed);
+              g_assert_true (closed.context_closed);
+              g_assert_true (closed.usb_backend_drained);
+              fixture_open (f);
+              g_assert_false (goodix_device_context_get_poisoned (f->ctx));
+              fixture_close (f);
+              test_fixture_free (f);
+              return;
+            }
 #ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-          if (probe_case != NULL && stage == 2u)
+          if (probe_case != NULL && GPOINTER_TO_UINT (probe_case) < 100u && stage == 2u)
             {
               guint mode = GPOINTER_TO_UINT (probe_case);
               guint64 out_before = goodix_fpi_usb_backend_get_out_submit_count (backend);
@@ -2899,6 +2975,16 @@ int
 main (int argc, char **argv)
 {
   g_test_init (&argc, &argv, NULL);
+  const guint contact_cases[] = { 102, 104, 107, 108, 202, 302, 402, 502, 602, 702 };
+  const gchar *contact_names[] = { "stage2", "intermediate", "near-terminal", "terminal",
+    "cancel-after-zero", "cancel-before-zero", "malformed", "wrong-irq", "reserved", "wrong-control" };
+  for (guint i = 0; i < G_N_ELEMENTS (contact_cases); i++)
+    {
+      g_autofree gchar *path = g_strdup_printf ("/unusable-contact/%s", contact_names[i]);
+      g_test_add_data_func (path, GUINT_TO_POINTER (contact_cases[i]),
+                           test_d279_24_context_first_arm_enrollment_handoff);
+    }
+
 #ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
   const gchar *probe_names[] = { "silence", "one-0200", "two-0200", "event-budget",
     "other-irq", "malformed", "cancel", "unexpected-b0", "unknown-outer", "concatenated-budget" };

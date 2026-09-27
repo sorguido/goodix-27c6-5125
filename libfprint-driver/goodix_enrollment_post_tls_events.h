@@ -109,6 +109,10 @@ GoodixEnrollmentEvent goodix_enrollment_post_tls_events_get_expected_event (
   const GoodixEnrollmentPostTlsEvents *events);
 gboolean goodix_enrollment_post_tls_events_is_complete (
   const GoodixEnrollmentPostTlsEvents *events);
+/* Typed terminal condition; this does not authorize a retry or next contact. */
+gboolean goodix_enrollment_post_tls_events_error_is_unusable_contact (
+  const GError *error);
+
 gboolean goodix_enrollment_post_tls_events_is_failed (
   const GoodixEnrollmentPostTlsEvents *events);
 

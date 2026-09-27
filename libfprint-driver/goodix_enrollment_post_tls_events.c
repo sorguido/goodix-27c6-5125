@@ -10,6 +10,7 @@ typedef enum
   GOODIX_ENROLLMENT_POST_TLS_ERROR_STATE,
   GOODIX_ENROLLMENT_POST_TLS_ERROR_FRAME,
   GOODIX_ENROLLMENT_POST_TLS_ERROR_EVENT,
+  GOODIX_ENROLLMENT_POST_TLS_ERROR_UNUSABLE_CONTACT,
 } GoodixEnrollmentPostTlsError;
 
 #define GOODIX_ENROLLMENT_POST_TLS_ERROR \
@@ -44,6 +45,13 @@ goodix_enrollment_post_tls_error_quark (void)
   return g_quark_from_static_string ("goodix-enrollment-post-tls-events-error");
 }
 
+gboolean
+goodix_enrollment_post_tls_events_error_is_unusable_contact (const GError *error)
+{
+  return g_error_matches (error, GOODIX_ENROLLMENT_POST_TLS_ERROR,
+                          GOODIX_ENROLLMENT_POST_TLS_ERROR_UNUSABLE_CONTACT);
+}
+
 static gboolean
 events_fail (GoodixEnrollmentPostTlsEvents *events,
              GoodixEnrollmentPostTlsError   code,
@@ -54,7 +62,10 @@ events_fail (GoodixEnrollmentPostTlsEvents *events,
     {
       events->failed = TRUE;
       events->audit->failed = TRUE;
-      events->audit->rejected_inbound_count++;
+      /* A valid unusable contact is not protocol corruption. Keep the
+       * exported audit layout stable; its reason travels in the GError. */
+      if (code != GOODIX_ENROLLMENT_POST_TLS_ERROR_UNUSABLE_CONTACT)
+        events->audit->rejected_inbound_count++;
       clear_pending (events->b0_pending);
     }
   if (error == NULL || *error == NULL)
@@ -210,6 +221,27 @@ parse_irq (const GoodixA0Message *message,
   return TRUE;
 }
 
+/* Only classify the observed repeated-contact signature after A0 checksum
+ * validation. Conservative raw bounds match the diagnostic probe; no table is
+ * derived or installed, and zero does not mean physical release. */
+static gboolean
+is_unusable_zero_contact (const GoodixA0Message *message)
+{
+  gsize length;
+  const guint8 *body = g_bytes_get_data (message->body, &length);
+  if (message->control != 0x36 || length != 16u ||
+      body[0] != 0x00 || body[1] != 0x01 || body[2] != 0 || body[3] != 0)
+    return FALSE;
+  for (guint i = 0; i < GOODIX_FDT_CHANNEL_COUNT; i++)
+    {
+      guint value = ((guint) body[4u + 2u * i] |
+                    ((guint) body[5u + 2u * i] << 8)) >> 1;
+      if (value < 1u || value > 254u)
+        return FALSE;
+    }
+  return TRUE;
+}
+
 static void
 record_a0_mismatch (GoodixEnrollmentPostTlsEvents *events,
                     GoodixEnrollmentEvent          expected,
@@ -361,6 +393,19 @@ goodix_enrollment_post_tls_events_handle_a0 (
           else if (events->contact != NULL)
             events->audit->finger_down_delivery_count++;
         }
+    }
+  else if (expected == GOODIX_ENROLLMENT_EVENT_IRQ0100 &&
+           is_unusable_zero_contact (&message))
+    {
+      goodix_a0_message_clear (&message);
+      /* Keep the pending primary undelivered. Returning FALSE freezes the
+       * transaction before graph-ready submission; the owner cancels/drains. */
+      return events_fail (
+        events, GOODIX_ENROLLMENT_POST_TLS_ERROR_UNUSABLE_CONTACT,
+        "Goodix zero-mask contact unusable: no active touch channels in the "
+        "enrollment contact sample. Enrollment stopped safely; no sample saved "
+        "for this contact. Start a new enrollment manually after closing this "
+        "attempt, keeping the finger centered and steady.", error);
     }
   else if (expected == GOODIX_ENROLLMENT_EVENT_IRQ0100 &&
            parse_irq (&message, 0x36, 0x0100,

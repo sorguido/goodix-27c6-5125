@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
 /* Synthetic enrollment protocol regression. No device or biometric fixtures. */
 #include "goodix_enrollment_fpi_usb_binding.h"
+#include "goodix_usb_router.h"
 
 #include <fpi-image.h>
 #include <string.h>
@@ -10,6 +11,7 @@ typedef struct
   GoodixEnrollmentPostTlsEvents *events; /* Owned by binding. */
   GoodixEnrollmentFpiUsbBinding *binding;
   GoodixFpiUsbBackend *backend;
+  GoodixUsbRouter *router;
   GCancellable *cancellable;
   GoodixEnrollmentPostTlsEventsAudit audit;
   GoodixEnrollmentFpiUsbBindingAudit binding_audit;
@@ -77,7 +79,9 @@ fixture_init (Fixture *f)
   g_autoptr(GError) error = NULL;
   *f = (Fixture) { 0 };
   f->cancellable = g_cancellable_new ();
-  f->backend = goodix_fpi_usb_backend_new (NULL, NULL, 0x81, 0x01, 8192u);
+  f->router = goodix_usb_router_new (NULL, NULL, NULL);
+  goodix_usb_router_begin_generation (f->router, 7u);
+  f->backend = goodix_fpi_usb_backend_new (NULL, f->router, 0x81, 0x01, 8192u);
   g_assert_true (goodix_fpi_usb_backend_begin_generation (
     f->backend, 7u, f->cancellable, &error));
   goodix_fpi_usb_backend_set_async_submit_seam (f->backend, submit_seam, f);
@@ -104,6 +108,7 @@ fixture_clear (Fixture *f)
   g_assert_true (goodix_enrollment_fpi_usb_binding_can_free (f->binding));
   goodix_enrollment_fpi_usb_binding_free (f->binding);
   goodix_fpi_usb_backend_free (f->backend);
+  goodix_usb_router_free (f->router);
   g_object_unref (f->cancellable);
 }
 
@@ -127,6 +132,18 @@ irq_frame (guint8 control, guint16 irq, guint16 flags, gsize body_length)
   for (guint i = 0; i < 6u; i++)
     body[4u + i * 2u] = (guint8) (0x88u + i * 2u);
   return frame (control, body, body_length);
+}
+
+static GBytes *
+zero_mask_raw_frame (guint index, guint16 word)
+{
+  guint8 body[16] = { 0, 0x01 };
+  g_assert_cmpuint (index, <, 6u);
+  for (guint i = 0; i < 6u; i++)
+    body[4u + i * 2u] = (guint8) (0x88u + i * 2u);
+  body[4u + index * 2u] = (guint8) word;
+  body[5u + index * 2u] = (guint8) (word >> 8);
+  return frame (0x36, body, sizeof body);
 }
 
 static void
@@ -246,14 +263,19 @@ reach_sample (Fixture *f, guint stage)
 }
 
 static void
-reject_without_progress (Fixture *f, GBytes *bytes, const gchar *reason)
+reject_without_progress (Fixture *f, GBytes *bytes, const gchar *reason,
+                         gboolean unusable_contact)
 {
   g_autoptr(GError) error = NULL;
   guint commands[256];
   guint images = f->images;
+  guint parsed;
+  guint rejected;
   memcpy (commands, f->commands, sizeof commands);
   g_assert_false (goodix_enrollment_fpi_usb_binding_handle_a0 (f->binding, bytes, &error));
   g_assert_nonnull (error);
+  g_assert_cmpint (goodix_enrollment_post_tls_events_error_is_unusable_contact (error),
+                   ==, unusable_contact);
   if (reason != NULL)
     g_assert_nonnull (strstr (error->message, reason));
   g_assert_true (goodix_enrollment_fpi_usb_binding_is_failed (f->binding));
@@ -261,11 +283,16 @@ reject_without_progress (Fixture *f, GBytes *bytes, const gchar *reason)
   g_assert_cmpmem (commands, sizeof commands, f->commands, sizeof f->commands);
   g_assert_cmpuint (f->audit.lifecycle.plan.pipeline.protocol.retry_stage_count, ==, 0u);
   g_assert_cmpuint (f->binding_audit.retry_count, ==, 0u);
+  parsed = f->audit.parsed_a0_count;
+  rejected = f->audit.rejected_inbound_count;
   /* A second input cannot revive the failed graph or emit a new command. */
   g_clear_error (&error);
   g_assert_false (goodix_enrollment_fpi_usb_binding_handle_a0 (f->binding, bytes, &error));
+  g_assert_nonnull (error);
   g_assert_cmpmem (commands, sizeof commands, f->commands, sizeof f->commands);
   g_assert_cmpuint (f->images, ==, images);
+  g_assert_cmpuint (f->audit.parsed_a0_count, ==, parsed);
+  g_assert_cmpuint (f->audit.rejected_inbound_count, ==, rejected);
 }
 
 static void
@@ -274,18 +301,81 @@ test_zero_flags (gconstpointer data)
   guint stage = GPOINTER_TO_UINT (data);
   Fixture f;
   g_autoptr(GBytes) bytes = irq_frame (0x36, 0x0100, 0u, 16u);
-  g_autofree gchar *detail = g_strdup_printf (
-    "reason=flags-zero policy=contact-sample-nonzero-subset-0x003f contacts=%u stages=%u pending_primary=1",
-    stage, stage - 1u);
   reach_sample (&f, stage);
-  reject_without_progress (&f, bytes, detail);
-  g_assert_cmpint (f.audit.last_mismatch_expected_event, ==, GOODIX_ENROLLMENT_EVENT_IRQ0100);
-  g_assert_cmphex (f.audit.last_mismatch_observed_control, ==, 0x36);
-  g_assert_cmphex (f.audit.last_mismatch_observed_irq, ==, 0x0100);
-  g_assert_cmphex (f.audit.last_mismatch_observed_irq_flags, ==, 0u);
+  guint parsed = f.audit.parsed_a0_count;
+  reject_without_progress (&f, bytes, "zero-mask contact unusable", TRUE);
+  g_assert_cmpuint (f.audit.parsed_a0_count, ==, parsed + 1u);
   g_assert_cmpuint (f.audit.lifecycle.plan.pipeline.fpimage_construct_count, ==, stage);
   g_assert_cmpuint (f.audit.lifecycle.plan.pipeline.fpimage_delivery_count, ==, stage - 1u);
-  g_assert_cmpuint (f.audit.rejected_inbound_count, ==, 1u);
+  g_assert_cmpuint (f.audit.rejected_inbound_count, ==, 0u);
+  g_assert_cmpint (goodix_enrollment_post_tls_events_get_expected_event (f.events),
+                   ==, GOODIX_ENROLLMENT_EVENT_NONE);
+  fixture_clear (&f);
+}
+
+static void
+test_zero_raw_valid_boundary (gconstpointer data)
+{
+  guint16 word = (guint16) GPOINTER_TO_UINT (data);
+  for (guint index = 0; index < 6u; index++)
+    {
+      Fixture f;
+      g_autoptr(GBytes) bytes = zero_mask_raw_frame (index, word);
+      reach_sample (&f, 2u);
+      reject_without_progress (&f, bytes, "zero-mask contact unusable", TRUE);
+      g_assert_cmpuint (f.audit.rejected_inbound_count, ==, 0u);
+      g_assert_cmpuint (f.images, ==, 1u);
+      fixture_clear (&f);
+    }
+}
+
+static void
+test_zero_raw_invalid (gconstpointer data)
+{
+  guint index = GPOINTER_TO_UINT (data);
+  const guint16 words[] = { 0x0000u, 0x0001u, 0x01feu, 0x01ffu, 0xffffu };
+  for (guint i = 0; i < G_N_ELEMENTS (words); i++)
+    {
+      Fixture f;
+      g_autoptr(GBytes) bytes = zero_mask_raw_frame (index, words[i]);
+      reach_sample (&f, 2u);
+      reject_without_progress (&f, bytes, NULL, FALSE);
+      g_assert_cmpuint (f.audit.rejected_inbound_count, ==, 1u);
+      g_assert_cmpuint (f.images, ==, 1u);
+      fixture_clear (&f);
+    }
+}
+
+static void
+test_cancel_before_zero (void)
+{
+  Fixture f;
+  g_autoptr(GBytes) bytes = irq_frame (0x36, 0x0100, 0u, 16u);
+  reach_sample (&f, 2u);
+  guint parsed = f.audit.parsed_a0_count;
+  goodix_enrollment_fpi_usb_binding_cancel (f.binding, "cancel before zero-mask");
+  reject_without_progress (&f, bytes, NULL, FALSE);
+  g_assert_cmpuint (f.audit.parsed_a0_count, ==, parsed);
+  g_assert_cmpuint (f.audit.rejected_inbound_count, ==, 0u);
+  g_assert_cmpuint (f.images, ==, 1u);
+  fixture_clear (&f);
+}
+
+static void
+test_zero_after_terminal (void)
+{
+  Fixture f;
+  g_autoptr(GBytes) zero = irq_frame (0x36, 0x0100, 0u, 16u);
+  g_autoptr(GBytes) other = irq_frame (0x34, 0x0200, 0u, 16u);
+  reach_sample (&f, 2u);
+  reject_without_progress (&f, zero, "zero-mask contact unusable", TRUE);
+  guint parsed = f.audit.parsed_a0_count;
+  /* Late release and repeated zero cannot resume the terminal graph. */
+  reject_without_progress (&f, other, NULL, FALSE);
+  reject_without_progress (&f, zero, NULL, FALSE);
+  g_assert_cmpuint (f.audit.parsed_a0_count, ==, parsed);
+  g_assert_cmpuint (f.audit.rejected_inbound_count, ==, 0u);
+  g_assert_cmpuint (f.images, ==, 1u);
   fixture_clear (&f);
 }
 
@@ -319,13 +409,13 @@ test_invalid (gconstpointer data)
   g_autoptr(GBytes) bytes = NULL;
   reach_sample (&f, 2u);
   if (g_str_equal (kind, "control"))
-    { bytes = irq_frame (0x34, 0x0100, 0x002f, 16u); reason = "reason=control"; }
+    { bytes = irq_frame (0x34, 0x0100, 0u, 16u); reason = "reason=control"; }
   else if (g_str_equal (kind, "irq"))
-    { bytes = irq_frame (0x36, 0x0200, 0x002f, 16u); reason = "reason=irq"; }
+    { bytes = irq_frame (0x36, 0x0200, 0u, 16u); reason = "reason=irq"; }
   else if (g_str_equal (kind, "reserved"))
     { bytes = irq_frame (0x36, 0x0100, 0x0040, 16u); reason = "reason=flags-reserved"; }
   else if (g_str_equal (kind, "body-length"))
-    { bytes = irq_frame (0x36, 0x0100, 0x002f, 15u); reason = "reason=body-length"; }
+    { bytes = irq_frame (0x36, 0x0100, 0u, 15u); reason = "reason=body-length"; }
   else if (g_str_equal (kind, "ack"))
     {
       const guint8 body[] = { 0x36, 0x01 };
@@ -334,7 +424,7 @@ test_invalid (gconstpointer data)
     }
   else
     {
-      g_autoptr(GBytes) valid = irq_frame (0x36, 0x0100, 0x002f, 16u);
+      g_autoptr(GBytes) valid = irq_frame (0x36, 0x0100, 0u, 16u);
       gsize length;
       const guint8 *source = g_bytes_get_data (valid, &length);
       guint8 *copy = g_memdup2 (source, length);
@@ -344,7 +434,8 @@ test_invalid (gconstpointer data)
         { length--; reason = "outer length is inconsistent"; }
       bytes = g_bytes_new_take (copy, length);
     }
-  reject_without_progress (&f, bytes, reason);
+  reject_without_progress (&f, bytes, reason, FALSE);
+  g_assert_cmpuint (f.audit.rejected_inbound_count, ==, 1u);
   fixture_clear (&f);
 }
 
@@ -352,9 +443,10 @@ static void
 test_wrong_state (void)
 {
   Fixture f;
-  g_autoptr(GBytes) bytes = irq_frame (0x36, 0x0100, 0x002f, 16u);
+  g_autoptr(GBytes) bytes = irq_frame (0x36, 0x0100, 0u, 16u);
   fixture_init (&f);
-  reject_without_progress (&f, bytes, "expected IRQ2");
+  reject_without_progress (&f, bytes, "expected IRQ2", FALSE);
+  g_assert_cmpuint (f.audit.rejected_inbound_count, ==, 1u);
   g_assert_cmpuint (f.images, ==, 0u);
   fixture_clear (&f);
 }
@@ -398,6 +490,11 @@ test_probe_entry (gconstpointer data)
   gboolean accepted = goodix_enrollment_fpi_usb_binding_handle_a0 (f.binding, bytes, &error);
   g_assert_cmpint (accepted, ==, target);
   g_assert_cmpint (goodix_enrollment_fpi_usb_binding_probe_audit (f.binding)->zero_seen, ==, target);
+  if (!target)
+    {
+      g_assert_nonnull (error);
+      g_assert_false (goodix_enrollment_post_tls_events_error_is_unusable_contact (error));
+    }
   if (target)
     {
       g_assert_cmpuint (f.images, ==, 1u);
@@ -411,11 +508,12 @@ test_probe_entry (gconstpointer data)
       g_assert_cmpuint (f.images, ==, 1u);
     }
   fixture_clear (&f);
-  /* New binding starts disabled and retains the production rejection. */
+  /* A new binding starts with the probe disabled and uses the production outcome. */
   reach_sample (&f, 2u);
   g_clear_pointer (&bytes, g_bytes_unref);
   bytes = irq_frame (0x36, 0x0100, 0, 16u);
-  reject_without_progress (&f, bytes, "flags-zero");
+  reject_without_progress (&f, bytes, "zero-mask contact unusable", TRUE);
+  g_assert_cmpuint (f.audit.rejected_inbound_count, ==, 0u);
   fixture_clear (&f);
 }
 #endif
@@ -449,6 +547,20 @@ main (int argc, char **argv)
       g_autofree gchar *path = g_strdup_printf ("/enrollment-a0/valid-flags/0x%04x", flags[i]);
       g_test_add_data_func (path, GUINT_TO_POINTER (flags[i]), test_valid_flags);
     }
+  const guint valid_zero_raw[] = { 0x0002u, 0x01fdu };
+  for (guint i = 0; i < G_N_ELEMENTS (valid_zero_raw); i++)
+    {
+      g_autofree gchar *path = g_strdup_printf (
+        "/enrollment-a0/zero-raw-valid-boundary/0x%04x", valid_zero_raw[i]);
+      g_test_add_data_func (path, GUINT_TO_POINTER (valid_zero_raw[i]), test_zero_raw_valid_boundary);
+    }
+  for (guint i = 0; i < 6u; i++)
+    {
+      g_autofree gchar *path = g_strdup_printf ("/enrollment-a0/zero-raw-invalid/word-%u", i);
+      g_test_add_data_func (path, GUINT_TO_POINTER (i), test_zero_raw_invalid);
+    }
+  g_test_add_func ("/enrollment-a0/cancel-before-zero", test_cancel_before_zero);
+  g_test_add_func ("/enrollment-a0/zero-after-terminal", test_zero_after_terminal);
   for (guint i = 0; i < G_N_ELEMENTS (invalid); i++)
     {
       g_autofree gchar *path = g_strdup_printf ("/enrollment-a0/invalid/%s", invalid[i]);
