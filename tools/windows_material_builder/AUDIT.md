@@ -117,7 +117,7 @@ Export validation must exercise the candidate from a copy with no `.git` or
 
 ## Offline verification (2026-09-27)
 
-The 59 builder tests passed using synthetic inputs, including acceptance of
+The 66 builder tests passed using synthetic inputs, including acceptance of
 generated material by the compiled production C loader. Existing deployment
 (76), production (13) and recovery (48) Python tests passed. The C A0 (51),
 post-TLS (19) and image-device (58) suites each passed both normally and under
@@ -133,3 +133,11 @@ size/mtime unchanged; the timestamp correction did not change its classification
 A public source copy without Git history or `development` passed the builder
 tests, CLI entrypoint check and complete source-ledger hash verification.
 Its inventory excludes raw captures, OEM binaries and material bundles.
+
+The first operator Windows run stopped at source validation with SOURCE_UNSAFE,
+before USBPcap or reader interaction. Reported stable handle snapshots differed
+from pathname metadata only in ctime. The fix retains strict handle-before/after
+checks and excludes ctime only from Windows handle/path identity, retaining
+device, inode, link count, size, mtime and file-type/reparse checks. POSIX checks
+are unchanged. Seven focused synthetic tests cover this compatibility case and
+rejection boundaries; Windows live revalidation remains pending.

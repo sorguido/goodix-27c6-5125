@@ -17,6 +17,16 @@ def real_path(path):
     return path
 
 
+def _handle_snapshot_identity(info):
+    return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+
+
+def _windows_path_identity(info):
+    # Windows fstat/lstat can expose different ctime semantics. Only this
+    # cross-API comparison excludes ctime; the same-handle check remains strict.
+    return (info.st_dev, info.st_ino, info.st_nlink, info.st_size, info.st_mtime_ns)
+
+
 def read_regular(path, maximum, minimum=1):
     try:
         path = real_path(path)
@@ -44,9 +54,17 @@ def read_regular(path, maximum, minimum=1):
             data = stream.read(maximum + 1)
             last = os.fstat(stream.fileno())
             current = path.lstat()
-            identity = lambda i: (i.st_dev, i.st_ino, i.st_size, i.st_mtime_ns, i.st_ctime_ns)
-            require(len(data) == first.st_size and identity(first) == identity(last) == identity(current),
+            require(len(data) == first.st_size and
+                    _handle_snapshot_identity(first) == _handle_snapshot_identity(last),
                     'SOURCE_UNSAFE')
+            if os.name == 'nt':
+                require(stat.S_ISREG(current.st_mode) and not stat.S_ISLNK(current.st_mode) and
+                        not getattr(current, 'st_file_attributes', 0) & 0x400 and
+                        _windows_path_identity(first) == _windows_path_identity(last) ==
+                        _windows_path_identity(current), 'SOURCE_UNSAFE')
+            else:
+                require(_handle_snapshot_identity(first) == _handle_snapshot_identity(current),
+                        'SOURCE_UNSAFE')
             real_path(path)
             return data
     except OSError:

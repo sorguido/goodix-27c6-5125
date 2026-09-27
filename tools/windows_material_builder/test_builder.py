@@ -14,7 +14,7 @@ import unittest
 from unittest.mock import Mock, patch
 from deployment import test_materials as fixture
 from deployment import materials
-from . import backend, binding, capture, capture_session, diagnostics, windows, gui
+from . import backend, binding, capture, capture_session, diagnostics, windows, gui, files
 from .diagnostics import Failure
 from .files import create_run, read_regular
 
@@ -223,6 +223,88 @@ class ParserTests(Case):
         e = capture.analyze_bytes(pcapng(records(missing=('CONFIG90',))))
         self.assertEqual(e.codes, ('CONFIG90_MISSING',))
         self.assertEqual(set(e.selected), {'A2', 'CHIP82', 'A6'})
+
+
+class SnapshotTests(Case):
+    def info(self, **changes):
+        from types import SimpleNamespace
+        fields = dict(st_dev=1, st_ino=2, st_nlink=1, st_size=4,
+                      st_mtime_ns=100, st_ctime_ns=200, st_mode=0o100600,
+                      st_file_attributes=0x20)
+        fields.update(changes)
+        return SimpleNamespace(**fields)
+
+    def snapshot(self, *, first=None, last=None, current=None, data=b'data', maximum=4, platform='nt'):
+        import ctypes
+        from types import SimpleNamespace
+        first = first or self.info()
+        last = last or first
+        current = current or first
+        path = Mock()
+        path.lstat.return_value = current
+        stream = Mock()
+        stream.read.return_value = data
+        stream.fileno.return_value = 123
+        manager = Mock()
+        manager.__enter__ = Mock(return_value=stream)
+        manager.__exit__ = Mock(return_value=False)
+        native_os = Mock(wraps=os)
+        native_os.name = platform
+        native_os.O_RDONLY = os.O_RDONLY
+        native_os.O_NOFOLLOW = getattr(os, 'O_NOFOLLOW', 0)
+        native_os.O_NONBLOCK = getattr(os, 'O_NONBLOCK', 0)
+        native_os.O_BINARY = 0
+        native_os.open.return_value = 123
+        native_os.fdopen.return_value = manager
+        native_os.fstat.side_effect = [first, last]
+        kernel = Mock()
+        kernel.CreateFileW.return_value = 456
+        crt = SimpleNamespace(open_osfhandle=Mock(return_value=123))
+        with patch.object(files, 'os', native_os), patch.object(files, 'real_path', return_value=path), \
+                patch.object(ctypes, 'WinDLL', return_value=kernel, create=True), \
+                patch.dict('sys.modules', {'msvcrt': crt}):
+            return files.read_regular(path, maximum)
+
+    def test_windows_cross_api_ctime_difference_is_accepted(self):
+        self.assertEqual(self.snapshot(current=self.info(st_ctime_ns=999)), b'data')
+        # Ordinary archive/read-only bits are not identity or reparse failures.
+        self.assertEqual(self.snapshot(current=self.info(st_ctime_ns=999, st_file_attributes=1)), b'data')
+
+    def test_windows_path_identity_changes_are_rejected(self):
+        for field, value in [('st_dev', 9), ('st_ino', 9), ('st_nlink', 2),
+                             ('st_size', 5), ('st_mtime_ns', 101)]:
+            with self.subTest(field=field):
+                self.fails('SOURCE_UNSAFE', self.snapshot,
+                           current=self.info(st_ctime_ns=999, **{field: value}))
+
+    def test_same_handle_mutation_including_ctime_is_rejected(self):
+        for field, value in [('st_dev', 9), ('st_ino', 9), ('st_nlink', 2),
+                             ('st_size', 5), ('st_mtime_ns', 101), ('st_ctime_ns', 201)]:
+            with self.subTest(field=field):
+                self.fails('SOURCE_UNSAFE', self.snapshot, last=self.info(**{field: value}))
+
+    def test_windows_path_symlink_reparse_and_nonregular_are_rejected(self):
+        for changes in ({'st_mode': 0o120777}, {'st_file_attributes': 0x400},
+                        {'st_mode': 0o010600}, {'st_mode': 0o040700}):
+            with self.subTest(changes=changes):
+                self.fails('SOURCE_UNSAFE', self.snapshot, current=self.info(**changes))
+
+    def test_unsafe_handle_metadata_is_rejected(self):
+        for changes in ({'st_mode': 0o120777}, {'st_file_attributes': 0x400},
+                        {'st_mode': 0o010600}, {'st_nlink': 0}, {'st_nlink': 2}):
+            with self.subTest(changes=changes):
+                self.fails('SOURCE_UNSAFE', self.snapshot, first=self.info(**changes))
+
+    def test_short_oversized_and_empty_reads_are_rejected(self):
+        self.fails('SOURCE_UNSAFE', self.snapshot, data=b'dat')
+        self.fails('SOURCE_UNSAFE', self.snapshot, data=b'data!')
+        self.fails('SOURCE_UNSAFE', self.snapshot, maximum=3)
+        self.fails('SOURCE_UNSAFE', self.snapshot, first=self.info(st_size=0), data=b'')
+
+    def test_posix_retains_strict_cross_api_and_handle_ctime(self):
+        self.assertEqual(self.snapshot(platform='posix'), b'data')
+        self.fails('SOURCE_UNSAFE', self.snapshot, platform='posix', current=self.info(st_ctime_ns=999))
+        self.fails('SOURCE_UNSAFE', self.snapshot, platform='posix', last=self.info(st_ctime_ns=999))
 
 
 class MaterialTests(Case):
