@@ -23,3 +23,11 @@ than an LGPL-only work. See `docs/LICENSING_AND_PROVENANCE.md`.
 
 No file in this directory contains firmware, a PSK, factory data, a real
 fingerprint sample, a template, or a private capture.
+
+Synthetic A0 regressions run with `sh tests/run_goodix_enrollment_a0_test.sh`
+and `sh tests/run_goodix_post_tls_test.sh` from this directory. Both run normal
+and ASan/UBSan builds using the public source tree, without a reader or real
+materials. The enrollment suite preserves zero-mask rejection at repeated
+contacts and checks that the rejected event does not deliver the pending
+primary, send an auxiliary acquisition, or rearm. These tests do not establish
+the correct recovery sequence on hardware.

@@ -386,6 +386,48 @@ event_fields (const GoodixA0Message *message,
   return TRUE;
 }
 
+/* Diagnostic labels only: the acceptance checks remain in handle_a0(). */
+static const gchar *
+expected_a0_event (GoodixPostTlsPhase phase,
+                   gboolean           ack_seen)
+{
+  switch (phase)
+    {
+    case GOODIX_POST_TLS_PHASE_AF:
+      return "AE_CONTROLLER_STATE";
+    case GOODIX_POST_TLS_PHASE_FDT_IRQ100_1:
+    case GOODIX_POST_TLS_PHASE_FDT_IRQ100_2:
+    case GOODIX_POST_TLS_PHASE_FDT_IRQ100_3:
+      return "BASELINE_IRQ0100";
+    case GOODIX_POST_TLS_PHASE_FIRST_IRQ2:
+    case GOODIX_POST_TLS_PHASE_SECOND_IRQ2:
+      return "FINGER_DOWN_IRQ0002";
+    case GOODIX_POST_TLS_PHASE_RELEASE_IRQ200:
+      return "FINGER_UP_IRQ0200";
+    case GOODIX_POST_TLS_PHASE_FDT_NAV_1:
+      return ack_seen ? "NAV" : "ACK";
+    case GOODIX_POST_TLS_PHASE_FDT_82:
+      return ack_seen ? "FDT_THRESHOLD" : "ACK";
+    case GOODIX_POST_TLS_PHASE_RELEASE_NAV:
+      return "NAV";
+    case GOODIX_POST_TLS_PHASE_D4:
+    case GOODIX_POST_TLS_PHASE_FDT36_1:
+    case GOODIX_POST_TLS_PHASE_FDT36_2:
+    case GOODIX_POST_TLS_PHASE_FDT36_3:
+    case GOODIX_POST_TLS_PHASE_FDT_20:
+    case GOODIX_POST_TLS_PHASE_FIRST_ARM:
+    case GOODIX_POST_TLS_PHASE_FIRST_22:
+    case GOODIX_POST_TLS_PHASE_RELEASE_34:
+    case GOODIX_POST_TLS_PHASE_RELEASE_20:
+    case GOODIX_POST_TLS_PHASE_RELEASE_50:
+    case GOODIX_POST_TLS_PHASE_SECOND_ARM:
+    case GOODIX_POST_TLS_PHASE_SECOND_22:
+      return "ACK";
+    default:
+      return "NO_A0";
+    }
+}
+
 static void
 submit_or_fail (GoodixPostTlsLifecycle *lifecycle,
                 gboolean                submitted,
@@ -855,37 +897,50 @@ goodix_post_tls_lifecycle_handle_a0 (GoodixPostTlsLifecycle *lifecycle,
   return;
 
 unexpected:
-  if (lifecycle->audit != NULL)
-    {
-      const guint8 *rejected_body = NULL;
-      const guint8 *rejected_raw = NULL;
-      gsize rejected_length = 0;
-      guint16 rejected_irq = 0;
-      guint16 rejected_flags = 0;
+  {
+    const guint8 *rejected_raw = NULL;
+    guint16 rejected_irq = 0;
+    guint16 rejected_flags = 0;
+    gboolean irq_classified;
+    gchar irq_metadata[64];
+    GError *rejection;
 
-      if (message.body != NULL)
-        rejected_body = g_bytes_get_data (message.body, &rejected_length);
+    /* A sixteen-byte AE controller response is not an IRQ. Never print its
+     * opaque body, FDT readings or any image/material bytes as diagnostics. */
+    irq_classified = (message.control == 0x32 || message.control == 0x34 ||
+                      message.control == 0x36) &&
+      event_fields (&message, &rejected_irq, &rejected_flags, &rejected_raw);
+    if (irq_classified)
+      g_snprintf (irq_metadata, sizeof irq_metadata,
+                  "irq=0x%04x flags=0x%04x", rejected_irq, rejected_flags);
+    else
+      g_strlcpy (irq_metadata, "irq=unclassified flags=unclassified",
+                 sizeof irq_metadata);
 
-      lifecycle->audit->rejected_a0_observed = TRUE;
-      lifecycle->audit->rejected_a0_phase = phase_at_entry;
-      lifecycle->audit->rejected_a0_control = message.control;
-      lifecycle->audit->rejected_a0_body_length =
-        message.body != NULL ? (gssize) rejected_length : (gssize) -1;
-      lifecycle->audit->rejected_a0_irq = -1;
-      lifecycle->audit->rejected_a0_flags = -1;
+    if (lifecycle->audit != NULL)
+      {
+        lifecycle->audit->rejected_a0_observed = TRUE;
+        lifecycle->audit->rejected_a0_phase = phase_at_entry;
+        lifecycle->audit->rejected_a0_control = message.control;
+        lifecycle->audit->rejected_a0_body_length = (gssize) length;
+        lifecycle->audit->rejected_a0_irq = irq_classified ? rejected_irq : -1;
+        lifecycle->audit->rejected_a0_flags = irq_classified ? rejected_flags : -1;
+      }
 
-      if (rejected_body != NULL &&
-          event_fields (&message, &rejected_irq,
-                        &rejected_flags, &rejected_raw))
-        {
-          lifecycle->audit->rejected_a0_irq = rejected_irq;
-          lifecycle->audit->rejected_a0_flags = rejected_flags;
-        }
-    }
-
-  goodix_a0_message_clear (&message);
-  lifecycle_fail_literal (lifecycle, GOODIX_POST_TLS_ERROR_PROTOCOL,
-                          "unexpected post-TLS A0 frame or state");
+    rejection = g_error_new (
+      GOODIX_POST_TLS_ERROR, GOODIX_POST_TLS_ERROR_PROTOCOL,
+      "unexpected post-TLS A0 frame or state: phase=%s expected=%s "
+      "control=0x%02x body_length=%" G_GSIZE_FORMAT " %s "
+      "ack_expected=0x%02x ack_seen=%u fdt_samples=%u baseline_ready=%u "
+      "decision=reject",
+      goodix_post_tls_phase_name (phase_at_entry),
+      expected_a0_event (phase_at_entry, lifecycle->ack_seen),
+      message.control, length, irq_metadata, lifecycle->expected_ack,
+      (guint) lifecycle->ack_seen, lifecycle->fdt_raw_count,
+      (guint) lifecycle->baseline_valid);
+    goodix_a0_message_clear (&message);
+    lifecycle_fail (lifecycle, rejection);
+  }
 }
 
 void

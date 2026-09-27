@@ -236,6 +236,53 @@ record_a0_mismatch (GoodixEnrollmentPostTlsEvents *events,
     }
 }
 
+/* Diagnostic classification only. The acceptance predicate remains parse_irq;
+ * this runs after a frame has already been rejected and never advances it. */
+static const gchar *
+a0_mismatch_reason (GoodixEnrollmentEvent  expected,
+                    const GoodixA0Message *message,
+                    const gchar          **policy)
+{
+  guint8 control;
+  guint16 irq;
+  guint16 flags;
+  const guint8 *body;
+  gsize length;
+
+  *policy = "expected-event";
+  switch (expected)
+    {
+    case GOODIX_ENROLLMENT_EVENT_IRQ2:
+      control = 0x32;
+      irq = 0x0002;
+      *policy = "finger-down-nonzero-subset-0x003f";
+      break;
+    case GOODIX_ENROLLMENT_EVENT_IRQ0100:
+      control = 0x36;
+      irq = 0x0100;
+      *policy = "contact-sample-nonzero-subset-0x003f";
+      break;
+    case GOODIX_ENROLLMENT_EVENT_IRQ0200:
+      control = 0x34;
+      irq = 0x0200;
+      *policy = "finger-up-zero";
+      break;
+    default:
+      return expected_ack_echo (expected, &control) ? "ack-shape" : "state";
+    }
+  if (message->control != control)
+    return "control";
+  body = g_bytes_get_data (message->body, &length);
+  if (length != 16u)
+    return "body-length";
+  if (((guint16) body[0] | ((guint16) body[1] << 8)) != irq)
+    return "irq";
+  flags = (guint16) ((guint16) body[2] | ((guint16) body[3] << 8));
+  if ((flags & (guint16) ~GOODIX_FDT_TOUCH_MASK) != 0u)
+    return "flags-reserved";
+  return flags == 0u ? "flags-zero" : "flags-nonzero";
+}
+
 gboolean
 goodix_enrollment_post_tls_events_handle_a0 (
   GoodixEnrollmentPostTlsEvents *events,
@@ -347,6 +394,15 @@ goodix_enrollment_post_tls_events_handle_a0 (
 out:
   if (!accepted && !frame_matches_expected)
     {
+      const GoodixEnrollmentModelAudit *protocol =
+        &events->audit->lifecycle.plan.pipeline.protocol;
+      const gchar *policy;
+      const gchar *reason = a0_mismatch_reason (expected, &message, &policy);
+      /* Metadata balance: an observed primary has not yet been accounted for
+       * as a completed or retried stage. This does not inspect image memory. */
+      gboolean pending_primary = protocol->observed_primary_stage_count >
+        protocol->completed_stage_count + protocol->retry_stage_count;
+
       record_a0_mismatch (events, expected, &message);
       if (error != NULL && *error == NULL)
         {
@@ -354,16 +410,22 @@ out:
             g_set_error (
               error, GOODIX_ENROLLMENT_POST_TLS_ERROR,
               GOODIX_ENROLLMENT_POST_TLS_ERROR_EVENT,
-              "A0 mismatch: expected %s, observed control 0x%02x IRQ 0x%04x flags 0x%04x",
+              "A0 mismatch: expected %s, observed control 0x%02x IRQ 0x%04x flags 0x%04x; "
+              "decision=reject reason=%s policy=%s contacts=%u stages=%u pending_primary=%u",
               goodix_enrollment_event_name (expected), message.control,
               events->audit->last_mismatch_observed_irq,
-              events->audit->last_mismatch_observed_irq_flags);
+              events->audit->last_mismatch_observed_irq_flags,
+              reason, policy, protocol->observed_primary_stage_count,
+              protocol->completed_stage_count, (guint) pending_primary);
           else
             g_set_error (
               error, GOODIX_ENROLLMENT_POST_TLS_ERROR,
               GOODIX_ENROLLMENT_POST_TLS_ERROR_EVENT,
-              "A0 mismatch: expected %s, observed control 0x%02x (not classified as IRQ)",
-              goodix_enrollment_event_name (expected), message.control);
+              "A0 mismatch: expected %s, observed control 0x%02x (not classified as IRQ); "
+              "decision=reject reason=%s policy=%s contacts=%u stages=%u pending_primary=%u",
+              goodix_enrollment_event_name (expected), message.control,
+              reason, policy, protocol->observed_primary_stage_count,
+              protocol->completed_stage_count, (guint) pending_primary);
         }
     }
   goodix_a0_message_clear (&message);

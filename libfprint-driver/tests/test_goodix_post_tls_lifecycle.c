@@ -976,7 +976,86 @@ test_rejected_a0_sanitized_telemetry (void)
   g_assert_cmpint (fixture->audit.rejected_a0_flags, ==, 0x1234);
   g_assert_cmpint (fixture->audit.rejected_a0_body_length, ==, 16);
   g_assert_cmpuint (fixture->terminal_count, ==, 1u);
+  g_assert_cmpstr (goodix_post_tls_lifecycle_get_error (fixture->lifecycle)->message,
+                   ==, "unexpected post-TLS A0 frame or state: phase=D4 expected=ACK "
+                   "control=0x32 body_length=16 irq=0x0080 flags=0x1234 "
+                   "ack_expected=0xd4 ack_seen=0 fdt_samples=0 baseline_ready=0 "
+                   "decision=reject");
+  g_assert_cmpuint (fixture->audit.command_count, ==, 1u);
+  g_assert_cmpuint (fixture->image_count, ==, 0u);
+  g_assert_true (g_queue_is_empty (fixture->out));
+  g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
 
+  fixture_free (fixture);
+}
+
+static void
+test_rejected_controller_state_is_not_irq (void)
+{
+  Fixture *fixture = fixture_new ();
+  guint8 body[16];
+  g_autoptr(GBytes) ack = build_ack (0xd4);
+  g_autoptr(GBytes) response = NULL;
+
+  /* Opaque synthetic AE bytes must never be rendered as IRQ/flags or dumped. */
+  memset (body, 0x5a, sizeof body);
+  body[1] = 0;
+  response = build_response (0xae, body, sizeof body);
+  g_assert_true (goodix_post_tls_lifecycle_start (fixture->lifecycle, NULL));
+  complete_command (fixture, 0xd4, NULL, 0);
+  feed_frame (fixture, ack, 0);
+  complete_command (fixture, 0xaf, NULL, 0);
+  feed_frame (fixture, response, 0);
+
+  g_assert_cmpstr (goodix_post_tls_lifecycle_get_error (fixture->lifecycle)->message,
+                   ==, "unexpected post-TLS A0 frame or state: phase=AF "
+                   "expected=AE_CONTROLLER_STATE control=0xae body_length=16 "
+                   "irq=unclassified flags=unclassified ack_expected=0xaf "
+                   "ack_seen=0 fdt_samples=0 baseline_ready=0 decision=reject");
+  g_assert_cmpint (fixture->audit.rejected_a0_irq, ==, -1);
+  g_assert_cmpint (fixture->audit.rejected_a0_flags, ==, -1);
+  g_assert_cmpuint (fixture->audit.command_count, ==, 2u);
+  g_assert_cmpuint (fixture->terminal_count, ==, 1u);
+  g_assert_cmpuint (fixture->image_count, ==, 0u);
+  g_assert_true (g_queue_is_empty (fixture->out));
+  g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
+  fixture_free (fixture);
+}
+
+static void
+test_zero_flags_invalid_baseline_is_not_enrollment_mismatch (void)
+{
+  Fixture *fixture = fixture_new ();
+  const guint8 state[16] = { 0, 2 };
+  g_autoptr(GBytes) ack_d4 = build_ack (0xd4);
+  g_autoptr(GBytes) ae = build_response (0xae, state, sizeof state);
+  g_autoptr(GBytes) ack36 = build_ack (0x36);
+  /* Zero flags are correct here, but a zero first baseline component is not.
+   * This is one possible generic-error cause, not a reconstruction of live. */
+  g_autoptr(GBytes) event = build_event (0x36, 0x0100, 0, 0);
+
+  g_assert_true (goodix_post_tls_lifecycle_start (fixture->lifecycle, NULL));
+  complete_command (fixture, 0xd4, NULL, 0);
+  feed_frame (fixture, ack_d4, 0);
+  complete_command (fixture, 0xaf, NULL, 0);
+  feed_frame (fixture, ae, 0);
+  complete_command (fixture, 0x36, NULL, 0);
+  feed_frame (fixture, ack36, 0);
+  feed_frame (fixture, event, 0);
+
+  g_assert_cmpstr (goodix_post_tls_lifecycle_get_error (fixture->lifecycle)->message,
+                   ==, "unexpected post-TLS A0 frame or state: "
+                   "phase=FDT_IRQ100_1 expected=BASELINE_IRQ0100 control=0x36 "
+                   "body_length=16 irq=0x0100 flags=0x0000 ack_expected=0x36 "
+                   "ack_seen=1 fdt_samples=1 baseline_ready=0 decision=reject");
+  g_assert_cmpuint (fixture->audit.command_count, ==, 3u);
+  g_assert_cmpuint (fixture->audit.fdt_irq100_count, ==, 0u);
+  g_assert_cmpuint (fixture->terminal_count, ==, 1u);
+  g_assert_cmpuint (fixture->image_count, ==, 0u);
+  g_assert_true (g_queue_is_empty (fixture->out));
+  g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_real_submit_count (
+                     fixture->backend), ==, 0u);
   fixture_free (fixture);
 }
 
@@ -1023,6 +1102,11 @@ test_login_baseline_contact_rejected (void)
   g_assert_cmpint (fixture->audit.rejected_a0_irq, ==, 0x0100);
   g_assert_cmpint (fixture->audit.rejected_a0_flags, ==, 0x003f);
   g_assert_cmpuint (fixture->audit.command_count, ==, 3u);
+  g_assert_cmpstr (goodix_post_tls_lifecycle_get_error (fixture->lifecycle)->message,
+                   ==, "unexpected post-TLS A0 frame or state: "
+                   "phase=FDT_IRQ100_1 expected=BASELINE_IRQ0100 control=0x36 "
+                   "body_length=16 irq=0x0100 flags=0x003f ack_expected=0x36 "
+                   "ack_seen=1 fdt_samples=0 baseline_ready=0 decision=reject");
 #endif
   g_assert_cmpuint (fixture->audit.first_image_command_count, ==, 0u);
   g_assert_cmpuint (fixture->terminal_count, ==, 1u);
@@ -1441,6 +1525,10 @@ main (int argc, char **argv)
                    test_fdt_delta_outside_threshold_terminal);
   g_test_add_func ("/d278-12/rejected-a0-sanitized-telemetry",
                    test_rejected_a0_sanitized_telemetry);
+  g_test_add_func ("/post-tls/rejected-controller-state-is-not-irq",
+                   test_rejected_controller_state_is_not_irq);
+  g_test_add_func ("/post-tls/zero-flags-invalid-baseline",
+                   test_zero_flags_invalid_baseline_is_not_enrollment_mismatch);
   g_test_add_func ("/d279-21/first-arm-backend-handoff",
                    test_first_arm_backend_handoff);
   g_test_add_func ("/d279-21/first-arm-backend-handoff-failure",

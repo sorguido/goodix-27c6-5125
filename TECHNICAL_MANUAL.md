@@ -483,6 +483,15 @@ and the applicable little-endian timestamp. IRQ `0x0002` is the finger-down
 boundary used before image acquisition; its raw words and touch mask also
 produce the up-table later used by `0x34` in the release path.
 
+The repeated enrollment graph also receives `0x36 / IRQ 0x0100`, but applies
+the separate contact-sample policy: at least one of the six low touch bits
+must be set. It currently validates this event without deriving a new table
+from its raw words. This nonzero requirement is a conservative context guard,
+not a demonstrated universal firmware rule. A zero mask in this enrollment
+slot therefore terminates the action even though control and IRQ are correct.
+It does not establish poor image quality or physical finger removal; see
+[A0 rejection diagnostics](#203-a0-rejection-diagnostics).
+
 The IRQ `0x0200` release event must yield a fresh valid down-table before reuse.
 Re-arm uses that table and the re-arm timestamp, never a stale table from
 another generation. Submission is allowed only after the complete release tail
@@ -1257,6 +1266,7 @@ matching.
 | Material rejected | Staging/import contract | Exact validator error and file metadata, never file contents |
 | TLS/bootstrap failure | Target binding or protocol phase | Exact phase/error name with protected bytes redacted |
 | Capture but processing error | Image bounds/preprocessing/template parser | Error class and action, never image/template data |
+| Enrollment A0 mismatch after accepted contacts | Expected enrollment event and contextual FDT flags | Exact mismatch, contact/stage counters and cleanup audit; see §20.3 |
 | Clean no-match | Biometric result | Which explicit attempt and enrolled finger label; do not recast as transport failure |
 | Plasma password works, fingerprint path does not | Empty-field selection, PAM compatibility, preparation timing | Whether input was empty and the first non-secret PAM/fprintd error |
 | Other consumers omit fingerprint | Fedora authselect/PAM policy | Current host policy; no manual project workaround |
@@ -1286,6 +1296,91 @@ first non-secret error, and whether password/desktop access still works.
 Do **not** share the material directory, manifest, transport material, OEM DLL,
 FDT cache, configuration payload, raw USB captures, fingerprint images,
 templates, core dumps containing them, or unredacted secret-bearing logs.
+
+### 20.3 A0 rejection diagnostics
+
+An enrollment error reporting `expected IRQ0100`, `control 0x36`,
+`IRQ 0x0100` and `flags 0x0000` identifies a failure of the current nonzero
+contact-mask requirement. It occurs in a repeated contact after its primary
+B0 has arrived, before the auxiliary branch and deferred sample delivery.
+Earlier keypoint counts describe earlier delivered samples; they do not
+establish the quality of the pending sample. The driver still rejects this
+case. Accepting it would immediately enable command `0x20`, so a broader mask
+check is not a passive diagnostic correction.
+
+The mismatch suffix names the rejection reason and contextual flag policy,
+with contact/stage counts. `pending_primary` is an accounting indicator:
+observed primary samples exceed completed plus retry stages. It is not a
+buffer inspection. In the production deferred-delivery path at IRQ0100, this
+identifies a primary not yet delivered; rejection follows the existing error
+cleanup without acquiring an auxiliary image or rearming the graph.
+
+The production epoch audit's `rejected` field counts rejected actions, not A0
+frames or poor-quality images. `enroll_contacts` counts observed primary B0
+samples, `enroll_stages` counts completed stages, and `enroll_retry_scans`
+counts retry stages. A failure with one more contact than completed stages is
+consistent with the current sample being held before delivery.
+
+The separate `unexpected post-TLS A0 frame or state` error comes from the
+preparation/capture lifecycle. Its diagnostic suffix reports the phase,
+expected event, control, body length, classified IRQ/flags, ACK state,
+number of recorded FDT readings, baseline readiness, and rejection decision.
+Only controls `0x32`, `0x34` and `0x36` with the exact IRQ body shape are
+classified as IRQs; opaque AE controller-state bytes are never printed as
+IRQ data. A correct zero baseline mask can still fail a material or delta
+check. Without the phase and rejected-frame metadata, the older generic
+message cannot establish the failed predicate or a common cause with the
+enrollment contact-mask rejection.
+
+These diagnostics preserve the existing error paths, acceptance policy and
+wire sequence. They emit no FDT readings, image, template or protected-material
+bytes. Synthetic regressions establish rejection and cleanup behavior; they
+do not qualify a recovery transition on the reader.
+
+### 20.4 Limits of the OEM zero-mask recovery evidence
+
+Static analysis of the qualified OEM driver links `PID_5125` to project
+selector 8. The preserved APP12509 target trace reports chip ID `0x2504`,
+which the OEM maps to sensor type 12, one of the engine's eligible enrollment
+types. Its `OnRetryCaptureIMG` handler (IOCTL `0x442140`) has a channel-count
+branch for request type 0: when its finger-down state is set, it requests a manual FDT
+sample and counts the returned touch-mask bits. For project 8, command `0x20`
+requires a count greater than five, finger-down state, and an available retry
+slot. A zero mask skips that acquisition, clears the software finger-down
+state and returns status to the caller. A subsequent `0x32` is conditional on
+another pending request. These are request-specific OEM rules, not a new
+Linux acceptance policy or proof that zero is a physical finger-up event.
+
+The OEM engine contains an enrollment image-selection caller of that request.
+On the zero/finger-up result, that caller stops supplementary image selection
+without replacing the already preprocessed primary. This narrows the likely
+recovery direction: keeping the primary and skipping an auxiliary acquisition
+is materially different from discarding the contact or sending a libfprint
+retry. The option defaults to enabled but permits configuration overrides;
+its effective registry value is not present in a USB trace. On chip `0x2504`,
+the primary capture bypasses a separate manual-sample path that would refine
+the up table. The retry IRQ0100 path instead invokes the down-table helper.
+That distinction rules out assuming that the current Linux FDT table can
+simply remain unchanged when `0x20` is skipped.
+
+The preserved APP12509 capture corpus contains zero IRQ0100 masks in bootstrap
+and nonzero masks in repeated enrollment; it does not contain an OEM enrollment
+zero-mask recovery trace. A related APP12508 source implementation corroborates
+per-channel FDT semantics but cannot fill that target-specific gap. The Linux
+driver therefore retains its current rejection behavior pending a complete
+transition review.
+
+The remaining integration issue is specific: the first `0x34` is already armed
+when manual `0x36` runs. The OEM host resets and waits for the manual-sample
+completion event; it does not drain the independent IRQ0200 event. Its general
+dispatcher can process that release separately. This does not establish which
+release events the firmware may emit or queue across the mode change. Linux
+currently rejects A0 during a pending OUT and permits only one down-table
+update per stage. A zero-mask recovery must therefore define ownership of a
+possible late IRQ0200, FDT update ordering, single sample delivery and the
+boundary before rearming. Simply skipping to `0x32` would leave those questions
+unresolved. Offline interleaving tests can verify a defined contract; the
+absence of a zero-mask capture alone does not require a new live experiment.
 
 ## 21. Developer invariants, licensing, and references
 
