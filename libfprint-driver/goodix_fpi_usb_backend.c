@@ -24,9 +24,6 @@ struct _GoodixFpiUsbBackend
   guint64 delivery_count, real_submit_count, out_submit_count;
   guint64 in_completion_count, out_completion_count;
   gboolean terminal_fence, drain_notified;
-#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-  gboolean probe_out_fenced; /* Irreversible for this backend instance. */
-#endif
   gboolean pre_session_sync_active;
 #ifdef GOODIX_ENABLE_TEST_SEAMS
   gboolean async_seam;
@@ -48,17 +45,6 @@ backend_error_quark (void)
 {
   return g_quark_from_static_string ("goodix-fpi-usb-backend-error");
 }
-
-#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-gboolean
-goodix_fpi_usb_backend_probe_fence_out (GoodixFpiUsbBackend *backend)
-{
-  if (backend == NULL || backend->terminal_fence || backend->out_outstanding != 0)
-    return FALSE;
-  backend->probe_out_fenced = TRUE;
-  return TRUE;
-}
-#endif
 
 static gboolean
 backend_is_drained (GoodixFpiUsbBackend *backend)
@@ -248,14 +234,6 @@ goodix_fpi_usb_backend_begin_generation (GoodixFpiUsbBackend *backend,
                            "cannot begin generation before backend drain");
       return FALSE;
     }
-#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-  if (backend->probe_out_fenced)
-    {
-      g_set_error_literal (error, backend_error_quark (), 2,
-                           "zero-mask probe forbids generation reuse");
-      return FALSE;
-    }
-#endif
   g_set_object (&backend->cancellable, cancellable);
   backend->generation = generation;
   backend->terminal_fence = FALSE;
@@ -381,14 +359,6 @@ goodix_fpi_usb_backend_submit_out (GoodixFpiUsbBackend *backend,
                            "a physical OUT is already pending");
       return FALSE;
     }
-#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-  if (backend->probe_out_fenced)
-    {
-      g_set_error_literal (error, backend_error_quark (), 2,
-                           "zero-mask probe permanently forbids OUT");
-      return FALSE;
-    }
-#endif
   backend->out_outstanding = 1;
   backend->out_generation = generation;
   backend->out_submit_count++;
@@ -490,14 +460,6 @@ goodix_fpi_usb_backend_reset_epoch_audit (GoodixFpiUsbBackend *backend,
       return FALSE;
     }
 
-#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-  if (backend->probe_out_fenced)
-    {
-      g_set_error_literal (error, backend_error_quark (), 7,
-                           "zero-mask probe preserves its terminal audit");
-      return FALSE;
-    }
-#endif
   backend->generation = 0;
   backend->in_generation = 0;
   backend->out_generation = 0;

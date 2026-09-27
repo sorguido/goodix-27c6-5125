@@ -50,10 +50,6 @@ struct _GoodixDeviceContext
   guint64                  generation;
 
   gboolean                 terminal_fence;
-#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-  gboolean probe_enabled;
-  guint probe_deadline;
-#endif
   gboolean                 poisoned;
   GCancellable            *activation_cancellable;
   GCancellable            *usb_cancellable;
@@ -166,9 +162,6 @@ typedef struct
   GoodixProductionEnrollmentAudit last_production_audit;
   gboolean last_production_audit_valid;
   gboolean last_production_audit_logged;
-#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-  gboolean probe_requested;
-#endif
 #ifdef GOODIX_ENABLE_TEST_SEAMS
   GoodixRuntimeMaterialAcquireSeam acquire_material;
   GoodixRuntimeMaterialReleaseSeam release_material;
@@ -196,18 +189,6 @@ G_DEFINE_TYPE_WITH_PRIVATE (GoodixFpImageDevice, goodix_fpimage_device,
 G_DEFINE_TYPE (GoodixUsbFpImageDevice, goodix_usb_fpimage_device,
                GOODIX_TYPE_FPIMAGE_DEVICE)
 
-#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-gboolean
-goodix_fpimage_device_enable_zero_mask_probe (FpDevice *device)
-{
-  if (!GOODIX_IS_FPIMAGE_DEVICE (device) || fp_device_is_open (device))
-    return FALSE;
-  GoodixFpImageDevicePrivate *priv = goodix_fpimage_device_get_instance_private (
-    GOODIX_FPIMAGE_DEVICE (device));
-  priv->probe_requested = TRUE;
-  return TRUE;
-}
-#endif
 
 static const FpIdEntry goodix_usb_id_table[] = {
   { .vid = 0x27c6, .pid = 0x5125 },
@@ -260,12 +241,6 @@ context_protocol_failure (GoodixDeviceContext *ctx,
       goodix_device_context_set_poisoned (ctx, error);
       return;
     }
-#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-  if (ctx->enrollment_binding != NULL &&
-      goodix_enrollment_fpi_usb_binding_probe_audit (ctx->enrollment_binding)->zero_seen)
-    g_print ("GOODIX_ZERO_MASK_PROBE_END reason=protocol-or-observation-stop error_code=%d\n",
-             error != NULL ? error->code : 0);
-#endif
   local_error = error != NULL ? g_error_copy (error) :
     g_error_new_literal (FP_DEVICE_ERROR, FP_DEVICE_ERROR_PROTO,
                          "Goodix production protocol failed closed");
@@ -624,18 +599,6 @@ goodix_device_context_has_dormant_enrollment_binding (
 }
 #endif
 
-#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-static gboolean
-probe_timeout (gpointer data)
-{
-  GoodixDeviceContext *ctx = data;
-  ctx->probe_deadline = 0;
-  g_autoptr(GError) error = g_error_new_literal (
-    G_IO_ERROR, G_IO_ERROR_TIMED_OUT, "zero-mask observation window ended; no barrier inferred");
-  context_protocol_failure (ctx, error);
-  return G_SOURCE_REMOVE;
-}
-#endif
 
 static void context_a0_consumer (guint8 type, GBytes *frame, gpointer user_data)
 {
@@ -647,10 +610,6 @@ static void context_a0_consumer (guint8 type, GBytes *frame, gpointer user_data)
     {
       g_autoptr(GError) error = NULL;
 
-#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-      if (ctx->probe_enabled)
-        goodix_enrollment_fpi_usb_binding_enable_probe (ctx->enrollment_binding);
-#endif
       ctx->handling_enrollment_a0 = TRUE;
       if (!goodix_enrollment_fpi_usb_binding_handle_a0 (
             ctx->enrollment_binding, frame, &error))
@@ -685,11 +644,6 @@ static void context_a0_consumer (guint8 type, GBytes *frame, gpointer user_data)
       ctx->handling_enrollment_a0 = FALSE;
       if (!ctx->terminal_fence)
         goodix_device_context_maybe_rearm (ctx);
-#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-      if (!ctx->terminal_fence && ctx->probe_enabled && ctx->probe_deadline == 0 &&
-          goodix_enrollment_fpi_usb_binding_probe_audit (ctx->enrollment_binding)->zero_seen)
-        ctx->probe_deadline = g_timeout_add (GOODIX_ZERO_MASK_WINDOW_MS, probe_timeout, ctx);
-#endif
     }
   else if (ctx->post_tls_lifecycle != NULL &&
       goodix_post_tls_lifecycle_get_phase (ctx->post_tls_lifecycle) !=
@@ -702,11 +656,6 @@ static void context_b0_consumer (guint8 type, GBytes *frame, gpointer user_data)
 {
   GoodixDeviceContext *ctx=user_data; gsize n; const guint8 *p; g_autoptr(GError) error=NULL;
   if(type!=0xb0||ctx->terminal_fence)return;
-#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-  if (ctx->enrollment_binding != NULL &&
-      goodix_enrollment_fpi_usb_binding_probe_audit (ctx->enrollment_binding)->zero_seen)
-    { context_protocol_failure (ctx, NULL); return; }
-#endif
   if(ctx->secure_session!=NULL){goodix_secure_session_handle_b0(ctx->secure_session,frame);return;}
   /* Host-only decrypted-plaintext injection. Production always retains the
    * secure-session branch above, so TLS records cannot bypass authentication. */
@@ -960,12 +909,6 @@ goodix_device_context_free (GoodixDeviceContext              *ctx,
                     goodix_enrollment_fpi_usb_binding_can_free (
                       ctx->enrollment_binding));
 
-#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-  GoodixZeroMaskProbeAudit probe = { 0 };
-  if (ctx->enrollment_binding != NULL)
-    probe = *goodix_enrollment_fpi_usb_binding_probe_audit (ctx->enrollment_binding);
-  g_clear_handle_id (&ctx->probe_deadline, g_source_remove);
-#endif
   g_clear_handle_id (&ctx->login_deadline, g_source_remove);
   g_clear_object (&ctx->activation_cancellable);
   g_clear_object (&ctx->usb_cancellable);
@@ -998,18 +941,6 @@ goodix_device_context_free (GoodixDeviceContext              *ctx,
   if (final_audit != NULL)
     goodix_device_context_collect_production_enrollment_audit (
       ctx, final_audit, TRUE);
-#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-  if (ctx->probe_enabled)
-    g_print ("GOODIX_ZERO_MASK_PROBE_RESULT=closed zero_seen=%u observed_events=%u "
-             "irq0200_count=%u other_irq_count=%u new_out_after_zero=%" G_GUINT64_FORMAT " "
-             "command20_after_zero=0 command32_after_zero=0 rearm_after_zero=0 "
-             "new_contact_after_zero=0 persistent=0 outstanding=%u drained=%u context_closed=1\n",
-             probe.zero_seen, probe.observed_events, probe.irq0200_count, probe.other_irq_count,
-             probe.zero_seen ? goodix_fpi_usb_backend_get_out_submit_count (ctx->fpi_usb_backend) -
-               probe.out_count_at_zero : 0u,
-             goodix_fpi_usb_backend_get_outstanding (ctx->fpi_usb_backend),
-             goodix_fpi_usb_backend_is_drained (ctx->fpi_usb_backend));
-#endif
   goodix_fpi_usb_backend_free (ctx->fpi_usb_backend);
   goodix_usb_router_free (ctx->usb_router);
   g_free (ctx);
@@ -1388,9 +1319,6 @@ static void
 goodix_device_context_set_terminal_fence (GoodixDeviceContext *ctx)
 {
   ctx->terminal_fence = TRUE;
-#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-  g_clear_handle_id (&ctx->probe_deadline, g_source_remove);
-#endif
   goodix_enrollment_fpi_usb_binding_cancel (
     ctx->enrollment_binding, "GoodixDeviceContext terminal fence");
   if (ctx->secure_session != NULL &&
@@ -1709,13 +1637,6 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
   GoodixFpImageDevice *self = GOODIX_FPIMAGE_DEVICE (dev);
   GoodixDeviceContext *ctx = goodix_fpimage_device_peek_context (self);
   FpiDeviceAction action = fpi_device_get_current_action (FP_DEVICE (self));
-#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-  GoodixFpImageDevicePrivate *probe_priv = goodix_fpimage_device_get_instance_private (self);
-  ctx->probe_enabled = probe_priv->probe_requested && action == FPI_DEVICE_ACTION_ENROLL;
-  probe_priv->probe_requested = FALSE;
-  if (ctx->probe_enabled)
-    g_print ("GOODIX_ZERO_MASK_PROBE_ACTIVE=1 max_events=4 window_ms=3000\n");
-#endif
 
   g_assert (ctx != NULL);
   g_assert (ctx->state == GOODIX_DEVICE_CONTEXT_STATE_INACTIVE ||

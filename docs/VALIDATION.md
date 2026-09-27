@@ -12,6 +12,8 @@ observations reviewed against the implementation and available telemetry.
 | Function | Evidence and boundary |
 | --- | --- |
 | Enrollment and standard verification | Enrollment completed and a subsequent verification matched the enrolled finger |
+| Enrollment zero-mask recovery | A logged zero at the third contact preserved the primary, skipped auxiliary acquisition and continued to 8 accepted stages in 8 contacts with one zero-specific re-arm; final audit recorded no persistent writes and complete host drain/close |
+| Duplicate detection | A manual duplicate-detection check with recovery enabled was reported successful, alongside ordinary enrollment and verification |
 | KScreenLocker | Password unlock and fingerprint unlock reached the desktop |
 | Ordinary sudo | Correct password and fingerprint authentication succeeded |
 | PolicyKit | Correct password and fingerprint authentication succeeded through the KDE agent |
@@ -56,6 +58,10 @@ recognition accuracy, hardware behavior or complete operating-system recovery.
 ## Known limitations
 
 - No broad independent-reader, cross-firmware or cross-distribution qualification.
+- Zero-mask recovery has one observed successful continuation without a late IRQ0200.
+  Its bounded host rule does not distinguish an old release from a current one
+  if both have identical bytes in a later compatible release slot; see the
+  [protocol boundary](../TECHNICAL_MANUAL.md#74-enrollment-zero-mask-recovery).
 - No measured universal false-acceptance or false-rejection rate.
 - No automated acquisition/extraction tooling is shipped or qualified as part
   of the release; the detailed [device-material acquisition reference](DEVICE_MATERIALS.md)

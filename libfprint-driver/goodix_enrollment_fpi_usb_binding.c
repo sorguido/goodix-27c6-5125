@@ -24,10 +24,6 @@ struct _GoodixEnrollmentFpiUsbBinding
   GError *terminal_error;
   GoodixEnrollmentFpiUsbErrorFunc failed;
   gpointer failed_data;
-#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-  gboolean probe_enabled;
-  GoodixZeroMaskProbeAudit probe;
-#endif
 };
 
 static GQuark
@@ -257,10 +253,6 @@ goodix_enrollment_fpi_usb_binding_submit_next (
   if (binding == NULL || binding->terminal_error != NULL)
     return binding_fail (binding, "enrollment USB binding is absent or terminal",
                          error);
-#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-  if (binding->probe.zero_seen)
-    return binding_fail (binding, "zero-mask probe graph is frozen", error);
-#endif
   if (!goodix_enrollment_outbound_transaction_submit_next (
         binding->transaction, error))
     return binding_fail (binding, "enrollment USB OUT submission failed", error);
@@ -309,100 +301,6 @@ goodix_enrollment_fpi_usb_binding_get_generation (
   return binding != NULL ? binding->generation : 0u;
 }
 
-#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-void
-goodix_enrollment_fpi_usb_binding_enable_probe (GoodixEnrollmentFpiUsbBinding *binding)
-{
-  g_return_if_fail (binding != NULL);
-  binding->probe_enabled = TRUE;
-}
-
-const GoodixZeroMaskProbeAudit *
-goodix_enrollment_fpi_usb_binding_probe_audit (const GoodixEnrollmentFpiUsbBinding *binding)
-{
-  return binding != NULL ? &binding->probe : NULL;
-}
-
-/* Returns TRUE when intercepted, with success/failure in accepted. The normal
- * parser and graph never see the zero or any subsequent input. No FDT mutation. */
-static gboolean
-probe_a0 (GoodixEnrollmentFpiUsbBinding *binding, GBytes *frame,
-          gboolean *accepted, GError **error)
-{
-  GoodixA0Message message = { 0 };
-  gsize size = 0, body_length = 0;
-  const guint8 *wire = frame != NULL ? g_bytes_get_data (frame, &size) : NULL;
-  const guint8 *body = NULL;
-  guint control = size > 4 ? wire[4] : 0;
-  guint irq = 0, flags = 0;
-  gboolean valid = goodix_a0_parse_frame (frame, (guint8) control, &message, NULL);
-  gboolean raw_valid = FALSE;
-  GoodixZeroMaskProbeAudit *p = &binding->probe;
-  if (valid)
-    {
-      body = g_bytes_get_data (message.body, &body_length);
-      if (body_length == 16u)
-        {
-          irq = (guint) body[0] | ((guint) body[1] << 8);
-          flags = (guint) body[2] | ((guint) body[3] << 8);
-          raw_valid = TRUE;
-          for (guint i = 0; i < 6u; i++)
-            {
-              guint value = ((guint) body[4u + 2u*i] |
-                            ((guint) body[5u + 2u*i] << 8)) >> 1;
-              if (value < 1u || value > 254u)
-                raw_valid = FALSE;
-            }
-        }
-    }
-  gboolean entering = !p->zero_seen && valid && raw_valid &&
-    control == 0x36u && irq == 0x0100u && flags == 0u &&
-    !goodix_enrollment_fpi_usb_binding_has_pending (binding) &&
-    goodix_enrollment_post_tls_events_get_expected_event (binding->events) ==
-      GOODIX_ENROLLMENT_EVENT_IRQ0100;
-  if (!p->zero_seen && !entering)
-    {
-      goodix_a0_message_clear (&message);
-      return FALSE;
-    }
-  if (entering)
-    {
-      if (!goodix_fpi_usb_backend_probe_fence_out (binding->backend))
-        {
-          goodix_a0_message_clear (&message);
-          *accepted = binding_fail (binding, "probe OUT fence failed", error);
-          return TRUE;
-        }
-      p->zero_seen = TRUE;
-      p->out_count_at_zero = goodix_fpi_usb_backend_get_out_submit_count (binding->backend);
-      p->deadline = g_get_monotonic_time () + GOODIX_ZERO_MASK_WINDOW_MS * 1000;
-    }
-  else
-    {
-      p->observed_events++;
-      if (valid && body_length == 16u && irq == 0x0200u)
-        p->irq0200_count++;
-      else
-        p->other_irq_count++;
-    }
-  gboolean release = valid && raw_valid && body_length == 16u &&
-    (control == 0x34u || control == 0x36u) && irq == 0x0200u && flags == 0u;
-  g_print ("GOODIX_ZERO_MASK_PROBE event_index=%u control=0x%02x irq=0x%04x "
-           "flags=0x%04x body_length=%zu classified=%s "
-           "phase=ZERO_MASK_DIAGNOSTIC_OBSERVE out_pending=%u generation=%" G_GUINT64_FORMAT
-           " raw_valid=%u fdt_candidate_valid=%u\n",
-           p->observed_events, control, irq, flags, body_length,
-           entering ? "zero-mask" : release ? "irq0200" : "ambiguous-or-malformed",
-           goodix_enrollment_fpi_usb_binding_has_pending (binding), binding->generation,
-           raw_valid, raw_valid);
-  goodix_a0_message_clear (&message);
-  *accepted = TRUE;
-  if ((!entering && !release) || p->observed_events >= GOODIX_ZERO_MASK_MAX_EVENTS ||
-      g_get_monotonic_time () >= p->deadline)
-    *accepted = binding_fail (binding, "zero-mask observation stopped", error);
-  return TRUE;
-}
-#endif
 
 gboolean
 goodix_enrollment_fpi_usb_binding_handle_a0 (
@@ -413,11 +311,6 @@ goodix_enrollment_fpi_usb_binding_handle_a0 (
   if (binding == NULL || binding->terminal_error != NULL)
     return binding_fail (binding, "enrollment USB binding is absent or terminal",
                          error);
-#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-  gboolean accepted;
-  if (binding->probe_enabled && probe_a0 (binding, frame, &accepted, error))
-    return accepted;
-#endif
   gboolean handled = FALSE;
   if (!goodix_enrollment_post_tls_events_consume_stale_release (
         binding->events, frame, &handled, error))
@@ -439,10 +332,6 @@ goodix_enrollment_fpi_usb_binding_handle_plaintext_chunk (
   if (binding == NULL || binding->terminal_error != NULL)
     return binding_fail (binding, "enrollment USB binding is absent or terminal",
                          error);
-#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-  if (binding->probe.zero_seen)
-    return binding_fail (binding, "zero-mask probe graph is frozen", error);
-#endif
   if (!goodix_enrollment_outbound_transaction_handle_plaintext_chunk (
         binding->transaction, chunk, error))
     return binding_fail (binding, "enrollment plaintext failed", error);

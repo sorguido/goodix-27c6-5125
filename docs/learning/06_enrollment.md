@@ -40,7 +40,7 @@ flowchart TD
     I --> K{"Eight samples reached?"}
     J --> E
     K -->|Not yet| E
-    K -->|Yes| L["Finish after safe finger release"]
+    K -->|Yes| L["Finish after the contact boundary is accepted"]
     T --> L
     L --> M["libfprint serializes template"]
     M --> N["fprintd saves it for the user"]
@@ -66,12 +66,18 @@ promise that every finger will finish in the same number of touches.
 
 ## Why lifting the finger matters
 
-A physical touch is not finished the instant its image is available. The
-driver must observe the release boundary and complete the protocol tail.
+A physical touch is not finished the instant its image is available. In the
+ordinary path, the driver observes the release boundary and completes the
+protocol tail before arming the next stage.
 
-Only then is it safe to arm the next stage. This is why good enrollment prompts
-alternate between touching and lifting instead of asking you to hold the finger
-while the system silently takes unlimited pictures.
+Enrollment also handles a specific zero-mask sensor report by keeping the image
+already captured and skipping the extra acquisition. Normal sample checks still
+apply before another touch is requested; a final sample can complete without a
+separate release notification. The [technical manual](../../TECHNICAL_MANUAL.md#74-enrollment-zero-mask-recovery)
+describes this bounded rule and its remaining late-event limitation.
+
+Keep following the touch-and-lift prompts. The driver does not silently take
+unlimited pictures while you hold the finger in place.
 
 ## Who is responsible for what?
 
@@ -120,7 +126,7 @@ preserve the user's templates for later reinstallation.
 - Accepted images become separate SIGFM feature samples in one template.
 - The current policy stores four to eight accepted samples and bounds physical
   contacts at 20.
-- Finger release is part of every safe stage boundary.
+- Each stage follows its contact-completion rules before requesting another touch.
 - `fprintd` saves the completed host template; the sensor does not become a
   database of Linux users.
 

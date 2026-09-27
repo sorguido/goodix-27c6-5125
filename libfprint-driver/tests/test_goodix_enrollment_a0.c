@@ -471,72 +471,6 @@ test_wrong_state (void)
   fixture_clear (&f);
 }
 
-#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-static void
-test_probe_entry (gconstpointer data)
-{
-  const gchar *kind = data;
-  Fixture f;
-  g_autoptr(GBytes) bytes = NULL;
-  g_autoptr(GError) error = NULL;
-  gboolean target = g_str_equal (kind, "target");
-  if (g_str_equal (kind, "state")) fixture_init (&f);
-  else reach_sample (&f, 2u);
-  goodix_enrollment_fpi_usb_binding_enable_probe (f.binding);
-  bytes = irq_frame (g_str_equal (kind, "control") ? 0x34 : 0x36,
-                     g_str_equal (kind, "irq") ? 0x0200 : 0x0100,
-                     g_str_equal (kind, "flags") ? 0x40 : 0,
-                     g_str_equal (kind, "length") ? 15u : 16u);
-  if (g_str_equal (kind, "checksum") || g_str_equal (kind, "raw"))
-    {
-      gsize n;
-      const guint8 *src = g_bytes_get_data (bytes, &n);
-      guint8 *copy = g_memdup2 (src, n);
-      if (g_str_equal (kind, "checksum")) copy[n - 1u] ^= 1u;
-      else
-        {
-          copy[n - 1u] = (guint8) (copy[n - 1u] + copy[11] + copy[12]);
-          copy[11] = copy[12] = 0;
-        }
-      g_clear_pointer (&bytes, g_bytes_unref);
-      bytes = g_bytes_new_take (copy, n);
-    }
-  if (g_str_equal (kind, "out-pending"))
-    {
-      guint8 command[64] = { 0 };
-      g_autoptr(GBytes) pending = g_bytes_new (command, sizeof command);
-      g_assert_true (goodix_fpi_usb_backend_submit_out (f.backend, 7u, pending, &error));
-    }
-  gboolean accepted = goodix_enrollment_fpi_usb_binding_handle_a0 (f.binding, bytes, &error);
-  g_assert_cmpint (accepted, ==, target);
-  g_assert_cmpint (goodix_enrollment_fpi_usb_binding_probe_audit (f.binding)->zero_seen, ==, target);
-  if (!target)
-    {
-      g_assert_nonnull (error);
-      g_assert_false (goodix_enrollment_post_tls_events_error_is_unusable_contact (error));
-    }
-  if (target)
-    {
-      g_assert_cmpuint (f.images, ==, 1u);
-      g_assert_cmpint (goodix_enrollment_post_tls_events_get_expected_event (f.events), ==,
-                       GOODIX_ENROLLMENT_EVENT_IRQ0100);
-      g_assert_false (goodix_enrollment_fpi_usb_binding_submit_next (f.binding, &error));
-      g_clear_error (&error);
-      g_assert_false (goodix_enrollment_fpi_usb_binding_handle_plaintext_chunk (f.binding, bytes, &error));
-      g_clear_error (&error);
-      g_assert_false (goodix_fpi_usb_backend_begin_generation (f.backend, 8u, f.cancellable, &error));
-      g_assert_cmpuint (f.images, ==, 1u);
-    }
-  fixture_clear (&f);
-  /* A new binding starts with the probe disabled and uses the production outcome. */
-  reach_sample (&f, 2u);
-  g_clear_pointer (&bytes, g_bytes_unref);
-  bytes = irq_frame (0x36, 0x0100, 0, 16u);
-  reject_without_progress (&f, bytes, "zero-mask contact unusable", TRUE);
-  g_assert_cmpuint (f.audit.rejected_inbound_count, ==, 0u);
-  fixture_clear (&f);
-}
-#endif
 
 static void
 reach_recovery (Fixture *f, guint stage, guint max_contacts)
@@ -798,15 +732,6 @@ main (int argc, char **argv)
       g_test_add_data_func (p, failures[i], test_recovery_failures); }
   g_test_add_func ("/recovery/contact-limit-20", test_recovery_contact_bound);
 
-#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-  const gchar *entry[] = { "target", "state", "control", "irq", "flags",
-                          "length", "checksum", "raw", "out-pending" };
-  for (guint i = 0; i < G_N_ELEMENTS (entry); i++)
-    {
-      g_autofree gchar *path = g_strdup_printf ("/zero-mask-probe/entry/%s", entry[i]);
-      g_test_add_data_func (path, entry[i], test_probe_entry);
-    }
-#endif
 
   for (guint i = 0; i < G_N_ELEMENTS (stages); i++)
     {

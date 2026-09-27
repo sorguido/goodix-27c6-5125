@@ -483,21 +483,49 @@ and the applicable little-endian timestamp. IRQ `0x0002` is the finger-down
 boundary used before image acquisition; its raw words and touch mask also
 produce the up-table later used by `0x34` in the release path.
 
-The ordinary repeated enrollment graph also receives `0x36 / IRQ 0x0100`
-with at least one low touch bit set, validating it without deriving a new table.
-Phase E adds a separate ENROLL-only zero-mask branch: exact control36/body 16,
-checksum/flags0 and all six shifted words in 1–254 produce a temporary DOWN table
-`0x80, R[i] >> 1`, committed atomically for that contact. It preserves the held
-primary and skips optional20/auxiliary B0/final auxiliary34. This local rule does
-not change bootstrap or global FDT policy, or establish physical finger-up.
+In the ordinary contact path, the IRQ `0x0200` release event must yield a fresh
+valid down-table before reuse.
+Re-arm uses that table and the re-arm timestamp, never a stale table from
+another generation. Submission is allowed only after the complete release tail
+has reached the re-arm gate, libfprint is again awaiting a finger, a fresh
+down-table is valid, and no re-arm has already been submitted. Failure of any
+formula, phase, generation, flag, threshold, or lifecycle gate terminates the
+action instead of silently reusing old FDT state.
 
-Ordinary release IRQ0200 supplies the next fresh DOWN table. The Phase E zero
-branch instead uses its validated zero-derived table; one late0200 before the
-first valid new IRQ2 is passive and does not change it. Re-arm requires the
-normal host sample request, free OUT ownership, remaining contact budget and no
-cancel/error/terminal fence. No timeout grants re-arm. See the full
-[limited contract](docs/ENROLLMENT_ZERO_MASK_CONTRACT.md) and section 20.6 for the
-accepted residual firmware ambiguity.
+For the repeated enrollment zero-mask alternative, an exact `0x36 / IRQ 0x0100`
+with zero flags derives the DOWN table locally: each channel contributes
+`0x80, R[i] >> 1`, with every shifted value constrained to 1–254. All six raw
+words and the current stage relationship are checked before the temporary
+12-byte table is committed atomically. There is no partial update, wrapping or
+truncation. This stricter local rule does not change bootstrap or global FDT
+acceptance. The resulting table and normal re-arm timestamp belong to this
+contact; a passive late release cannot update a table already used by an
+in-flight request.
+
+### 6.5 Target enrollment image-choice semantics
+
+The qualified OEM implementation maps PID5125 to project8 and chip `0x2504` to
+sensor type12 (ChicagoHU). Its enrollment image-choice path preserves the
+already preprocessed primary when the manual FDT sample has no active channels.
+Optional command `0x20` requires more than five active channels, software
+finger-down and an available retry slot on that target. Zero skips supplementary
+acquisition, clears software finger-down, and leaves a later `0x32` conditional
+on another request. These request-specific OEM rules are not a universal Linux
+image-quality policy or proof of physical finger removal.
+
+The image-choice option supports configuration overrides; its effective value
+cannot be inferred from a USB trace alone. On chip `0x2504`, primary acquisition
+bypasses a separate manual-sample path that would refine the UP table, while the
+retry IRQ0100 path uses the DOWN-table helper. Skipping optional acquisition
+therefore still requires the local DOWN-table derivation above.
+
+The first `0x34` monitor is already armed when manual `0x36` runs. The OEM host
+waits for manual-sample completion without draining the independent IRQ0200
+notification, whose consumer can also conditionally refresh background data.
+The Linux zero branch performs no such background refresh. OEM host control
+flow establishes neither a firmware flush nor a guarantee about late release
+bytes across contacts. Rockytkg supplies SIGFM/preprocessing code, not evidence
+for the Goodix IRQ/FDT/re-arm protocol.
 
 ## 7. Finger detection, capture, release, and cancellation
 
@@ -524,7 +552,7 @@ as soon as the image is delivered and can finish before or after device release,
 so the driver waits for the host biometric result, protocol phase, and backend
 drain required by that action before teardown or permitted reuse.
 
-In this ordinary verify/identify graph, finger-up is not reported to libfprint
+In the ordinary verify/identify path, finger-up is not reported to libfprint
 until the complete release tail has been accepted. This prevents the user interface from inviting another contact while
 the previous contact is still active at the protocol layer.
 
@@ -540,7 +568,7 @@ A0 0x34/ACK → IRQ 0x0200
 → A0 0x32/ACK → re-arm
 ```
 
-Later contacts with a nonzero IRQ0100 use the ordinary repeated/terminal path:
+Later contacts with nonzero IRQ0100 flags use the repeated/terminal path:
 
 ```text
 A0 0x34/ACK
@@ -553,12 +581,9 @@ A0 0x34/ACK
 
 Thus intermediate enrollment contacts do not enter the verify/identify STOP
 path, and the terminal enrollment path does not invent a `0x50/NAV` tail. Stage
-delivery is deferred until the corresponding release boundary is accepted.
-Phase E's exact zero IRQ0100 takes a separate branch after36: deliver the held
-primary once, clear software finger-down, skip20/auxiliary B0/final34, then wait
-for the normal host decision. Nonterminal continuation permits one32; terminal
-completion needs neither32 nor0200. The bounded stale-release window in 20.6 is
-a host rule, not a demonstrated firmware barrier.
+delivery in this ordinary path is deferred until the corresponding release
+boundary is safe. The zero-mask alternative is described in
+[Enrollment zero-mask recovery](#74-enrollment-zero-mask-recovery).
 
 ### 7.2 One acquisition per explicit verification attempt
 
@@ -587,6 +612,71 @@ The next action is then performed through teardown and reacquisition. On the
 qualified system, verification was observed to work after cancellation and
 after suspend/resume, but that evidence does not prove arbitrary on-device
 quiescence or all power-loss states.
+
+### 7.4 Enrollment zero-mask recovery
+
+A repeated enrollment contact can produce a valid `control=0x36 / IRQ=0x0100 /
+flags=0x0000` after its primary B0 image has arrived. The production driver has
+an explicit `ZERO_MASK_RECOVERY` transition for this case. It is enabled only
+for ENROLL and requires all of the following:
+
+- the graph expects the repeated-contact IRQ0100, after the first contact;
+- exactly one primary is held for the current contact;
+- no OUT is pending and no previous zero window remains open;
+- frame, control, checksum and 16-byte body are valid; and
+- all six shifted raw words are in 1–254, as specified in section 6.4.
+
+The primary is preserved and delivered at most once through ordinary
+preprocessing, quality, diversity and SIGFM/template processing. Optional
+image-choice `0x20`, auxiliary B0 and final auxiliary `0x34` are skipped. The
+software finger-down state is cleared; a zero mask itself does not count as a
+quality pass. An accepted sample advances at most one stage. Extraction/quality
+failure keeps the existing terminal policy, while a diversity rejection can
+produce the existing visible retry within the normal 20-contact bound.
+
+For a nonterminal zero, the graph waits for the ordinary host next-sample
+request. A new `0x32` requires completed host evaluation, libfprint awaiting a
+finger, the A0 handler unwound, a valid local DOWN table, remaining contact
+budget, free OUT ownership and no cancellation/error/terminal fence. Permission
+is consumed once per transition. There is no timer-based permission, hidden
+retry or separate extra-contact loop.
+
+A terminal zero can finish enrollment without `0x32` or waiting for IRQ0200.
+Errors, including OUT32 failure with IN still pending, notify the context and
+follow its terminal fence, cancellation and drain path. Old-generation or
+post-fence callbacks cannot change state. If strict recovery is unavailable,
+an exact valid zero retains a typed unusable-contact diagnosis and terminal
+GENERAL error without additional acquisition. Malformed frames and incompatible
+states remain protocol errors.
+
+#### Bounded late-release handling
+
+After a nonterminal zero enters primary processing, a host stale-release window
+remains open until the first valid IRQ0002 after actual `0x32` completion and
+ACK32. Within this window, one exact `control=0x34 / IRQ=0x0200 / flags=0`, with
+valid checksum, body and bounded raw words, is consumed as the previous contact's
+release. This exception also applies while host processing or OUT32 is pending
+and after ACK32. It changes no FDT, sample, stage, retry or contact callback and
+sends no command. A second such release fails closed. IRQ0002 before effective
+32/ACK and malformed or incompatible events fail closed.
+
+The first valid new IRQ0002 closes this window. Subsequent IRQ0200 is handled
+only by the ordinary graph and fails in an incompatible slot. There is no
+proved contact/request identifier in the wire event: an old release arriving in
+the new contact's ordinary release slot can be indistinguishable from a current
+release and can be accepted as current. The boundary is a bounded host rule,
+not a firmware barrier. A timeout, silent interval, drained host queue or fresh
+software generation does not resolve this ambiguity. Cross-action firmware
+release separation is likewise not proved by memory/ownership isolation.
+
+The normal libfprint progress/completion callbacks carry the result to fprintd
+and KDE. An accepted zero sample continues the same enrollment without a
+synthetic retry or error-status substitution. The diagnostic fallback uses
+terminal GENERAL: stock fprintd maps it to `enroll-unknown-error` rather than
+forwarding the detailed driver message. A terminal retry would be misleading
+for the examined KDE consumer, which treats retry status as a request for
+another scan despite the completion flag. Driver-specific causes belong in
+metadata diagnostics, not fabricated UI success.
 
 ## 8. Image decoding and preprocessing
 
@@ -1218,6 +1308,8 @@ and available telemetry.
 | --- | --- | --- |
 | Public install | Complete build/import/install passed on fresh and updated Fedora 44 KDE VM and physical target, SELinux Enforcing | One distribution/release, architecture, reader, and application |
 | Enrollment/verification | Enrollment completed; registered finger matched; wrong finger produced clean no-match | Functional evidence, not statistical accuracy |
+| Enrollment zero-mask recovery | A zero-mask third contact preserved its primary, skipped optional/auxiliary acquisition, issued one next 0x32 and completed the same enrollment at 8 stages/8 contacts; final audit showed persistent=0/outstanding=0/drained=1/context_closed=1 | One observed recovery with no late IRQ0200; no general stale-release guarantee |
+| Enrollment regression checks | Ordinary enrollment, verification and duplicate detection were manually reported successful with the recovery enabled | Operator observations; no new multi-user or statistical qualification |
 | Plasma Login | Empty-field fingerprint selection and immediate nonempty-password path reached desktop | Current Fedora vendor PAM layout |
 | KScreenLocker | Password and fingerprint unlock reached desktop | Qualified stock policy only |
 | Ordinary sudo | Password and fingerprint authentication succeeded | Login-shell and all command variants not separately qualified |
@@ -1248,6 +1340,7 @@ and normal/emergency removal with substituted privileged operations.
 | Account cleanup is not automated | Username rename/delete/reuse requires deliberate template management |
 | Hotplug and physical removal | Disconnect/reconnect during an action or lifecycle operation is not qualified |
 | Concurrency beyond stock serialization | Competing low-level clients or bypass of fprintd's claim model is not qualified |
+| Late IRQ0200 after zero-mask recovery | One release before the valid new IRQ2 is consumed passively; same-byte stale/current release in a later compatible slot is not distinguishable (section 7.4) |
 | Fault/stale-traffic stress | Process crash, injected faults, and exhaustive late-byte or cross-generation stress are not qualified |
 | SELinux audit suppression is type-based | The known denied read tuple can be hidden even when caused by a future process path |
 | Factory/Windows proof is incomplete | No exhaustive factory readback, Windows campaign, power-loss campaign, or future-update guarantee |
@@ -1270,7 +1363,7 @@ matching.
 | Material rejected | Staging/import contract | Exact validator error and file metadata, never file contents |
 | TLS/bootstrap failure | Target binding or protocol phase | Exact phase/error name with protected bytes redacted |
 | Capture but processing error | Image bounds/preprocessing/template parser | Error class and action, never image/template data |
-| Enrollment A0 mismatch after accepted contacts | Expected enrollment event and contextual FDT flags | Exact mismatch, contact/stage counters and cleanup audit; see §20.3 |
+| Enrollment A0 mismatch after accepted contacts | Expected enrollment event and contextual FDT flags | Exact mismatch, contact/stage counters and cleanup audit; see section 20.3 |
 | Clean no-match | Biometric result | Which explicit attempt and enrolled finger label; do not recast as transport failure |
 | Plasma password works, fingerprint path does not | Empty-field selection, PAM compatibility, preparation timing | Whether input was empty and the first non-secret PAM/fprintd error |
 | Other consumers omit fingerprint | Fedora authselect/PAM policy | Current host policy; no manual project workaround |
@@ -1301,236 +1394,34 @@ Do **not** share the material directory, manifest, transport material, OEM DLL,
 FDT cache, configuration payload, raw USB captures, fingerprint images,
 templates, core dumps containing them, or unredacted secret-bearing logs.
 
-### 20.3 A0 rejection diagnostics
+### 20.3 A0 and enrollment recovery diagnostics
 
-Historically, `expected IRQ0100`, `control 0x36`, `IRQ 0x0100` and
-`flags 0x0000` exposed the repeated-contact nonzero-mask rejection after primary
-B0 and before auxiliary acquisition/deferred sample delivery. Earlier keypoint
-counts did not establish the held primary's quality. Phase E recognizes an exact
-valid zero through an explicit recovery branch, without widening the ordinary
-parser predicate (which would incorrectly allow optional20). Phase D's specific
-terminal diagnosis remains the fallback when strict recovery is unavailable.
+Enrollment mismatch diagnostics identify the expected event, observed control,
+classified IRQ/flags and contextual flag policy, with contact/stage counts.
+`pending_primary` is an accounting indicator: observed primary samples exceed
+completed plus retry stages. It is not direct buffer inspection. At the repeated
+IRQ0100 slot it identifies a primary not yet delivered; earlier keypoint counts
+describe earlier samples and do not establish this sample's quality.
 
-The mismatch suffix names the rejection reason and contextual flag policy,
-with contact/stage counts. `pending_primary` is an accounting indicator:
-observed primary samples exceed completed plus retry stages. It is not a
-buffer inspection. In the production deferred-delivery path at IRQ0100, this
-identifies a primary not yet delivered; rejection follows the existing error
-cleanup without acquiring an auxiliary image or rearming the graph.
+The `unexpected post-TLS A0 frame or state` error instead reports the
+preparation/capture phase, expected event, control, body length, classified
+IRQ/flags, ACK state, FDT reading count, baseline readiness and rejection.
+Only `0x32`, `0x34` and `0x36` with exact IRQ body shape are classified as IRQs;
+opaque AE controller-state bytes are not printed as IRQ data. A zero bootstrap
+mask can still fail material or delta checks. Without phase and rejected-frame
+metadata, a generic A0 error does not establish a common cause across these paths.
 
-The production epoch audit's `rejected` field counts rejected actions, not A0
-frames or poor-quality images. `enroll_contacts` counts observed primary B0
-samples, `enroll_stages` counts completed stages, and `enroll_retry_scans`
-counts retry stages. A failure with one more contact than completed stages is
-consistent with the current sample being held before delivery.
-
-The separate `unexpected post-TLS A0 frame or state` error comes from the
-preparation/capture lifecycle. Its diagnostic suffix reports the phase,
-expected event, control, body length, classified IRQ/flags, ACK state,
-number of recorded FDT readings, baseline readiness, and rejection decision.
-Only controls `0x32`, `0x34` and `0x36` with the exact IRQ body shape are
-classified as IRQs; opaque AE controller-state bytes are never printed as
-IRQ data. A correct zero baseline mask can still fail a material or delta
-check. Without the phase and rejected-frame metadata, the older generic
-message cannot establish the failed predicate or a common cause with the
-enrollment contact-mask rejection.
-
-The diagnostic suffixes preserve their existing fail-closed paths. They emit no FDT readings, image, template or protected-material
-bytes. Synthetic regressions establish rejection and cleanup behavior; they
-do not qualify a recovery transition on the reader.
-
-### 20.4 Limits of the OEM zero-mask recovery evidence
-
-Static analysis of the qualified OEM driver links `PID_5125` to project
-selector 8. The preserved APP12509 target trace reports chip ID `0x2504`,
-which the OEM maps to sensor type 12, one of the engine's eligible enrollment
-types. Its `OnRetryCaptureIMG` handler (IOCTL `0x442140`) has a channel-count
-branch for request type 0: when its finger-down state is set, it requests a manual FDT
-sample and counts the returned touch-mask bits. For project 8, command `0x20`
-requires a count greater than five, finger-down state, and an available retry
-slot. A zero mask skips that acquisition, clears the software finger-down
-state and returns status to the caller. A subsequent `0x32` is conditional on
-another pending request. These are request-specific OEM rules, not a new
-Linux acceptance policy or proof that zero is a physical finger-up event.
-
-The OEM engine contains an enrollment image-selection caller of that request.
-On the zero/finger-up result, that caller stops supplementary image selection
-without replacing the already preprocessed primary. This narrows the likely
-recovery direction: keeping the primary and skipping an auxiliary acquisition
-is materially different from discarding the contact or sending a libfprint
-retry. The option defaults to enabled but permits configuration overrides;
-its effective registry value is not present in a USB trace. On chip `0x2504`,
-the primary capture bypasses a separate manual-sample path that would refine
-the up table. The retry IRQ0100 path instead invokes the down-table helper.
-That distinction rules out assuming that the current Linux FDT table can
-simply remain unchanged when `0x20` is skipped.
-
-The preserved APP12509 capture corpus contains zero IRQ0100 masks in bootstrap
-and nonzero masks in repeated enrollment; it does not contain an OEM enrollment
-zero-mask recovery trace. A related APP12508 source implementation corroborates
-per-channel FDT semantics but cannot fill that target-specific gap. Phase E now
-implements the OEM host behavior under the user's explicit, limited risk
-acceptance; section 20.6 describes the candidate and its offline verification.
-
-The first34 is already armed when manual36 runs. The OEM host resets/waits for
-manual completion without draining the independent0200 event; its dispatcher
-handles releases separately. This does not establish which releases firmware
-may emit across the mode change. Phase E permits one exact passive late release
-before the first valid newly armed IRQ2 and no others outside the normal graph.
-It never updates an in-flight32 table or delivers that primary again.
-
-The [late-release contract](docs/ENROLLMENT_ZERO_MASK_CONTRACT.md) retains the
-Phase B identical-old/current-byte counterexample and stronger historical model.
-That model cannot rearm because no firmware fence/correlator is established.
-Phase E runtime tests cover the newly authorized host rule; their success is not
-a proof of firmware separation. The skipped image-choice auxiliary is distinct
-from the OEM release consumer's conditional background refresh; Phase E adds
-neither auxiliary capture nor a background refresh.
-
-### 20.5 Isolated zero-mask observation probe
-
-The [manual operator kit](operator_kit/phase-c-zero-mask/README.md) builds a
-separate diagnostic library with `GOODIX_ENABLE_ZERO_MASK_PROBE`. Its device
-API must be explicitly enabled before open, and is consumed by one action;
-only ENROLL can enable the binding interception. Production builds omit this
-observation code and use the Phase E recovery or Phase D fallback described below. No normal KDE/fprintd
-configuration activates the probe.
-
-At the repeated-contact IRQ0100 slot, a checksum-valid control36/body 16 with
-flags zero and all six `(word >> 1)` values in1–254 freezes the enrollment
-graph before its normal parser. A backend latch forbids every further OUT,
-including20/32, and refuses generation/audit reuse until destruction. The held
-primary is discarded at cleanup, not delivered. IN continues for at most four
-subsequent A0 events or three seconds. IRQ0200 is counted without state/FDT
-updates; other or invalid events stop observation. Concatenated packets obey
-the same event budget. Timeout is only a termination bound, not a firmware
-barrier. Structured metadata and the final drain/close result are logged.
-
-The standalone runner requests one enrollment, cancels after120s, closes the
-device and never serializes a print. The kit stages only in `/run`, excludes
-fprintd with a temporary runtime mask, requires human review before a second
-manual run, and provides symmetric collection/rollback. No live behavior or
-late-IRQ ownership guarantee follows from the synthetic tests.
-
-Public offline entrypoint: `libfprint-driver/tests/run_goodix_zero_mask_probe_test.sh`.
-It runs normal and ASan/UBSan variants using synthetic USB, the actual libfprint
-core, parser/graph entry checks and mocked deployment operations. LeakSanitizer
-is disabled in the SDK sandbox; object drain/free and action isolation are
-asserted directly. Live cancellation latency remains to be measured.
-
-Two human-operated runs subsequently reached valid `36/0100/0000`, body length
-16, `out_pending=0` and `generation=1`, with `raw_valid=1` and
-`fdt_candidate_valid=1`. Run 1
-reached the signature after two accepted stages and three acquired contacts;
-run 2 reached it after one accepted stage and two acquired contacts. Both probe
-audits recorded no subsequent A0 in the configured 3000 ms observation window,
-no IRQ0200 or other IRQ, and zero new OUT, 0x20, 0x32, rearm or contact. Both
-closed with `outstanding=0`, `drained=1`, `context_closed=1` and close success.
-The diagnostic action
-itself failed intentionally; this was not successful enrollment. Cumulative
-rearm counts from earlier ordinary contacts are distinct from the zero
-after-zero counts.
-
-Run 1's evidence archive is the supplied original collection with a payload
-manifest. It also contains a run 2 log, contrary to its description as collected
-immediately after run 1; the exact collection chronology is unresolved. The
-separate run 2 archive explicitly declares reconstruction from terminal output
-and remains secondary corroborating evidence. Its process/probe records match
-the run 2 log in the original archive. Only their final wrapper records differ:
-the original file records process exit 0, whereas the reconstructed terminal
-output includes the wrapper's stop/path lines. The manifest matches the
-retained Phase C payload and all 327 source-inventory entries at the Phase C
-commit. No raw biometric, frame or material data is needed for this comparison.
-
-These audits establish clean closure for the two observed runs, not a general
-latency bound or independent wire-level verification. They report a configured
-three-second window without a separate timestamp on zero entry. Silence during
-either window is not a firmware release barrier and does not qualify a new 0x32.
-
-### 20.6 Phase E functional recovery, Phase D fallback and release risk
-
-The production ENROLL branch now recovers the exact repeated-contact zero
-signature: expected IRQ0100, no pending OUT, held primary, control36/body 16,
-valid checksum, flags0 and all six raw words satisfying `1 <= word >> 1 <= 254`.
-A temporary 12-byte DOWN candidate is fully validated before atomic commit.
-The held primary enters ordinary quality/diversity/SIGFM processing once;
-optional20, auxiliary B0 and final auxiliary34 are skipped. Software finger-down
-is cleared. Accepted stages advance at most once; quality errors and visible
-diversity retries retain existing policy and the 20-contact bound.
-
-The graph then waits for the normal libfprint next-sample request after host
-processing, with reentrant A0 handling unwound. Only one32 can be submitted for a
-nonterminal transition, with free OUT ownership and no cancel/error. A terminal
-zero closes normally without32 or waiting for0200. There is no hidden retry,
-automatic extra-contact policy or timer that grants rearm. An OUT32 failure
-closes the zero window and explicitly propagates error to the context even if
-IN is pending, ensuring terminal completion and drain.
-
-For nonterminal zero, one exact34/0200/flags0 with valid body/checksum/raw is
-consumed passively before the first valid newly armed IRQ2. This applies while
-waiting for host evaluation, during OUT32 and after ACK32. It changes no FDT,
-sample, stage, retry, callback or command. A second such release fails closed.
-IRQ2 before actual32/ACK fails closed. The first valid IRQ2 closes the window;
-subsequent0200 uses only the ordinary graph. Late callbacks after a terminal
-fence or from an old generation cannot modify state.
-
-This is an explicitly authorized **host boundary**, not a proved firmware fence.
-A stale0200 arriving in the new contact's compatible release slot can have the
-same bytes as a current release and can be accepted as current. The general
-issue remains open. The OEM host reconstruction and the two silent Phase C
-observations justify the user's decision to test a bounded, reversible candidate;
-silence, cleanup or a fresh generation never proves release separation.
-
-Phase D remains a diagnostic fallback if strict recovery prerequisites are
-unavailable: typed unusable-contact error → terminal GENERAL → fence/cancel/drain,
-without primary delivery or new acquisition. Malformed/reserved/wrong-phase
-inputs remain failures. The [consumer review](docs/ENROLLMENT_ZERO_MASK_UX.md)
-explains why a terminal retry enum would mislead the examined stock KDE UI.
-Fallback still appears as generic `enroll-unknown-error`; valid Phase E recovery
-instead uses ordinary progress and is expected to avoid the red error for an
-accepted sample. This expectation is **not yet live-validated**. No KDE/fprintd,
-PAM, global FDT, bootstrap, VERIFY or IDENTIFY behavior is rewritten.
-
-```text
-FUNCTIONAL_RECOVERY_IMPLEMENTED=YES
-SEPARATE_PROTOCOL_ISSUE=OPEN
-DEVICE_RELEASE_BARRIER_PROVEN=0
-PRIMARY_MAX_DELIVERY=1
-STAGE_MAX_INCREMENT=1
-AFTER_ZERO_0x20=0
-AFTER_ZERO_AUX_B0=0
-AFTER_ZERO_FINAL_AUX_34=0
-AFTER_ZERO_HIDDEN_RETRY=0
-AFTER_ZERO_0x32=one normal request if needed; zero on terminal/error/cancel
-LIVE_VALIDATED=0
-```
-
-Offline normal and combined ASan/UBSan validation passes60 A0/binding cases,
-58 image-device cases and 68 with the probe compiled. Supplementary internal
-full-TLS/SIGFM regressions pass 53 cases, including zero quality rejection,
-diversity retry, duplicate precheck, VERIFY, IDENTIFY, handoff and zero→ordinary
-synthetic template epochs. No live multi-user storage/authorization claim follows.
-LeakSanitizer is disabled in the existing SDK runners; ownership/drain checks
-remain enabled. The historical 23 Phase B specification tests retain their
-stronger no-rearm contract. The native production build passes ABI, host-test
-symbol exclusion, material and PAM mock checks; the existing exported audit
-layout is unchanged. Independent review accepted runtime and kit after local
-correctives for OUT32 failure notification and interrupted restoration.
-
-The [Phase E operator kit](operator_kit/phase-e-zero-mask/README.md) swaps only
-the candidate runtime, preserves the exact prior directory and supports symmetric
-rollback, including interrupted swaps and cleanup. Its 13 mock tests pass without
-root/USB. It provides metadata collection for zero-specific primary/command/rearm
-counts and final outstanding0/drained1/context_closed1. General epoch rearm counts
-include ordinary contacts; the zero-specific records are separate and do not
-constitute an independent wire trace.
-
-The candidate is built, not installed. Only the human operator performs install,
-one targeted little-finger enrollment, collection and optional follow-up ordinary
-enrollment/verify/duplicate checks. No zero means inconclusive; unexpected error,
-command or incomplete cleanup means stop and rollback. On PASS the validated
-candidate can remain installed. All factory/persistence and Windows compatibility
-invariants remain unchanged.
+`GOODIX_ZERO_MASK_RECOVERY` records primary preservation, omitted optional
+commands, re-arm and passive late-release counts. Its closed-record totals are
+cumulative within the action and must be correlated with individual sample
+records. The general epoch audit's `enroll_rearm32` also includes ordinary
+contacts, whereas `rejected` counts rejected actions, not frames or poor images.
+`enroll_contacts`, `enroll_stages` and `enroll_retry_scans` count acquired primary
+images, completed stages and retry stages respectively. After client Release,
+`outstanding=0`, `drained=1`, `context_closed=1` and `persistent=0` report host
+cleanup and command-family accounting. These records contain no raw FDT/image/
+template/material bytes and are not an independent USB trace or exhaustive
+factory-state readback.
 
 ## 21. Developer invariants, licensing, and references
 

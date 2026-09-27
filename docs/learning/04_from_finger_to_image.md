@@ -83,7 +83,7 @@ or authentication result.
 
 ## The release tail matters
 
-After the main image, the protocol still has work to do. The reader reports a
+After the main image, the ordinary capture path still has work to do. The reader reports a
 finger-up event, and the driver completes a bounded release sequence. It
 refreshes the finger-detection state, consumes protocol-internal data, and only
 then tells `libfprint` that the finger is gone.
@@ -100,6 +100,11 @@ image received
    + release sequence complete
    = safe contact boundary
 ```
+
+Enrollment also has a specific zero-mask path that can finish a contact without
+a separate release notification. Its normal sample checks and bounded late-event
+handling are described in [the enrollment chapter](06_enrollment.md#why-lifting-the-finger-matters)
+and the [technical manual](../../TECHNICAL_MANUAL.md#74-enrollment-zero-mask-recovery).
 
 ## An image is not recognition
 
@@ -125,7 +130,7 @@ The next chapter crosses that boundary.
 - A no-finger baseline helps the reader notice a real contact.
 - The image crosses USB inside the secure session.
 - The driver validates and decodes bytes into an 80×64 raster.
-- Capture is not complete until the finger-release sequence is safely finished.
+- Receiving the image does not by itself complete the contact protocol.
 - A decoded image still does not mean the person has been recognized.
 
 ---

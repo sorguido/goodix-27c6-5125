@@ -110,7 +110,7 @@ use it only where the current Fedora policy enables it.
 
 The project keeps Fedora's service command and D-Bus interface. A narrow service
 drop-in makes stock `fprintd` load the Goodix-enabled library. The architecture
-is summarized in the [Technical manual](../../TECHNICAL_MANUAL.md#architecture).
+is summarized in the [Technical manual](../../TECHNICAL_MANUAL.md#3-system-architecture-and-ownership).
 
 The small Plasma Login selector lives under
 [`deployment/plasma-login-opt-in/`](../../deployment/plasma-login-opt-in/).

@@ -20,7 +20,7 @@ local_fp="$root/reference/libfprint-fedora44-1.94.100/source/libfprint"
 cflags=$(pkg-config --cflags glib-2.0 gio-2.0 gobject-2.0)
 libs=$(pkg-config --libs glib-2.0 gio-2.0 gobject-2.0)
 includes="-I$build -I$script_dir/support -I$root/libfprint-driver -I$local_fp -I$local_fp/.. -I$local_fp/nbis/include -I$local_fp/nbis/libfprint-include -I$root/Rockytkg/libfprint/libfprint"
-strict="-std=gnu11 -O2 -g -DGOODIX_ENABLE_TEST_SEAMS -DGOODIX_ENABLE_ZERO_MASK_PROBE -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion"
+strict="-std=gnu11 -O2 -g -DGOODIX_ENABLE_TEST_SEAMS -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion"
 python3 "$script_dir/support/generate_libfprint_enums.py" \
   --identifier-prefix Fp --symbol-prefix fp --header-guard FP_ENUMS_H \
   --header-name fp-enums.h --output-header "$build/fp-enums.h" \

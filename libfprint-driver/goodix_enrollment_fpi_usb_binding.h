@@ -13,19 +13,6 @@ typedef void (*GoodixEnrollmentFpiUsbErrorFunc) (
 void goodix_enrollment_fpi_usb_binding_set_error_callback (
   GoodixEnrollmentFpiUsbBinding *binding,
   GoodixEnrollmentFpiUsbErrorFunc failed, gpointer user_data);
-#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-#define GOODIX_ZERO_MASK_MAX_EVENTS 4u
-#define GOODIX_ZERO_MASK_WINDOW_MS 3000u
-typedef struct {
-  gboolean zero_seen;
-  guint observed_events, irq0200_count, other_irq_count;
-  guint64 out_count_at_zero;
-  gint64 deadline;
-} GoodixZeroMaskProbeAudit;
-void goodix_enrollment_fpi_usb_binding_enable_probe (GoodixEnrollmentFpiUsbBinding *binding);
-const GoodixZeroMaskProbeAudit *goodix_enrollment_fpi_usb_binding_probe_audit (
-  const GoodixEnrollmentFpiUsbBinding *binding);
-#endif
 
 typedef gboolean (*GoodixEnrollmentFpiUsbReadyFunc) (
   GoodixEnrollmentFpiUsbBinding *binding,

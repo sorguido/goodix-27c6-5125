@@ -5,10 +5,6 @@
 typedef struct _FpDevice FpDevice;
 typedef struct _GoodixUsbRouter GoodixUsbRouter;
 typedef struct _GoodixFpiUsbBackend GoodixFpiUsbBackend;
-#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
-gboolean goodix_fpi_usb_backend_probe_fence_out (GoodixFpiUsbBackend *backend);
-#endif
-
 
 typedef enum { GOODIX_USB_TRANSFER_IN, GOODIX_USB_TRANSFER_OUT } GoodixUsbDirection;
 typedef enum

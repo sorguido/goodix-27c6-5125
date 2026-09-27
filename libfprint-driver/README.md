@@ -24,17 +24,27 @@ than an LGPL-only work. See `docs/LICENSING_AND_PROVENANCE.md`.
 No file in this directory contains firmware, a PSK, factory data, a real
 fingerprint sample, a template, or a private capture.
 
-Synthetic A0 regressions run with `sh tests/run_goodix_enrollment_a0_test.sh`
-and `sh tests/run_goodix_post_tls_test.sh` from this directory. Both run normal
-and ASan/UBSan builds using the public source tree, without a reader or real
-materials. The enrollment suite preserves zero-mask rejection at repeated
-contacts and checks that the rejected event does not deliver the pending
-primary, send an auxiliary acquisition, or rearm. These tests do not establish
-the correct recovery sequence on hardware.
+Synthetic enrollment parser/binding regressions run with
+`sh tests/run_goodix_enrollment_a0_test.sh`; preparation/capture lifecycle checks
+run with `sh tests/run_goodix_post_tls_test.sh` from this directory. Both run
+normal and ASan/UBSan builds without a reader or real materials. Enrollment
+coverage includes primary ownership, zero-mask continuation, omitted auxiliary
+commands, bounded late releases, raw bounds, cancellation and terminal cleanup.
+The low-level binding suite also checks diagnostic fallback when recovery is not
+enabled. Runtime semantics and qualification limits are described in the
+[technical manual](../TECHNICAL_MANUAL.md#74-enrollment-zero-mask-recovery).
 
-The separate [zero-mask contract](../docs/ENROLLMENT_ZERO_MASK_CONTRACT.md)
-has a Python standard-library specification model under `tests/spec/`.
-Run `python3 -I -B tests/spec/test_irq0200_late_contract.py` from this directory.
-It is not linked into the driver or production tests and intentionally leaves
-rearm blocked while the device release boundary is unproved. Its passing tests
-do not change or qualify runtime acceptance of zero flags.
+The image-device integration runner accepts the source root and a fresh build
+directory. With the required compiler/GLib/OpenSSL development tools available,
+run from this directory:
+
+```sh
+GOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE_TEST=1 \
+  sh tests/run_goodix_fpimage_device_test_inner.sh "$(pwd)/.." \
+  "$(mktemp -d /tmp/goodix-image-device-test.XXXXXX)"
+```
+
+This exercises actual libfprint actions with synthetic transport and image
+processing seams, including asynchronous decisions and ownership/drain. It does
+not require private fixtures or establish real biometric accuracy. Build output
+stays in the temporary directory; no host runtime is installed.

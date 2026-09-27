@@ -20,8 +20,3 @@ byte-identical to the upstream archive.
 Upstream and Fedora source files retain their original per-file copyright and
 license notices. The downstream Goodix integration and imported components are
 described in [Licensing and provenance](../../docs/LICENSING_AND_PROVENANCE.md).
-
-The downstream version map also lists the diagnostic-only
-`goodix_fpimage_device_enable_zero_mask_probe` entrypoint. Its definition is
-compiled only in the separate operator-kit variant; ordinary builds do not
-export or activate it. No upstream implementation was imported for this probe.

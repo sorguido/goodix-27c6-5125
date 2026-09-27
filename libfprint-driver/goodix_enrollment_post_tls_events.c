@@ -236,7 +236,7 @@ parse_irq (const GoodixA0Message *message,
 }
 
 /* Only classify the observed repeated-contact signature after A0 checksum
- * validation. Conservative raw bounds match the diagnostic probe; no table is
+ * validation. Conservative raw bounds forbid wrapping or truncation; no table is
  * derived or installed, and zero does not mean physical release. */
 static gboolean
 is_unusable_zero_contact (const GoodixA0Message *message)

@@ -2,7 +2,6 @@ LIBFPRINT_2.0.0 {
 global:
 	fp_*;
 	goodix_fpimage_device_get_production_enrollment_audit;
-	goodix_fpimage_device_enable_zero_mask_probe;
 local:
 	*;
 };
