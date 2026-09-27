@@ -51,6 +51,12 @@ gboolean goodix_enrollment_fdt_state_resolve (
   gboolean                           timestamp_available,
   GoodixEnrollmentResolvedMaterial  *resolved,
   GError                           **error);
+/* Enrollment zero branch only; atomic strict 1..254 derivation, no wrap. */
+gboolean goodix_enrollment_fdt_state_observe_zero (
+  GoodixEnrollmentFdtState *state,
+  guint stage_index,
+  const guint8 raw[GOODIX_ENROLLMENT_FDT_TABLE_LENGTH],
+  GError **error);
 void goodix_enrollment_resolved_material_clear (
   GoodixEnrollmentResolvedMaterial *resolved);
 

@@ -1,28 +1,44 @@
 <!-- SPDX-License-Identifier: LGPL-2.1-or-later -->
-# Enrollment zero-mask: terminal diagnosis and consumer limits
+# Enrollment zero-mask: functional recovery and diagnostic fallback
 
-Phase D selects a **specific contact-unusable diagnosis followed by safe action
-termination**. It does not implement enrollment recovery. The current KDE
-consumer cannot display a terminal retry correctly, and stock fprintd does not
-forward a driver's detailed terminal error message to that UI. Claiming that an
-enum change fixes the visible enrollment failure would therefore be incorrect.
-
-The separate [late/stale IRQ0200 contract](ENROLLMENT_ZERO_MASK_CONTRACT.md)
-remains open. It does not prevent terminating the current action without another
-sensor command. The [technical manual](../TECHNICAL_MANUAL.md) records the live
-evidence and its provenance; this page records the API and consumer decision.
+Phase E preserves a valid zero-mask contact's primary and evaluates it through
+normal quality/diversity/SIGFM processing. An accepted nonterminal sample
+continues the same enrollment via one normal next-sample request; a terminal
+sample completes without waiting for IRQ0200. This is a runtime change, not an
+error-enum or UI-text change. KDE is expected to continue without a red error
+for an accepted zero-mask sample. **Phase E has not yet been validated live.**
 
 ```text
-SELECTED_STRATEGY=typed contact-unusable diagnosis; terminal abort
-FUNCTIONAL_RECOVERY_IMPLEMENTED=NO
-FUNCTIONAL_RECOVERY_BLOCKED_BY_SEPARATE_IRQ0200_ISSUE=YES
+SELECTED_STRATEGY=Phase E functional recovery under the limited host contract
+FUNCTIONAL_RECOVERY_IMPLEMENTED=YES
 SEPARATE_PROTOCOL_ISSUE=OPEN
-AFTER_ZERO_NEW_OUT=0
 AFTER_ZERO_0x20=0
-AFTER_ZERO_0x32=0
-AFTER_ZERO_REARM=0
+AFTER_ZERO_AUX_B0=0
+AFTER_ZERO_FINAL_AUX_34=0
+AFTER_ZERO_0x32=one normal request if needed; none on terminal/error/cancel
 AFTER_ZERO_HIDDEN_RETRY=0
+PRIMARY_MAX_DELIVERY=1
+STAGE_MAX_INCREMENT=1
 ```
+
+The [contract](ENROLLMENT_ZERO_MASK_CONTRACT.md) defines strict entry, atomic
+DOWN-table derivation, one passive late0200 before the first valid new IRQ2, and
+failure outside that window's rules. That IRQ2 is an explicitly accepted host
+boundary, not a demonstrated firmware fence. A same-byte stale0200 in the next
+ordinary release slot can remain indistinguishable from the current release.
+The [technical manual](../TECHNICAL_MANUAL.md) retains the Phase C observations
+and OEM evidence supporting this bounded candidate.
+
+A zero mask does not bypass quality checks. An extraction/quality failure keeps
+the project's terminal error policy; an ordinary diversity rejection keeps its
+visible retry policy and contact bound. Phase E adds no hidden sensor retry and
+manufactures no successful stage. The software finger-down transition permits
+the existing libfprint host decision to request the next sample after processing.
+
+Phase D's typed contact-unusable GENERAL remains a **fallback** when strict
+recovery prerequisites are unavailable. It is no longer the ordinary result of
+an eligible, valid zero contact. Its UI limitation and the alternatives examined
+in Phase D are retained below as historical consumer analysis.
 
 ## Reviewed stack and evidence
 
@@ -32,12 +48,11 @@ The review checked the installed Fedora 44 package versions: libfprint
 production libfprint source. The locally available fprintd reference's
 `src/device.c` was compared byte-for-byte with the official `v1.94.5` source.
 KDE conclusions use official `v6.7.5` sources, with relevant strings also present
-in the installed plugin. These are source-based expectations, pending live
-validation of Phase D. The versions are review provenance, not runtime pins.
+in the installed plugin. These are source-based expectations, from the Phase D review, without a live qualification of either Phase D or E. The versions are review provenance, not runtime pins.
 
-## Options considered
+## Phase D alternatives considered (historical fallback decision)
 
-| Option | Actual behavior | Decision |
+| Option | Actual behavior | Phase D decision |
 | --- | --- | --- |
 | 1. Classify zero-mask as a normal recoverable scan with `fpi_image_device_retry_scan()` | Enrollment progress reports retry, then the image-device state waits for finger removal and can return to waiting for another finger. The action remains open. | Reject: no demonstrated way to complete another contact without crossing the unresolved rearm boundary. |
 | 2. End enrollment with terminal `FP_DEVICE_RETRY` | Enrollment completion preserves the error domain; fprintd emits a retry status with `done=true`. KDE ignores `done` and presents this as another scan of the same enrollment. | Reject: the reader would be stopped while the UI invites a scan it cannot process. |
@@ -109,7 +124,7 @@ FPRINTD_RESULT=enroll-unknown-error; done=true; detailed cause in journal
 KDE_EXPECTED_BEHAVIOR=generic error and return to fingerprint list; no automatic retry
 ```
 
-## Selected boundary and manual restart
+## Phase D fallback boundary and manual restart
 
 The diagnostic applies only to the expected repeated-contact ENROLL
 `control=0x36 / IRQ=0x0100 / flags=0x0000`, with valid frame shape, checksum and
@@ -140,51 +155,48 @@ bootstrap path. No new automatic reopen behavior is added. Host close/open and
 drain are not a claimed firmware release barrier, and this review does not
 resolve late/stale IRQ0200 ownership.
 
-## Proposed live validation, not executed
+## Phase E manual live validation, not executed
 
-This is the prompt's Case B diagnostic outcome. The production build has been
-checked offline; a Phase D deployment and symmetric restoration of the previous
-runtime have not been prepared. The existing full installer and uninstaller
-are not such a pair: uninstall removes the integration rather than restoring
-the preceding build. The following describes a future validation scope, not a
-ready-to-run operator procedure.
+The [operator kit](../operator_kit/phase-e-zero-mask/README.md) is now prepared
+with manual installation, metadata collection and symmetric restoration of the
+previous runtime. The agent has built and checked the candidate offline and
+has not installed it, invoked sudo, opened USB or performed a live attempt.
 
-After offline checks and manual installation of the reviewed candidate, perform
-one manual enrollment through the normal consumer until the first target
-zero-mask, completion, cancellation or unexpected error; then stop. The target
-observation is the new explicit diagnostic followed by terminal cleanup, not
-successful recovery. Record whether KDE returns to the fingerprint list as
-expected and retain metadata-only logs identifying the candidate and outcome.
+Use one normal KDE enrollment and try the observed brief/poorly positioned
+little-finger contact after the first accepted sample. An actual logged zero
+must preserve the primary, skip20/auxiliary B0/final auxiliary34 and continue the
+same enrollment if host processing accepts it. Completion and the absence of a
+red error are human observations; metadata counters alone do not establish UX.
+No zero means the target behavior is inconclusive. Do not automatically repeat.
 
-At zero-mask, require no further OUT (including `0x20` and `0x32`), rearm,
-automatic contact, hidden retry or delivery of the held primary. Verify drained
-USB with no outstanding transfers and a closed context after client Release.
-Unexpected commands, continued acquisition or incomplete cleanup fail the test
-and require stopping before another attempt. If zero-mask is not reached, the
-specific Phase D behavior remains unvalidated; do not automatically repeat.
-Neither a quiet interval nor successful cleanup proves the separate IRQ0200
-contract. This proposed live test has not been executed by the agent.
+After targeted PASS, check one ordinary enrollment, verification and duplicate
+attempt through the normal consumer. A second profile requires human involvement
+and is optional. Preserve existing prints. Unexpected error, command/retry,
+stalled action or missing drain/close means stop, collect and roll back.
 
-The existing epoch audit has cumulative rearm counts, which can include earlier
-ordinary contacts. Those counts must not be interpreted as commands after zero.
-The specific terminal diagnostic and drain metadata are observable in the
-journal; they are not an independent per-command USB trace.
+The zero-specific sample/rearm/late-release/closed records distinguish the
+allowed post-zero activity. The existing epoch audit's cumulative rearm counter
+also includes earlier ordinary contacts and must not be interpreted as activity
+after zero. Require final `outstanding=0`, `drained=1`, `context_closed=1` and
+`persistent=0` after client Release. The counters are metadata, not an independent
+USB trace or firmware separation proof.
 
 ## Offline validation
 
-The final synthetic suites pass in normal and ASan/UBSan modes: 34 A0/graph
-cases, 55 image-device cases, 65 cases with the optional Phase C probe compiled,
-and 45 full TLS/stock-action cases. The zero-mask tests cover contacts 2, 4, 7
-and 8, raw-value bounds, cancellation, malformed input and terminal cleanup.
-They check no primary delivery or new acquisition, reject all 256 OUT controls
-after the fence, and assert drained transfers and closed context. Ordinary
-enrollment, VERIFY, IDENTIFY, duplicate precheck and distinct synthetic template
-epochs retain their regression results. Template-epoch isolation is not a live
-multi-user authorization or storage qualification.
+Normal and combined ASan/UBSan runs pass 60 A0/graph cases, 58 actual image-device
+cases and 68 with the optional Phase C probe compiled. They exercise successful
+zero at contacts 2/4/7/8, strict entry/raw bounds, ownership, terminal/cancel,
+late-release interleavings and failed32 cleanup. Supplementary internal
+full-TLS/SIGFM tests pass 53 cases in both modes, including zero-sample quality
+failure, visible diversity retry, ordinary enrollment, VERIFY, IDENTIFY,
+duplicate precheck, IDENTIFY→ENROLL handoff and distinct synthetic template
+epochs following zero recovery. This is not live multi-user storage/authorization
+qualification. SDK runners disable LeakSanitizer; explicit drain/free assertions
+remain active.
 
-The 23 independent Phase B specification tests still pass without a successful
-rearm transition. The native production payload builds with its ABI, material
-and PAM mock checks. The exported audit structure layout is unchanged. All
-tests run without real USB; LeakSanitizer is disabled by the SDK runners, while
-ASan/UBSan and explicit ownership/drain assertions remain active. These results
-do not qualify Phase D's live behavior or improve the stock KDE error text.
+The 23 Phase B model tests still demonstrate the stronger unresolved firmware
+contract and have no successful rearm; Phase E runtime tests exercise the newly
+authorized rule. The native production build checks ABI, test-symbol exclusion,
+materials and PAM mocks. The reversible kit passes 13 synthetic deployment tests.
+Independent runtime/kit review accepted the corrected candidate. No exported
+audit structure layout, fprintd consumer, KDE code or global FDT policy changes.

@@ -246,7 +246,9 @@ goodix_enrollment_model_feed (GoodixEnrollmentModel *model,
                            "enrollment model is already terminal");
       return FALSE;
     }
-  if (event != model->expected)
+  if (event != model->expected &&
+      !(event == GOODIX_ENROLLMENT_EVENT_ZERO_MASK_RECOVERY &&
+        model->expected == GOODIX_ENROLLMENT_EVENT_IRQ0100))
     return model_fail (model, GOODIX_ENROLLMENT_ERROR_PROTOCOL,
                        event, error);
 
@@ -314,6 +316,18 @@ goodix_enrollment_model_feed (GoodixEnrollmentModel *model,
       break;
     case GOODIX_ENROLLMENT_EVENT_IRQ0100:
       expect (model, GOODIX_ENROLLMENT_EVENT_COMMAND_20);
+      break;
+    case GOODIX_ENROLLMENT_EVENT_ZERO_MASK_RECOVERY:
+      /* Primary ownership and the normal callback's accept/retry/finish
+       * decision are unchanged. Only the optional auxiliary tail is skipped. */
+      if (model->observed_stage_count < 2u || !model->stage_delivery_pending ||
+          model->repeated_after_auxiliary)
+        return model_fail (model, GOODIX_ENROLLMENT_ERROR_STATE, event, error);
+      if (!deliver_pending_stage (model, error))
+        return FALSE;
+      if (model->transition == GOODIX_ENROLLMENT_TRANSITION_TERMINAL)
+        return finish (model, error);
+      expect (model, GOODIX_ENROLLMENT_EVENT_COMMAND_32);
       break;
     case GOODIX_ENROLLMENT_EVENT_COMMAND_20:
       expect (model, GOODIX_ENROLLMENT_EVENT_ACK_20);
@@ -460,7 +474,7 @@ goodix_enrollment_event_name (GoodixEnrollmentEvent event)
     "NONE", "IRQ2", "COMMAND_22", "ACK_22", "PRIMARY_B0",
     "COMMAND_34", "ACK_34", "IRQ0200", "COMMAND_20", "ACK_20",
     "AUXILIARY_B0", "COMMAND_32", "ACK_32", "COMMAND_50", "ACK_50",
-    "NAV", "COMMAND_36", "ACK_36", "IRQ0100"
+    "NAV", "COMMAND_36", "ACK_36", "IRQ0100", "ZERO_MASK_RECOVERY"
   };
   return (guint) event < G_N_ELEMENTS (names) ? names[event] : "UNKNOWN";
 }

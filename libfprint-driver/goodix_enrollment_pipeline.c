@@ -140,7 +140,10 @@ goodix_enrollment_pipeline_feed (GoodixEnrollmentPipeline *pipeline,
                            "enrollment image pipeline is already terminal");
       return FALSE;
     }
-  if (event != goodix_enrollment_model_get_expected_event (pipeline->model))
+  if (event != goodix_enrollment_model_get_expected_event (pipeline->model) &&
+      !(event == GOODIX_ENROLLMENT_EVENT_ZERO_MASK_RECOVERY &&
+        goodix_enrollment_model_get_expected_event (pipeline->model) ==
+          GOODIX_ENROLLMENT_EVENT_IRQ0100))
     {
       accepted = goodix_enrollment_model_feed (pipeline->model, event, error);
       g_assert (!accepted);

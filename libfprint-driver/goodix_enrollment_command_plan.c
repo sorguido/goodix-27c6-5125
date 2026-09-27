@@ -198,6 +198,7 @@ goodix_enrollment_command_plan_peek (const GoodixEnrollmentCommandPlan *plan,
     case GOODIX_ENROLLMENT_EVENT_NAV:
     case GOODIX_ENROLLMENT_EVENT_ACK_36:
     case GOODIX_ENROLLMENT_EVENT_IRQ0100:
+    case GOODIX_ENROLLMENT_EVENT_ZERO_MASK_RECOVERY:
       g_assert_not_reached ();
     }
   return TRUE;

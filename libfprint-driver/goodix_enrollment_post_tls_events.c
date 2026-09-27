@@ -27,6 +27,9 @@ struct _GoodixEnrollmentPostTlsEvents
   gpointer user_data;
   GByteArray *b0_pending;
   gboolean failed;
+  gboolean zero_eligible;
+  gboolean zero_enabled;
+  GoodixZeroMaskRecoveryAudit zero;
 };
 
 static void
@@ -61,6 +64,7 @@ events_fail (GoodixEnrollmentPostTlsEvents *events,
   if (events != NULL && !events->failed)
     {
       events->failed = TRUE;
+      goodix_enrollment_post_tls_events_close_zero_window (events);
       events->audit->failed = TRUE;
       /* A valid unusable contact is not protocol corruption. Keep the
        * exported audit layout stable; its reason travels in the GError. */
@@ -94,6 +98,10 @@ goodix_enrollment_post_tls_events_new (
       return NULL;
     }
   events = g_new0 (GoodixEnrollmentPostTlsEvents, 1);
+  events->zero_eligible = config != NULL &&
+    config->defer_intermediate_stage_delivery_until_release_ready &&
+    (config->defer_terminal_stage_delivery ||
+     config->defer_terminal_stage_delivery_until_release_ready);
   events->audit = audit != NULL ? audit : &events->internal_audit;
   *events->audit = (GoodixEnrollmentPostTlsEventsAudit) { 0 };
   events->auxiliary_ready = auxiliary_ready;
@@ -117,6 +125,11 @@ goodix_enrollment_post_tls_events_free (GoodixEnrollmentPostTlsEvents *events)
 {
   if (events == NULL)
     return;
+  if (events->zero.recovered_count != 0u)
+    g_message ("GOODIX_ZERO_MASK_RECOVERY event=closed recovered=%u "
+               "LATE_0200_COUNT=%u REARM32_COUNT=%u HIDDEN_RETRY=0",
+               events->zero.recovered_count, events->zero.late_release_count,
+               events->zero.rearm32_count);
   clear_pending (events->b0_pending);
   g_byte_array_unref (events->b0_pending);
   goodix_enrollment_lifecycle_adapter_free (events->lifecycle);
@@ -166,6 +179,7 @@ expected_ack_echo (GoodixEnrollmentEvent expected,
     case GOODIX_ENROLLMENT_EVENT_NAV:
     case GOODIX_ENROLLMENT_EVENT_COMMAND_36:
     case GOODIX_ENROLLMENT_EVENT_IRQ0100:
+    case GOODIX_ENROLLMENT_EVENT_ZERO_MASK_RECOVERY:
       return FALSE;
     }
   return FALSE;
@@ -239,6 +253,84 @@ is_unusable_zero_contact (const GoodixA0Message *message)
       if (value < 1u || value > 254u)
         return FALSE;
     }
+  return TRUE;
+}
+
+void
+goodix_enrollment_post_tls_events_enable_zero_recovery (
+  GoodixEnrollmentPostTlsEvents *events)
+{
+  g_return_if_fail (events != NULL && !events->failed &&
+                   events->audit->parsed_a0_count == 0u);
+  events->zero_enabled = events->zero_eligible;
+}
+
+const GoodixZeroMaskRecoveryAudit *
+goodix_enrollment_post_tls_events_zero_audit (const GoodixEnrollmentPostTlsEvents *events)
+{
+  return events != NULL ? &events->zero : NULL;
+}
+
+void
+goodix_enrollment_post_tls_events_close_zero_window (GoodixEnrollmentPostTlsEvents *events)
+{
+  if (events == NULL)
+    return;
+  events->zero.stale_window_open = FALSE;
+  events->zero.awaiting_sample_request = FALSE;
+  events->zero.late_seen = FALSE;
+}
+
+gboolean
+goodix_enrollment_post_tls_events_request_zero_sample (
+  GoodixEnrollmentPostTlsEvents *events, GError **error)
+{
+  if (events == NULL || events->failed || !events->zero.awaiting_sample_request ||
+      goodix_enrollment_post_tls_events_get_expected_event (events) !=
+        GOODIX_ENROLLMENT_EVENT_COMMAND_32)
+    return events_fail (events, GOODIX_ENROLLMENT_POST_TLS_ERROR_STATE,
+                        "zero-mask has no pending next-sample request", error);
+  events->zero.awaiting_sample_request = FALSE;
+  return TRUE;
+}
+
+gboolean
+goodix_enrollment_post_tls_events_consume_stale_release (
+  GoodixEnrollmentPostTlsEvents *events, GBytes *frame,
+  gboolean *handled, GError **error)
+{
+  GoodixA0Message message = { 0 };
+  gsize length;
+  const guint8 *wire = frame != NULL ? g_bytes_get_data (frame, &length) : NULL;
+  *handled = FALSE;
+  if (events == NULL || events->failed || !events->zero.stale_window_open ||
+      wire == NULL || length < 5u || wire[4] != 0x34)
+    return TRUE;
+  *handled = TRUE;
+  if (!goodix_a0_parse_frame (frame, 0x34, &message, error))
+    return events_fail (events, GOODIX_ENROLLMENT_POST_TLS_ERROR_FRAME,
+                        "malformed late release in zero-mask window", error);
+  /* Reuse exact zero/raw validation with the release's control and IRQ
+   * checked separately; the immutable input frame is never rewritten. */
+  gsize n;
+  const guint8 *body = g_bytes_get_data (message.body, &n);
+  gboolean valid = n == 16u && body[0] == 0 && body[1] == 2 &&
+                   body[2] == 0 && body[3] == 0;
+  for (guint i = 0; valid && i < GOODIX_FDT_CHANNEL_COUNT; i++)
+    {
+      guint value = ((guint) body[4u + 2u*i] | ((guint) body[5u + 2u*i] << 8)) >> 1;
+      valid = value >= 1u && value <= 254u;
+    }
+  goodix_a0_message_clear (&message);
+  if (!valid || events->zero.late_seen)
+    return events_fail (events, GOODIX_ENROLLMENT_POST_TLS_ERROR_EVENT,
+                        "invalid or duplicate late release in zero-mask window", error);
+  events->zero.late_seen = TRUE;
+  events->zero.late_release_count++;
+  events->audit->parsed_a0_count++;
+  g_message ("GOODIX_ZERO_MASK_RECOVERY event=late-release LATE_0200_COUNT=%u "
+             "sample_delivery=0 stage_increment=0 response_out=0",
+             events->zero.late_release_count);
   return TRUE;
 }
 
@@ -385,6 +477,8 @@ goodix_enrollment_post_tls_events_handle_a0 (
         events->lifecycle, expected, NULL, 0u, raw, 12u, touch_flags, error);
       if (accepted)
         {
+          events->zero.stale_window_open = FALSE;
+          events->zero.late_seen = FALSE;
           events->audit->irq2_count++;
           if (events->contact != NULL &&
               !events->contact (events->audit->irq2_count, TRUE,
@@ -397,6 +491,37 @@ goodix_enrollment_post_tls_events_handle_a0 (
   else if (expected == GOODIX_ENROLLMENT_EVENT_IRQ0100 &&
            is_unusable_zero_contact (&message))
     {
+      const GoodixEnrollmentModelAudit *p = &events->audit->lifecycle.plan.pipeline.protocol;
+      if (events->zero_enabled && !events->zero.stale_window_open &&
+          p->observed_primary_stage_count >= 2u &&
+          p->observed_primary_stage_count == p->completed_stage_count + p->retry_stage_count + 1u)
+        {
+          frame_matches_expected = TRUE;
+          accepted = goodix_enrollment_lifecycle_adapter_observe (
+            events->lifecycle, GOODIX_ENROLLMENT_EVENT_ZERO_MASK_RECOVERY,
+            NULL, 0u, body + 4u, 12u, 0u, error);
+          if (accepted)
+            {
+              events->audit->irq0100_count++;
+              events->zero.recovered_count++;
+              events->zero.stale_window_open =
+                !goodix_enrollment_lifecycle_adapter_is_complete (events->lifecycle);
+              events->zero.awaiting_sample_request = events->zero.stale_window_open;
+              events->zero.late_seen = FALSE;
+              if (events->contact != NULL)
+                {
+                  accepted = events->contact (p->observed_primary_stage_count,
+                    FALSE, events->contact_data, error);
+                  if (accepted)
+                    events->audit->finger_up_delivery_count++;
+                }
+              g_message ("GOODIX_ZERO_MASK_RECOVERY event=sample ZERO_MASK_RECOVERY=1 "
+                         "contact=%u PRIMARY_PRESERVED=1 OPTIONAL_20_SENT=0 AUX_B0_COUNT=0 "
+                         "FINAL_AUX_34_SENT=0 HIDDEN_RETRY=0 terminal=%u",
+                         p->observed_primary_stage_count, (guint) !events->zero.stale_window_open);
+            }
+          goto out;
+        }
       goodix_a0_message_clear (&message);
       /* Keep the pending primary undelivered. Returning FALSE freezes the
        * transaction before graph-ready submission; the owner cancels/drains. */
@@ -620,7 +745,8 @@ goodix_enrollment_post_tls_events_prepare (
   GoodixEnrollmentPreparedCommand *prepared,
   GError                          **error)
 {
-  if (events == NULL || events->failed || events->b0_pending->len != 0u)
+  if (events == NULL || events->failed || events->b0_pending->len != 0u ||
+      events->zero.awaiting_sample_request)
     return events_fail (events, GOODIX_ENROLLMENT_POST_TLS_ERROR_STATE,
                         "post-TLS event adapter is absent or terminal", error);
   if (!goodix_enrollment_lifecycle_adapter_prepare (
@@ -643,6 +769,13 @@ goodix_enrollment_post_tls_events_commit (
         events->lifecycle, command_event, error))
     return events_fail (events, GOODIX_ENROLLMENT_POST_TLS_ERROR_EVENT,
                         "enrollment command commit failed", error);
+  if (command_event == GOODIX_ENROLLMENT_EVENT_COMMAND_32 &&
+      events->zero.stale_window_open)
+    {
+      events->zero.rearm32_count++;
+      g_message ("GOODIX_ZERO_MASK_RECOVERY event=rearm REARM32_COUNT=%u HIDDEN_RETRY=0",
+                 events->zero.rearm32_count);
+    }
   return TRUE;
 }
 

@@ -113,6 +113,31 @@ gboolean goodix_enrollment_post_tls_events_is_complete (
 gboolean goodix_enrollment_post_tls_events_error_is_unusable_contact (
   const GError *error);
 
+/* Kept separate from the exported production audit layout. Counts refer only
+ * to zero-mask transitions, not ordinary enrollment contacts. */
+typedef struct
+{
+  guint recovered_count;
+  guint late_release_count;
+  guint rearm32_count;
+  gboolean stale_window_open;
+  gboolean late_seen;
+  gboolean awaiting_sample_request;
+} GoodixZeroMaskRecoveryAudit;
+void goodix_enrollment_post_tls_events_enable_zero_recovery (
+  GoodixEnrollmentPostTlsEvents *events);
+const GoodixZeroMaskRecoveryAudit *goodix_enrollment_post_tls_events_zero_audit (
+  const GoodixEnrollmentPostTlsEvents *events);
+void goodix_enrollment_post_tls_events_close_zero_window (
+  GoodixEnrollmentPostTlsEvents *events);
+gboolean goodix_enrollment_post_tls_events_request_zero_sample (
+  GoodixEnrollmentPostTlsEvents *events, GError **error);
+/* The sole passive exception to normal OUT ownership: no graph/FDT mutation,
+ * callback, command preparation or submission can occur in this function. */
+gboolean goodix_enrollment_post_tls_events_consume_stale_release (
+  GoodixEnrollmentPostTlsEvents *events, GBytes *frame,
+  gboolean *handled, GError **error);
+
 gboolean goodix_enrollment_post_tls_events_is_failed (
   const GoodixEnrollmentPostTlsEvents *events);
 

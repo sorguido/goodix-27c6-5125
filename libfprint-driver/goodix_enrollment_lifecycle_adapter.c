@@ -114,7 +114,8 @@ payload_contract_valid (GoodixEnrollmentEvent event,
            fdt_raw_length == GOODIX_ENROLLMENT_FDT_TABLE_LENGTH &&
            goodix_fdt_irq_flags_valid (GOODIX_FDT_FLAGS_FINGER_DOWN,
                                        fdt_touch_flags);
-  if (event == GOODIX_ENROLLMENT_EVENT_IRQ0200)
+  if (event == GOODIX_ENROLLMENT_EVENT_IRQ0200 ||
+      event == GOODIX_ENROLLMENT_EVENT_ZERO_MASK_RECOVERY)
     return samples == NULL && sample_count == 0u && fdt_raw != NULL &&
            fdt_raw_length == GOODIX_ENROLLMENT_FDT_TABLE_LENGTH &&
            goodix_fdt_irq_flags_valid (GOODIX_FDT_FLAGS_FINGER_UP,
@@ -159,6 +160,13 @@ goodix_enrollment_lifecycle_adapter_observe (
             adapter->fdt, stage + 1u, fdt_touch_flags, fdt_raw, error))
         return adapter_fail (adapter, GOODIX_ENROLLMENT_ADAPTER_ERROR_PROTOCOL,
                              "IRQ2 FDT state rejected the observation", error);
+    }
+  else if (event == GOODIX_ENROLLMENT_EVENT_ZERO_MASK_RECOVERY)
+    {
+      if (!goodix_enrollment_fdt_state_observe_zero (
+            adapter->fdt, stage, fdt_raw, error))
+        return adapter_fail (adapter, GOODIX_ENROLLMENT_ADAPTER_ERROR_PROTOCOL,
+                             "zero-mask FDT state rejected the observation", error);
     }
   else if (event == GOODIX_ENROLLMENT_EVENT_IRQ0200)
     {

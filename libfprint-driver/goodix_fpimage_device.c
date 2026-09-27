@@ -116,6 +116,7 @@ struct _GoodixDeviceContext
   guint                      terminal_enroll_completion_abort_count;
   gboolean                   terminal_enroll_completion_held;
   gboolean                   terminal_delivery_at_release_ready;
+  gboolean                   handling_enrollment_a0;
   gboolean                   production_action_consumed;
   FpiDeviceAction            production_action;
   guint                      production_action_attempt_count;
@@ -233,6 +234,7 @@ goodix_fpimage_device_set_context (GoodixFpImageDevice *self,
 }
 
 static void goodix_device_context_set_terminal_fence (GoodixDeviceContext *ctx);
+static void goodix_device_context_maybe_rearm (GoodixDeviceContext *ctx);
 static void goodix_device_context_set_poisoned (GoodixDeviceContext *ctx,
                                                 const GError        *error);
 static void emit_terminal (GoodixDeviceContext *ctx, GError *error);
@@ -649,6 +651,7 @@ static void context_a0_consumer (guint8 type, GBytes *frame, gpointer user_data)
       if (ctx->probe_enabled)
         goodix_enrollment_fpi_usb_binding_enable_probe (ctx->enrollment_binding);
 #endif
+      ctx->handling_enrollment_a0 = TRUE;
       if (!goodix_enrollment_fpi_usb_binding_handle_a0 (
             ctx->enrollment_binding, frame, &error))
         {
@@ -679,6 +682,9 @@ static void context_a0_consumer (guint8 type, GBytes *frame, gpointer user_data)
           fpi_image_device_release_enroll_completion (
             FP_IMAGE_DEVICE (ctx->device));
         }
+      ctx->handling_enrollment_a0 = FALSE;
+      if (!ctx->terminal_fence)
+        goodix_device_context_maybe_rearm (ctx);
 #ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
       if (!ctx->terminal_fence && ctx->probe_enabled && ctx->probe_deadline == 0 &&
           goodix_enrollment_fpi_usb_binding_probe_audit (ctx->enrollment_binding)->zero_seen)
@@ -1436,6 +1442,22 @@ goodix_device_context_maybe_rearm (GoodixDeviceContext *ctx)
 
   if (ctx->last_framework_state != FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_ON)
     return;
+
+  if (ctx->enrollment_binding != NULL)
+    {
+      const GoodixZeroMaskRecoveryAudit *zero =
+        goodix_enrollment_fpi_usb_binding_zero_audit (ctx->enrollment_binding);
+      if (!ctx->handling_enrollment_a0 && zero->awaiting_sample_request &&
+          !g_cancellable_is_cancelled (ctx->activation_cancellable) &&
+          fpi_device_get_current_action (FP_DEVICE (ctx->device)) == FPI_DEVICE_ACTION_ENROLL)
+        {
+          g_autoptr(GError) error = NULL;
+          if (!goodix_enrollment_fpi_usb_binding_request_zero_sample (
+                ctx->enrollment_binding, &error))
+            context_protocol_failure (ctx, error);
+        }
+      return;
+    }
 
   if (ctx->post_tls_lifecycle != NULL &&
       goodix_post_tls_lifecycle_get_phase (ctx->post_tls_lifecycle) !=
@@ -2746,7 +2768,15 @@ context_enrollment_ready (GoodixEnrollmentFpiUsbBinding *binding,
                            "enrollment receive continuation is not current");
       return FALSE;
     }
+  if (goodix_fpi_usb_backend_get_outstanding (ctx->fpi_usb_backend) != 0u)
+    return TRUE;
   return goodix_device_context_arm_receive (ctx, error);
+}
+
+static void
+context_enrollment_failed (const GError *error, gpointer user_data)
+{
+  context_protocol_failure (user_data, error);
 }
 
 static gboolean
@@ -2787,6 +2817,7 @@ context_enrollment_first_arm_handoff (GoodixPostTlsLifecycle *lifecycle,
     return FALSE;
   ctx->pending_enrollment_events = NULL;
   ctx->enrollment_binding = binding;
+  goodix_enrollment_fpi_usb_binding_set_error_callback (binding, context_enrollment_failed, ctx);
   return goodix_enrollment_fpi_usb_binding_set_ready_callback (
     binding, context_enrollment_ready, ctx, error);
 }
@@ -2894,6 +2925,9 @@ goodix_device_context_configure_enrollment_graph (
       return FALSE;
     }
   ctx->pending_enrollment_events = events;
+  if (!ctx->operator_epoch &&
+      fpi_device_get_current_action (FP_DEVICE (ctx->device)) == FPI_DEVICE_ACTION_ENROLL)
+    goodix_enrollment_post_tls_events_enable_zero_recovery (events);
   ctx->terminal_delivery_at_release_ready =
     config->defer_terminal_stage_delivery_until_release_ready;
   ctx->enrollment_auxiliary = auxiliary_ready;

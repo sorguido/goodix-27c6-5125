@@ -114,6 +114,33 @@ goodix_enrollment_fdt_state_observe_irq0200 (
 }
 
 gboolean
+goodix_enrollment_fdt_state_observe_zero (
+  GoodixEnrollmentFdtState *state,
+  guint stage_index,
+  const guint8 raw[GOODIX_ENROLLMENT_FDT_TABLE_LENGTH],
+  GError **error)
+{
+  guint8 candidate[GOODIX_ENROLLMENT_FDT_TABLE_LENGTH];
+  if (state == NULL || raw == NULL || stage_index < 2u || state->failed ||
+      state->current_stage != stage_index || state->up_stage != stage_index ||
+      state->down_stage + 1u != stage_index)
+    return fail (state, GOODIX_ENROLLMENT_FDT_ERROR_ORDER,
+                 "zero-mask FDT stage is not the pending repeated contact", error);
+  for (guint i = 0; i < GOODIX_FDT_CHANNEL_COUNT; i++)
+    {
+      guint value = ((guint) raw[2u * i] | ((guint) raw[2u * i + 1u] << 8)) >> 1;
+      if (value < 1u || value > 254u)
+        return fail (state, GOODIX_ENROLLMENT_FDT_ERROR_RANGE,
+                     "zero-mask FDT raw is outside 1..254", error);
+      candidate[2u * i] = 0x80;
+      candidate[2u * i + 1u] = (guint8) value;
+    }
+  memcpy (state->down_table, candidate, sizeof candidate);
+  state->down_stage = stage_index;
+  return TRUE;
+}
+
+gboolean
 goodix_enrollment_fdt_state_resolve (
   GoodixEnrollmentFdtState            *state,
   const GoodixEnrollmentCommandIntent *intent,

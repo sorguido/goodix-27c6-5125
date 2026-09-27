@@ -18,6 +18,9 @@ typedef struct
   guint images;
   guint commands[256];
   guint8 last_control;
+  guint8 last_out[64];
+  guint reject_from_stage;
+  guint fail_stage;
 } Fixture;
 
 static gboolean
@@ -30,6 +33,13 @@ image_ready (GoodixEnrollmentPipeline *pipeline, guint stage,
   g_assert_true (FP_IS_IMAGE (image));
   g_assert_cmpuint (stage, ==, f->images + 1u);
   f->images++;
+  if (stage == f->fail_stage)
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA, "synthetic quality failure");
+      return FALSE;
+    }
+  if (f->reject_from_stage != 0u && stage >= f->reject_from_stage)
+    return goodix_enrollment_pipeline_retry_current_stage (pipeline, error);
   return TRUE;
 }
 
@@ -66,13 +76,15 @@ submit_seam (GoodixFpiUsbBackend *backend, GoodixUsbDirection direction,
   g_assert_cmpuint (length, ==, GOODIX_ENROLLMENT_FIXED64_LENGTH);
   f->last_control = data[4];
   f->commands[data[4]]++;
+  memcpy (f->last_out, data, sizeof f->last_out);
 }
 
 static void
-fixture_init (Fixture *f)
+fixture_init_config (Fixture *f, guint max_contacts, gboolean recovery)
 {
   GoodixEnrollmentModelConfig config = {
     .required_stage_count = 8u,
+    .max_physical_stage_count = max_contacts,
     .defer_terminal_stage_delivery_until_release_ready = TRUE,
     .defer_intermediate_stage_delivery_until_release_ready = TRUE,
   };
@@ -87,10 +99,18 @@ fixture_init (Fixture *f)
   goodix_fpi_usb_backend_set_async_submit_seam (f->backend, submit_seam, f);
   f->events = goodix_enrollment_post_tls_events_new (
     &config, image_ready, timestamp_ready, auxiliary_ready, f, &f->audit, &error);
+  if (recovery)
+    goodix_enrollment_post_tls_events_enable_zero_recovery (f->events);
   f->binding = goodix_enrollment_fpi_usb_binding_new (
     f->events, f->backend, 7u, &f->binding_audit, &error);
   g_assert_no_error (error);
   g_assert_nonnull (f->binding);
+}
+
+static void
+fixture_init (Fixture *f)
+{
+  fixture_init_config (f, 0u, FALSE);
 }
 
 static void
@@ -518,6 +538,239 @@ test_probe_entry (gconstpointer data)
 }
 #endif
 
+static void
+reach_recovery (Fixture *f, guint stage, guint max_contacts)
+{
+  fixture_init_config (f, max_contacts, TRUE);
+  for (guint contact = 1u; contact < stage; contact++)
+    {
+      begin_contact (f, contact);
+      finish_contact (f, contact, 0x002f);
+    }
+  begin_contact (f, stage);
+}
+
+static void
+request_sample (Fixture *f)
+{
+  g_autoptr(GError) error = NULL;
+  g_assert_true (goodix_enrollment_fpi_usb_binding_request_zero_sample (f->binding, &error));
+  g_assert_no_error (error);
+}
+
+static void
+test_recovery_stage (gconstpointer data)
+{
+  guint stage = GPOINTER_TO_UINT (data);
+  Fixture f;
+  reach_recovery (&f, stage, 0u);
+  guint commands[256];
+  memcpy (commands, f.commands, sizeof commands);
+  guint aux = f.audit.auxiliary_b0_count;
+  accept_irq (&f, 0x36, 0x0100, 0u);
+  const GoodixZeroMaskRecoveryAudit *z = goodix_enrollment_fpi_usb_binding_zero_audit (f.binding);
+  g_assert_cmpuint (z->recovered_count, ==, 1u);
+  g_assert_cmpuint (f.images, ==, stage);
+  g_assert_cmpuint (f.audit.lifecycle.plan.pipeline.fpimage_delivery_count, ==, stage);
+  g_assert_cmpuint (f.audit.lifecycle.plan.pipeline.protocol.completed_stage_count, ==, stage);
+  g_assert_cmpuint (f.audit.auxiliary_b0_count, ==, aux);
+  g_assert_cmpmem (commands, sizeof commands, f.commands, sizeof f.commands);
+  if (stage == 8u)
+    {
+      g_assert_true (goodix_enrollment_fpi_usb_binding_is_complete (f.binding));
+      g_assert_false (z->stale_window_open);
+      g_assert_false (z->awaiting_sample_request);
+    }
+  else
+    {
+      g_assert_true (z->stale_window_open);
+      g_assert_true (z->awaiting_sample_request);
+      request_sample (&f);
+      commands[0x32]++;
+      g_assert_cmpmem (commands, sizeof commands, f.commands, sizeof f.commands);
+      ack (&f, 0x32);
+      g_assert_cmpuint (z->rearm32_count, ==, 1u);
+      begin_contact (&f, stage + 1u);
+      g_assert_false (z->stale_window_open);
+      finish_contact (&f, stage + 1u, 0x002f);
+      g_assert_cmpuint (f.images, ==, stage + 1u);
+      g_assert_cmpuint (z->rearm32_count, ==, 1u);
+    }
+  fixture_clear (&f);
+  fixture_init_config (&f, 0u, TRUE);
+  z = goodix_enrollment_fpi_usb_binding_zero_audit (f.binding);
+  g_assert_cmpuint (z->recovered_count, ==, 0u);
+  g_assert_false (z->stale_window_open);
+  fixture_clear (&f);
+}
+
+static void
+test_recovery_late (gconstpointer data)
+{
+  guint mode = GPOINTER_TO_UINT (data);
+  Fixture f;
+  g_autoptr(GBytes) late = irq_frame (0x34, 0x0200, 0, 16u);
+  g_autoptr(GError) error = NULL;
+  reach_recovery (&f, 2u, 0u);
+  accept_irq (&f, 0x36, 0x0100, 0u);
+  const GoodixZeroMaskRecoveryAudit *z = goodix_enrollment_fpi_usb_binding_zero_audit (f.binding);
+  guint commands[256];
+  if (mode != 0u && mode != 4u && mode != 5u)
+    request_sample (&f);
+  if (mode == 2u)
+    goodix_fpi_usb_backend_complete_out (f.backend, 7u, NULL);
+  if (mode == 3u || mode == 6u)
+    ack (&f, 0x32);
+  if (mode == 6u)
+    accept_irq (&f, 0x32, 0x0002, 0x002f);
+  memcpy (commands, f.commands, sizeof commands);
+  if (mode == 5u)
+    {
+      gsize n; const guint8 *b = g_bytes_get_data (late, &n);
+      guint8 *bad = g_memdup2 (b, n); bad[n - 1u] ^= 1u;
+      g_clear_pointer (&late, g_bytes_unref); late = g_bytes_new_take (bad, n);
+    }
+  if (mode == 5u || mode == 6u)
+    g_assert_false (goodix_enrollment_fpi_usb_binding_handle_a0 (f.binding, late, &error));
+  else
+    {
+      accept_a0 (&f, late);
+      g_assert_true (z->late_seen);
+      g_assert_cmpuint (z->late_release_count, ==, 1u);
+      if (mode == 4u)
+        g_assert_false (goodix_enrollment_fpi_usb_binding_handle_a0 (f.binding, late, &error));
+    }
+  g_assert_cmpmem (commands, sizeof commands, f.commands, sizeof f.commands);
+  g_assert_cmpuint (f.images, ==, 2u);
+  g_assert_cmpuint (f.audit.lifecycle.plan.pipeline.protocol.completed_stage_count, ==, 2u);
+  g_assert_cmpuint (f.audit.lifecycle.plan.pipeline.protocol.retry_stage_count, ==, 0u);
+  if (mode == 4u || mode == 5u || mode == 6u)
+    {
+      g_assert_nonnull (error);
+      g_assert_true (goodix_enrollment_fpi_usb_binding_is_failed (f.binding));
+      g_assert_false (z->stale_window_open);
+    }
+  else
+    {
+      /* Passive release does not request a sample or change the prepared FDT. */
+      if (mode == 0u) request_sample (&f);
+      if (mode == 2u)
+        { const guint8 b[] = {0x32, 1}; g_autoptr(GBytes) a = frame (0xb0, b, 2); accept_a0 (&f, a); }
+      else if (mode != 3u) ack (&f, 0x32);
+      begin_contact (&f, 3u);
+      g_assert_false (z->stale_window_open);
+      finish_contact (&f, 3u, 0x002f);
+    }
+  fixture_clear (&f);
+}
+
+static void
+test_recovery_bounds (gconstpointer data)
+{
+  guint16 word = (guint16) GPOINTER_TO_UINT (data);
+  gboolean valid = word >= 2u && word <= 0x01fdu;
+  for (guint i = 0; i < 6u; i++)
+    {
+      Fixture f;
+      g_autoptr(GError) error = NULL;
+      g_autoptr(GBytes) bytes = zero_mask_raw_frame (i, word);
+      reach_recovery (&f, 2u, 0u);
+      guint before = f.commands[0x32];
+      g_assert_cmpint (goodix_enrollment_fpi_usb_binding_handle_a0 (f.binding, bytes, &error), ==, valid);
+      g_assert_cmpuint (f.commands[0x32], ==, before);
+      if (valid)
+        {
+          request_sample (&f);
+          /* A0 inner body begins at7: 0801 then twelve candidate bytes. */
+          g_assert_cmphex (f.last_out[9u + i*2u], ==, 0x80);
+          g_assert_cmphex (f.last_out[10u + i*2u], ==, word >> 1);
+        }
+      else
+        {
+          g_assert_nonnull (error);
+          g_assert_cmpuint (f.images, ==, 1u);
+        }
+      fixture_clear (&f);
+    }
+}
+
+static void
+test_recovery_failures (gconstpointer data)
+{
+  const gchar *kind = data;
+  Fixture f;
+  g_autoptr(GError) error = NULL;
+  reach_recovery (&f, 2u, 0u);
+  guint before = f.commands[0x32];
+  if (g_str_equal (kind, "quality")) f.fail_stage = 2u;
+  if (g_str_equal (kind, "reserved"))
+    { g_autoptr(GBytes) b = irq_frame (0x36, 0x0100, 0x40, 16u);
+      g_assert_false (goodix_enrollment_fpi_usb_binding_handle_a0 (f.binding, b, &error)); }
+  else if (g_str_equal (kind, "quality"))
+    { g_autoptr(GBytes) b = irq_frame (0x36, 0x0100, 0, 16u);
+      g_assert_false (goodix_enrollment_fpi_usb_binding_handle_a0 (f.binding, b, &error)); }
+  else
+    {
+      accept_irq (&f, 0x36, 0x0100, 0u);
+      if (g_str_equal (kind, "out32-error"))
+        {
+          request_sample (&f);
+          before++;
+          g_autoptr(GError) failure = g_error_new_literal (G_IO_ERROR, G_IO_ERROR_FAILED, "OUT32 failed");
+          goodix_fpi_usb_backend_complete_out (f.backend, 7u, failure);
+          g_assert_false (goodix_enrollment_fpi_usb_binding_zero_audit (f.binding)->stale_window_open);
+          g_assert_false (goodix_enrollment_fpi_usb_binding_request_zero_sample (f.binding, &error));
+        }
+      else if (g_str_equal (kind, "aux"))
+        { g_autoptr(GBytes) b = primary ();
+          g_assert_false (goodix_enrollment_fpi_usb_binding_handle_plaintext_chunk (f.binding, b, &error)); }
+      else if (g_str_equal (kind, "early-irq2"))
+        { g_autoptr(GBytes) b = irq_frame (0x32, 2, 0x2f, 16u);
+          g_assert_false (goodix_enrollment_fpi_usb_binding_handle_a0 (f.binding, b, &error)); }
+      else if (g_str_equal (kind, "direct-out"))
+        g_assert_false (goodix_enrollment_fpi_usb_binding_submit_next (f.binding, &error));
+      else
+        {
+          goodix_enrollment_fpi_usb_binding_cancel (f.binding, "cancel after zero");
+          g_assert_false (goodix_enrollment_fpi_usb_binding_request_zero_sample (f.binding, &error));
+        }
+    }
+  g_assert_nonnull (error);
+  g_assert_cmpuint (f.commands[0x32], ==, before);
+  g_assert_true (goodix_enrollment_fpi_usb_binding_is_failed (f.binding));
+  fixture_clear (&f);
+}
+
+static void
+test_recovery_contact_bound (void)
+{
+  Fixture f;
+  reach_recovery (&f, 2u, 20u);
+  f.reject_from_stage = 2u;
+  for (guint stage = 2u; stage <= 20u; stage++)
+    {
+      g_autoptr(GBytes) zero = irq_frame (0x36, 0x0100, 0, 16u);
+      g_autoptr(GError) error = NULL;
+      guint before = f.commands[0x32];
+      gboolean ok = goodix_enrollment_fpi_usb_binding_handle_a0 (f.binding, zero, &error);
+      g_assert_cmpint (ok, ==, stage < 20u);
+      g_assert_cmpuint (f.commands[0x32], ==, before);
+      g_assert_cmpuint (f.audit.lifecycle.plan.pipeline.protocol.completed_stage_count, ==, 1u);
+      if (stage < 20u)
+        {
+          request_sample (&f);
+          ack (&f, 0x32);
+          begin_contact (&f, stage + 1u);
+        }
+      else
+        { g_assert_nonnull (strstr (error->message, "bound exhausted")); }
+    }
+  g_assert_cmpuint (f.images, ==, 20u);
+  g_assert_cmpuint (f.audit.lifecycle.plan.pipeline.protocol.retry_stage_count, ==, 18u);
+  g_assert_cmpuint (goodix_enrollment_fpi_usb_binding_zero_audit (f.binding)->rearm32_count, ==, 18u);
+  fixture_clear (&f);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -527,6 +780,24 @@ main (int argc, char **argv)
     "control", "irq", "reserved", "body-length", "ack", "checksum", "outer-length"
   };
   g_test_init (&argc, &argv, NULL);
+  const guint recovery_stages[] = {2, 4, 7, 8};
+  for (guint i = 0; i < G_N_ELEMENTS (recovery_stages); i++)
+    { g_autofree gchar *p = g_strdup_printf ("/recovery/stage-%u", recovery_stages[i]);
+      g_test_add_data_func (p, GUINT_TO_POINTER (recovery_stages[i]), test_recovery_stage); }
+  const gchar *late_names[] = {"before-request", "pending-out32", "before-ack32", "after-ack32", "duplicate", "malformed", "after-irq2"};
+  for (guint i = 0; i < G_N_ELEMENTS (late_names); i++)
+    { g_autofree gchar *p = g_strdup_printf ("/recovery/late/%s", late_names[i]);
+      g_test_add_data_func (p, GUINT_TO_POINTER (i), test_recovery_late); }
+  const guint recovery_words[] = {0x0002u, 0x01fdu, 0u, 1u, 0x01feu, 0x01ffu, 0xffffu};
+  for (guint i = 0; i < G_N_ELEMENTS (recovery_words); i++)
+    { g_autofree gchar *p = g_strdup_printf ("/recovery/raw/%04x", recovery_words[i]);
+      g_test_add_data_func (p, GUINT_TO_POINTER (recovery_words[i]), test_recovery_bounds); }
+  const gchar *failures[] = {"quality", "reserved", "aux", "early-irq2", "direct-out", "cancel", "out32-error"};
+  for (guint i = 0; i < G_N_ELEMENTS (failures); i++)
+    { g_autofree gchar *p = g_strdup_printf ("/recovery/fail/%s", failures[i]);
+      g_test_add_data_func (p, failures[i], test_recovery_failures); }
+  g_test_add_func ("/recovery/contact-limit-20", test_recovery_contact_bound);
+
 #ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
   const gchar *entry[] = { "target", "state", "control", "irq", "flags",
                           "length", "checksum", "raw", "out-pending" };

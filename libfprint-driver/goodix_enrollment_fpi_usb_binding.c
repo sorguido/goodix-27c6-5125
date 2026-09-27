@@ -22,6 +22,8 @@ struct _GoodixEnrollmentFpiUsbBinding
   GoodixEnrollmentFpiUsbReadyFunc ready;
   gpointer ready_data;
   GError *terminal_error;
+  GoodixEnrollmentFpiUsbErrorFunc failed;
+  gpointer failed_data;
 #ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
   gboolean probe_enabled;
   GoodixZeroMaskProbeAudit probe;
@@ -41,6 +43,7 @@ binding_fail (GoodixEnrollmentFpiUsbBinding *binding,
 {
   if (binding != NULL && binding->terminal_error == NULL)
     {
+      goodix_enrollment_post_tls_events_close_zero_window (binding->events);
       binding->terminal_error = g_error_new_literal (
         GOODIX_ENROLLMENT_USB_BINDING_ERROR,
         GOODIX_ENROLLMENT_USB_BINDING_ERROR_STATE, message);
@@ -86,6 +89,7 @@ backend_out_complete (GoodixFpiUsbBackend *backend,
       binding->terminal_error == NULL)
     {
       binding->terminal_error = g_steal_pointer (&error);
+      goodix_enrollment_post_tls_events_close_zero_window (binding->events);
       if (binding->terminal_error == NULL)
         binding->terminal_error = g_error_new_literal (
           GOODIX_ENROLLMENT_USB_BINDING_ERROR,
@@ -99,6 +103,7 @@ backend_out_complete (GoodixFpiUsbBackend *backend,
            !binding->ready (binding, binding->ready_data, &error))
     {
       binding->terminal_error = g_steal_pointer (&error);
+      goodix_enrollment_post_tls_events_close_zero_window (binding->events);
       if (binding->terminal_error == NULL)
         binding->terminal_error = g_error_new_literal (
           GOODIX_ENROLLMENT_USB_BINDING_ERROR,
@@ -106,6 +111,19 @@ backend_out_complete (GoodixFpiUsbBackend *backend,
           "enrollment receive continuation failed");
       binding->audit->terminal = TRUE;
     }
+  if (binding->terminal_error != NULL && binding->failed != NULL)
+    binding->failed (binding->terminal_error, binding->failed_data);
+}
+
+void
+goodix_enrollment_fpi_usb_binding_set_error_callback (
+  GoodixEnrollmentFpiUsbBinding *binding,
+  GoodixEnrollmentFpiUsbErrorFunc failed, gpointer user_data)
+{
+  g_return_if_fail (binding != NULL && binding->failed == NULL &&
+                   binding->audit->backend_submit_attempt_count == 0u);
+  binding->failed = failed;
+  binding->failed_data = user_data;
 }
 
 static gboolean
@@ -133,6 +151,7 @@ expected_event_is_command (GoodixEnrollmentEvent event)
     case GOODIX_ENROLLMENT_EVENT_AUXILIARY_B0:
     case GOODIX_ENROLLMENT_EVENT_NAV:
     case GOODIX_ENROLLMENT_EVENT_IRQ0100:
+    case GOODIX_ENROLLMENT_EVENT_ZERO_MASK_RECOVERY:
       return FALSE;
     }
   return FALSE;
@@ -148,7 +167,8 @@ submit_if_graph_ready (GoodixEnrollmentFpiUsbBinding *binding,
       goodix_enrollment_outbound_transaction_has_pending (
         binding->transaction) ||
       goodix_enrollment_outbound_transaction_is_complete (
-        binding->transaction))
+        binding->transaction) ||
+      goodix_enrollment_post_tls_events_zero_audit (binding->events)->awaiting_sample_request)
     return binding->terminal_error == NULL;
   expected = goodix_enrollment_post_tls_events_get_expected_event (
     binding->events);
@@ -259,6 +279,7 @@ goodix_enrollment_fpi_usb_binding_cancel (
         binding->transaction))
     return;
   message = reason != NULL ? reason : "enrollment USB binding cancelled";
+  goodix_enrollment_post_tls_events_close_zero_window (binding->events);
   binding->audit->cancellation_count++;
   goodix_fpi_usb_backend_cancel (binding->backend);
   goodix_enrollment_outbound_transaction_cancel (binding->transaction,
@@ -397,6 +418,12 @@ goodix_enrollment_fpi_usb_binding_handle_a0 (
   if (binding->probe_enabled && probe_a0 (binding, frame, &accepted, error))
     return accepted;
 #endif
+  gboolean handled = FALSE;
+  if (!goodix_enrollment_post_tls_events_consume_stale_release (
+        binding->events, frame, &handled, error))
+    return binding_fail (binding, "zero-mask stale release rejected", error);
+  if (handled)
+    return TRUE;
   if (!goodix_enrollment_outbound_transaction_handle_a0 (
         binding->transaction, frame, error))
     return binding_fail (binding, "enrollment inbound A0 failed", error);
@@ -440,9 +467,28 @@ goodix_enrollment_fpi_usb_binding_needs_receive (
            binding->transaction) &&
          !goodix_enrollment_outbound_transaction_is_complete (
            binding->transaction) &&
-         !expected_event_is_command (
+         (goodix_enrollment_post_tls_events_zero_audit (binding->events)->awaiting_sample_request ||
+          !expected_event_is_command (
            goodix_enrollment_post_tls_events_get_expected_event (
-             binding->events));
+             binding->events)));
+}
+
+const GoodixZeroMaskRecoveryAudit *
+goodix_enrollment_fpi_usb_binding_zero_audit (const GoodixEnrollmentFpiUsbBinding *binding)
+{
+  return binding != NULL ? goodix_enrollment_post_tls_events_zero_audit (binding->events) : NULL;
+}
+
+gboolean
+goodix_enrollment_fpi_usb_binding_request_zero_sample (
+  GoodixEnrollmentFpiUsbBinding *binding, GError **error)
+{
+  if (binding == NULL || binding->terminal_error != NULL ||
+      goodix_enrollment_fpi_usb_binding_has_pending (binding))
+    return binding_fail (binding, "zero-mask next sample has no free OUT owner", error);
+  if (!goodix_enrollment_post_tls_events_request_zero_sample (binding->events, error))
+    return binding_fail (binding, "zero-mask next sample is not pending", error);
+  return submit_if_graph_ready (binding, error);
 }
 
 gboolean

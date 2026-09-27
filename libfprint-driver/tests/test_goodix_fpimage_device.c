@@ -2473,8 +2473,62 @@ test_d279_24_context_first_arm_enrollment_handoff (gconstpointer probe_case)
                     g_main_context_iteration (NULL, FALSE);
                 }
               goodix_device_context_complete_receive (f->ctx, generation, copy, length, NULL);
+              if (kind == 1u || kind == 8u || kind == 9u || kind == 10u)
+                {
+                  g_assert_false (goodix_device_context_get_terminal_fence (f->ctx));
+                  g_assert_cmpuint (events_audit.lifecycle.plan.pipeline.fpimage_delivery_count, ==, images_before + 1u);
+                  g_assert_cmpuint (auxiliary_count, ==, auxiliary_before);
+                  /* Host extraction is asynchronous: no rearm before its normal
+                   * next-sample request. A stale callback cannot supply it. */
+                  g_assert_cmpuint (goodix_fpi_usb_backend_get_out_submit_count (backend), ==, out_before);
+                  goodix_device_context_complete_receive (f->ctx, generation - 1u, copy, length, NULL);
+                  if (kind == 8u)
+                    d279_25_feed_context_frame (f->ctx, generation, irq0200);
+                  gint64 deadline = g_get_monotonic_time () + TEST_TIMEOUT_MS * 1000;
+                  while (f->enroll_progress_count < stage && !f->done &&
+                         g_get_monotonic_time () < deadline)
+                    g_main_context_iteration (NULL, FALSE);
+                  g_assert_cmpuint (f->enroll_progress_count, ==, stage);
+                  if (stage < GOODIX_SIGFM_ENROLL_MAX_STAGES)
+                    {
+                      g_assert_cmpuint (goodix_fpi_usb_backend_get_out_submit_count (backend), ==, out_before + 1u);
+                      g_assert_cmpuint (goodix_fpi_usb_backend_get_out_outstanding (backend), ==, 1u);
+                      if (kind == 10u)
+                        {
+                          g_autoptr(GError) out_error = g_error_new_literal (G_IO_ERROR, G_IO_ERROR_FAILED, "synthetic OUT32 error");
+                          g_autoptr(GError) cancel_error = g_error_new_literal (G_IO_ERROR, G_IO_ERROR_CANCELLED, "synthetic IN drain");
+                          goodix_fpi_usb_backend_complete_out (backend, generation, out_error);
+                          g_assert_true (goodix_device_context_get_terminal_fence (f->ctx));
+                          goodix_device_context_complete_receive (f->ctx, generation, NULL, 0, cancel_error);
+                          test_wait (f);
+                          g_assert_false (f->success);
+                          g_assert_cmpuint (f->completion_count, ==, 1u);
+                          g_assert_nonnull (strstr (f->error->message, "OUT32 error"));
+                          g_assert_cmpuint (goodix_fpi_usb_backend_get_out_submit_count (backend), ==, out_before + 1u);
+                          g_assert_true (goodix_fpi_usb_backend_is_drained (backend));
+                          g_clear_error (&f->error);
+                          fixture_close (f);
+                          g_assert_null (goodix_fpimage_device_get_context (f->device));
+                          test_fixture_free (f);
+                          return;
+                        }
+                      if (kind == 9u)
+                        d279_25_feed_context_frame (f->ctx, generation, irq0200);
+                      d279_25_complete_and_ack (f->ctx, generation, 0x32);
+                    }
+                  else
+                    g_assert_cmpuint (goodix_fpi_usb_backend_get_out_submit_count (backend), ==, out_before);
+                  goto stage_done;
+                }
+              if (kind == 2u)
+                {
+                  g_cancellable_cancel (cancellable);
+                  gint64 deadline = g_get_monotonic_time () + TEST_TIMEOUT_MS * 1000;
+                  while (!goodix_device_context_get_terminal_fence (f->ctx) &&
+                         g_get_monotonic_time () < deadline)
+                    g_main_context_iteration (NULL, FALSE);
+                }
               g_assert_true (goodix_device_context_get_terminal_fence (f->ctx));
-              if (kind == 2u) g_cancellable_cancel (cancellable);
               /* No direct OUT or duplicate zero can revive the terminated graph. */
               for (guint command = 0; command < 256u; command++)
                 {
@@ -2501,7 +2555,7 @@ test_d279_24_context_first_arm_enrollment_handoff (gconstpointer probe_case)
                   g_assert_false (goodix_enrollment_post_tls_events_error_is_unusable_contact (f->error));
                   g_assert_cmpuint (events_audit.rejected_inbound_count, ==, 1u);
                 }
-              g_assert_cmpuint (events_audit.lifecycle.plan.pipeline.fpimage_delivery_count, ==, images_before);
+              g_assert_cmpuint (events_audit.lifecycle.plan.pipeline.fpimage_delivery_count, ==, images_before + (kind == 2u ? 1u : 0u));
               g_assert_cmpuint (events_audit.primary_b0_count, ==, primary_before);
               g_assert_cmpuint (auxiliary_count, ==, auxiliary_before);
               g_assert_cmpuint (binding_audit.retry_count, ==, 0u);
@@ -2613,6 +2667,7 @@ test_d279_24_context_first_arm_enrollment_handoff (gconstpointer probe_case)
           if (stage < GOODIX_SIGFM_ENROLL_MAX_STAGES)
             d279_25_complete_and_ack (f->ctx, generation, 0x32);
         }
+stage_done:
       {
         gint64 deadline = g_get_monotonic_time () + TEST_TIMEOUT_MS * 1000;
 
@@ -2630,11 +2685,14 @@ test_d279_24_context_first_arm_enrollment_handoff (gconstpointer probe_case)
   g_assert_cmpuint (
     events_audit.lifecycle.plan.pipeline.protocol.configured_required_stage_count,
     ==, GOODIX_SIGFM_ENROLL_MAX_STAGES);
-  g_assert_cmpuint (events_audit.parsed_a0_count, ==, 71u);
+  guint case_kind = GPOINTER_TO_UINT (probe_case) / 100u;
+  guint recovered = (case_kind == 1u || case_kind == 8u || case_kind == 9u) ? 1u : 0u;
+  guint late = case_kind == 8u || case_kind == 9u ? 1u : 0u;
+  g_assert_cmpuint (events_audit.parsed_a0_count, ==, 71u - 3u * recovered + late);
   g_assert_cmpuint (events_audit.primary_b0_count, ==,
                     GOODIX_SIGFM_ENROLL_MAX_STAGES);
   g_assert_cmpuint (events_audit.auxiliary_b0_count, ==,
-                    GOODIX_SIGFM_ENROLL_MAX_STAGES);
+                    GOODIX_SIGFM_ENROLL_MAX_STAGES - recovered);
   g_assert_cmpuint (events_audit.lifecycle.plan.pipeline.fpimage_delivery_count,
                     ==, GOODIX_SIGFM_ENROLL_MAX_STAGES);
   g_assert_cmpuint (events_audit.finger_down_delivery_count, ==,
@@ -2642,11 +2700,11 @@ test_d279_24_context_first_arm_enrollment_handoff (gconstpointer probe_case)
   g_assert_cmpuint (events_audit.finger_up_delivery_count, ==,
                     GOODIX_SIGFM_ENROLL_MAX_STAGES);
   g_assert_cmpuint (events_audit.auxiliary_b0_delivery_count, ==,
-                    GOODIX_SIGFM_ENROLL_MAX_STAGES);
-  g_assert_cmpuint (auxiliary_count, ==, GOODIX_SIGFM_ENROLL_MAX_STAGES);
-  g_assert_cmpuint (binding_audit.graph_ready_submit_count, ==, 47u);
+                    GOODIX_SIGFM_ENROLL_MAX_STAGES - recovered);
+  g_assert_cmpuint (auxiliary_count, ==, GOODIX_SIGFM_ENROLL_MAX_STAGES - recovered);
+  g_assert_cmpuint (binding_audit.graph_ready_submit_count, ==, 47u - 2u * recovered);
   g_assert_cmpuint (binding_audit.transaction.committed_after_completion_count,
-                    ==, 47u);
+                    ==, 47u - 2u * recovered);
   g_assert_cmpuint (binding_audit.retry_count, ==, 0u);
   g_assert_cmpuint (goodix_fpi_usb_backend_get_outstanding (backend), ==, 0u);
 
@@ -2975,12 +3033,12 @@ int
 main (int argc, char **argv)
 {
   g_test_init (&argc, &argv, NULL);
-  const guint contact_cases[] = { 102, 104, 107, 108, 202, 302, 402, 502, 602, 702 };
+  const guint contact_cases[] = { 102, 104, 107, 108, 202, 302, 402, 502, 602, 702, 802, 902, 1002 };
   const gchar *contact_names[] = { "stage2", "intermediate", "near-terminal", "terminal",
-    "cancel-after-zero", "cancel-before-zero", "malformed", "wrong-irq", "reserved", "wrong-control" };
+    "cancel-after-zero", "cancel-before-zero", "malformed", "wrong-irq", "reserved", "wrong-control", "late-before-host-result", "late-pending-out32", "out32-error" };
   for (guint i = 0; i < G_N_ELEMENTS (contact_cases); i++)
     {
-      g_autofree gchar *path = g_strdup_printf ("/unusable-contact/%s", contact_names[i]);
+      g_autofree gchar *path = g_strdup_printf ("/zero-recovery/%s", contact_names[i]);
       g_test_add_data_func (path, GUINT_TO_POINTER (contact_cases[i]),
                            test_d279_24_context_first_arm_enrollment_handoff);
     }

@@ -76,6 +76,7 @@ intent_contract_valid (const GoodixEnrollmentCommandIntent *intent)
     case GOODIX_ENROLLMENT_EVENT_NAV:
     case GOODIX_ENROLLMENT_EVENT_ACK_36:
     case GOODIX_ENROLLMENT_EVENT_IRQ0100:
+    case GOODIX_ENROLLMENT_EVENT_ZERO_MASK_RECOVERY:
       return FALSE;
     }
   return FALSE;

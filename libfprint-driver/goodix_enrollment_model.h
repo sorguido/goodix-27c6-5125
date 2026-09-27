@@ -33,6 +33,8 @@ typedef enum
   GOODIX_ENROLLMENT_EVENT_COMMAND_36,
   GOODIX_ENROLLMENT_EVENT_ACK_36,
   GOODIX_ENROLLMENT_EVENT_IRQ0100,
+  /* Local classification of a validated enrollment-only 36/0100/0000. */
+  GOODIX_ENROLLMENT_EVENT_ZERO_MASK_RECOVERY,
 } GoodixEnrollmentEvent;
 
 typedef enum

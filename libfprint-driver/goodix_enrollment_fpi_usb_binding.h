@@ -8,6 +8,11 @@
 G_BEGIN_DECLS
 
 typedef struct _GoodixEnrollmentFpiUsbBinding GoodixEnrollmentFpiUsbBinding;
+typedef void (*GoodixEnrollmentFpiUsbErrorFunc) (
+  const GError *error, gpointer user_data);
+void goodix_enrollment_fpi_usb_binding_set_error_callback (
+  GoodixEnrollmentFpiUsbBinding *binding,
+  GoodixEnrollmentFpiUsbErrorFunc failed, gpointer user_data);
 #ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
 #define GOODIX_ZERO_MASK_MAX_EVENTS 4u
 #define GOODIX_ZERO_MASK_WINDOW_MS 3000u
@@ -93,6 +98,12 @@ gboolean goodix_enrollment_fpi_usb_binding_is_failed (
   const GoodixEnrollmentFpiUsbBinding *binding);
 const GError *goodix_enrollment_fpi_usb_binding_get_error (
   const GoodixEnrollmentFpiUsbBinding *binding);
+const GoodixZeroMaskRecoveryAudit *goodix_enrollment_fpi_usb_binding_zero_audit (
+  const GoodixEnrollmentFpiUsbBinding *binding);
+/* Called only by the normal ENROLL AWAIT_FINGER_ON continuation after host
+ * processing. No timer, automatic retry or late release calls this API. */
+gboolean goodix_enrollment_fpi_usb_binding_request_zero_sample (
+  GoodixEnrollmentFpiUsbBinding *binding, GError **error);
 
 G_END_DECLS
 
