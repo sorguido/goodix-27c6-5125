@@ -13,6 +13,9 @@
 #include "goodix_enrollment_fpi_usb_binding.h"
 
 G_BEGIN_DECLS
+#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
+gboolean goodix_fpimage_device_enable_zero_mask_probe (FpDevice *device);
+#endif
 
 #define GOODIX_TYPE_FPIMAGE_DEVICE (goodix_fpimage_device_get_type ())
 G_DECLARE_DERIVABLE_TYPE (GoodixFpImageDevice, goodix_fpimage_device,

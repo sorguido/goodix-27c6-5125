@@ -87,6 +87,7 @@ remain unproven.
 - [Device-specific material contract](docs/DEVICE_MATERIALS.md)
 - [Security and privacy](docs/SECURITY.md)
 - [Validation scope and known limitations](docs/VALIDATION.md)
+- [Temporary zero-mask diagnostic probe (manual operator kit)](operator_kit/phase-c-zero-mask/README.md)
 - [Licensing and provenance](docs/LICENSING_AND_PROVENANCE.md)
 - [Upstream references](docs/REFERENCES.md)
 - [Source build and offline checks](production/README.md)

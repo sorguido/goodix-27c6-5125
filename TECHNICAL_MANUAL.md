@@ -1392,6 +1392,37 @@ remains unchanged. The contract also distinguishes the skipped image-choice
 auxiliary acquisition from the OEM release consumer's conditional background
 refresh when its baseline-valid flag is false.
 
+### 20.5 Isolated zero-mask observation probe
+
+The [manual operator kit](operator_kit/phase-c-zero-mask/README.md) builds a
+separate diagnostic library with `GOODIX_ENABLE_ZERO_MASK_PROBE`. Its device
+API must be explicitly enabled before open, and is consumed by one action;
+only ENROLL can enable the binding interception. Production builds omit this
+code and retain zero-mask rejection. No normal KDE/fprintd configuration
+activates the probe.
+
+At the repeated-contact IRQ0100 slot, a checksum-valid control36/body16 with
+flags zero and all six `(word >> 1)` values in1–254 freezes the enrollment
+graph before its normal parser. A backend latch forbids every further OUT,
+including20/32, and refuses generation/audit reuse until destruction. The held
+primary is discarded at cleanup, not delivered. IN continues for at most four
+subsequent A0 events or three seconds. IRQ0200 is counted without state/FDT
+updates; other or invalid events stop observation. Concatenated packets obey
+the same event budget. Timeout is only a termination bound, not a firmware
+barrier. Structured metadata and the final drain/close result are logged.
+
+The standalone runner requests one enrollment, cancels after120s, closes the
+device and never serializes a print. The kit stages only in `/run`, excludes
+fprintd with a temporary runtime mask, requires human review before a second
+manual run, and provides symmetric collection/rollback. No live behavior or
+late-IRQ ownership guarantee follows from the synthetic tests.
+
+Public offline entrypoint: `libfprint-driver/tests/run_goodix_zero_mask_probe_test.sh`.
+It runs normal and ASan/UBSan variants using synthetic USB, the actual libfprint
+core, parser/graph entry checks and mocked deployment operations. LeakSanitizer
+is disabled in the SDK sandbox; object drain/free and action isolation are
+asserted directly. Live cancellation latency remains to be measured.
+
 ## 21. Developer invariants, licensing, and references
 
 ### 21.1 Invariants for changes

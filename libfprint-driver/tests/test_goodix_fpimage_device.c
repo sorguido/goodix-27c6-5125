@@ -1948,6 +1948,10 @@ test_d279_55_production_identify_single_acquisition (void)
   GoodixPostTlsLifecycle *post_tls;
   guint64 generation;
 
+#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
+  /* Even explicit opt-in cannot turn IDENTIFY into diagnostic enrollment. */
+  g_assert_true (goodix_fpimage_device_enable_zero_mask_probe (FP_DEVICE (f->device)));
+#endif
   fixture_open (f);
   backend = goodix_device_context_get_fpi_usb_backend (f->ctx);
   goodix_device_context_set_async_usb_submit_seam (
@@ -2253,7 +2257,7 @@ d279_25_feed_plaintext (GoodixDeviceContext *ctx,
 }
 
 static void
-test_d279_24_context_first_arm_enrollment_handoff (void)
+test_d279_24_context_first_arm_enrollment_handoff (gconstpointer probe_case)
 {
   GoodixEnrollmentModelConfig config = {
     .required_stage_count = GOODIX_SIGFM_ENROLL_MAX_STAGES,
@@ -2276,6 +2280,12 @@ test_d279_24_context_first_arm_enrollment_handoff (void)
   const guint8 typed82_body[2] = { 0x00, 0x20 };
   g_autoptr(GBytes) baseline = d279_25_build_primary_plaintext (0u);
 
+#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
+  if (probe_case != NULL)
+    g_assert_true (goodix_fpimage_device_enable_zero_mask_probe (FP_DEVICE (f->device)));
+#else
+  (void) probe_case;
+#endif
   fixture_open (f);
   backend = goodix_device_context_get_fpi_usb_backend (f->ctx);
   goodix_device_context_set_async_usb_submit_seam (
@@ -2438,6 +2448,87 @@ test_d279_24_context_first_arm_enrollment_handoff (void)
             0x34, 0x0200, 0x0000, (guint16) (0x40u + stage * 8u));
 
           d279_25_complete_and_ack (f->ctx, generation, 0x36);
+#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
+          if (probe_case != NULL && stage == 2u)
+            {
+              guint mode = GPOINTER_TO_UINT (probe_case);
+              guint64 out_before = goodix_fpi_usb_backend_get_out_submit_count (backend);
+              guint images_before = events_audit.lifecycle.plan.pipeline.fpimage_delivery_count;
+              g_autoptr(GBytes) zero = d279_24_build_event (0x36, 0x0100, 0, 0x88);
+              d279_25_feed_context_frame (f->ctx, generation, zero);
+              /* Exercise the physical barrier with arbitrary OUT, including
+               * command20/32, independently of the frozen enrollment graph. */
+              for (guint control = 0; control <= 255; control++)
+                {
+                  g_autoptr(GBytes) out = d279_24_build_response ((guint8) control, NULL, 0);
+                  g_autoptr(GError) blocked = NULL;
+                  g_assert_false (goodix_fpi_usb_backend_submit_out (backend, generation, out, &blocked));
+                  g_assert_nonnull (blocked);
+                }
+              guint count = mode == 2 ? 1u : mode == 3 ? 2u : mode == 4 ? 4u : 0u;
+              for (guint n = 0; n < count; n++)
+                {
+                  gsize length;
+                  const guint8 *bytes = g_bytes_get_data (irq0200, &length);
+                  goodix_device_context_complete_receive (f->ctx, generation, bytes, length, NULL);
+                }
+              if (mode == 5 || mode == 6 || mode == 8 || mode == 9)
+                {
+                  g_autoptr(GBytes) other = mode == 5 ?
+                    d279_24_build_event (0x36, 0x0002, 0, 0x88) :
+                    mode == 8 ? d279_25_wrap_b0 (auxiliary) :
+                    d279_24_build_response (0x99, NULL, 0);
+                  gsize length;
+                  const guint8 *bytes = g_bytes_get_data (other, &length);
+                  g_autofree guint8 *copy = g_memdup2 (bytes, length);
+                  if (mode == 6) copy[length - 1u] ^= 1u;
+                  if (mode == 9) copy[0] = 0x99; /* Unknown outer type. */
+                  goodix_device_context_complete_receive (f->ctx, generation, copy, length, NULL);
+                }
+              if (mode == 10)
+                {
+                  gsize length;
+                  const guint8 *bytes = g_bytes_get_data (irq0200, &length);
+                  g_autoptr(GByteArray) batch = g_byte_array_new ();
+                  for (guint n = 0; n < 8u; n++)
+                    g_byte_array_append (batch, bytes, (guint) length);
+                  goodix_device_context_complete_receive (f->ctx, generation,
+                                                          batch->data, batch->len, NULL);
+                }
+              if (mode == 7)
+                g_cancellable_cancel (cancellable);
+              gint64 until = g_get_monotonic_time () + 4500000;
+              while (!goodix_device_context_get_terminal_fence (f->ctx) &&
+                     g_get_monotonic_time () < until)
+                g_main_context_iteration (NULL, FALSE);
+              g_assert_true (goodix_device_context_get_terminal_fence (f->ctx));
+              if (!goodix_fpi_usb_backend_is_drained (backend))
+                {
+                  g_autoptr(GError) cancelled = g_error_new_literal (
+                    G_IO_ERROR, G_IO_ERROR_CANCELLED, "synthetic IN drain");
+                  goodix_device_context_complete_receive (f->ctx, generation, NULL, 0, cancelled);
+                }
+              test_wait (f);
+              g_assert_false (f->success);
+              g_assert_null (f->enroll_print);
+              g_assert_cmpuint (events_audit.lifecycle.plan.pipeline.fpimage_delivery_count, ==, images_before);
+              g_assert_cmpuint (auxiliary_count, ==, 1u);
+              g_assert_cmpuint (binding_audit.retry_count, ==, 0u);
+              g_assert_cmpuint (goodix_fpi_usb_backend_get_out_submit_count (backend), ==, out_before);
+              g_assert_true (goodix_fpi_usb_backend_is_drained (backend));
+              g_assert_cmpuint (goodix_fpi_usb_backend_get_outstanding (backend), ==, 0u);
+              g_assert_cmpuint (goodix_fpi_usb_backend_get_real_submit_count (backend), ==, 0u);
+              g_clear_error (&f->error);
+              fixture_close (f);
+              g_assert_null (goodix_fpimage_device_get_context (f->device));
+              /* A reopened object has neither a live timer nor an inherited
+               * opt-in. Ordinary action completion still works. */
+              fixture_open (f);
+              fixture_close (f);
+              test_fixture_free (f);
+              return;
+            }
+#endif
           d279_25_feed_context_frame (f->ctx, generation, irq0100);
           d279_25_complete_and_ack (f->ctx, generation, 0x20);
           d279_25_feed_plaintext (f->ctx, generation, auxiliary);
@@ -2808,6 +2899,17 @@ int
 main (int argc, char **argv)
 {
   g_test_init (&argc, &argv, NULL);
+#ifdef GOODIX_ENABLE_ZERO_MASK_PROBE
+  const gchar *probe_names[] = { "silence", "one-0200", "two-0200", "event-budget",
+    "other-irq", "malformed", "cancel", "unexpected-b0", "unknown-outer", "concatenated-budget" };
+  for (guint i = 0; i < G_N_ELEMENTS (probe_names); i++)
+    {
+      g_autofree gchar *path = g_strdup_printf ("/zero-mask-probe/context/%s", probe_names[i]);
+      g_test_add_data_func (path, GUINT_TO_POINTER (i + 1u),
+                           test_d279_24_context_first_arm_enrollment_handoff);
+    }
+#endif
+
   g_test_add_data_func ("/login/identify-second-match", GUINT_TO_POINTER (121), test_login_series);
   g_test_add_data_func ("/login/identify-third-match", GUINT_TO_POINTER (131), test_login_series);
   g_test_add_data_func ("/login/cancel-after-release-before-completion", GUINT_TO_POINTER (14), test_login_series);
@@ -2884,8 +2986,8 @@ main (int argc, char **argv)
                    test_d279_55_production_identify_single_acquisition);
   g_test_add_func ("/goodix-fpimage-device/d279-20-dormant-enrollment-context-ownership",
                    test_d279_20_dormant_enrollment_context_ownership);
-  g_test_add_func ("/goodix-fpimage-device/d279-24-context-first-arm-enrollment-handoff",
-                   test_d279_24_context_first_arm_enrollment_handoff);
+  g_test_add_data_func ("/goodix-fpimage-device/d279-24-context-first-arm-enrollment-handoff",
+                        NULL, test_d279_24_context_first_arm_enrollment_handoff);
 
   return g_test_run ();
 }

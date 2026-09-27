@@ -36,6 +36,10 @@ if [ "${GOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE_TEST:-0}" = 1 ]; then
   strict_flags="$strict_flags -DGOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE"
 fi
 
+if [ "${GOODIX_ZERO_MASK_PROBE_TEST:-0}" = 1 ]; then
+  strict_flags="$strict_flags -DGOODIX_ENABLE_ZERO_MASK_PROBE"
+fi
+
 adoption_mentions=$(find "$git_root/libfprint-driver" \
   -path "$git_root/libfprint-driver/tests" -prune -o \
   \( -name '*.c' -o -name '*.h' \) -type f -exec \
