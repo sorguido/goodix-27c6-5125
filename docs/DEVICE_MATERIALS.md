@@ -345,14 +345,16 @@ Require the qualified DLL size and SHA-256 listed earlier.
 
 ## Step 3 — Capture the OEM initialization traffic
 
-The manual reference uses Wireshark/TShark with USBPcap support. Capture before
-initialization can retain early traffic, but attach-once initialization has not
-been proven to yield CONFIG90 reproducibly. Two observed zero-finger recordings
-lack it. The positive historical source is known, while its OEM trigger/capture
-mode and historical wire 0x90 versus the current 0x91 acquisition rule require
-review; see the [builder provenance audit](../tools/windows_material_builder/AUDIT.md).
-CONFIG90 remains mandatory. Do not repeat or extend capture solely to force it;
-no new acquisition is prescribed while this provenance gate remains open.
+The manual reference uses Wireshark/TShark with USBPcap support. Start recording
+before initialization to retain early traffic. A retained ordinary attach-once
+Windows VM capture contains a valid CONFIG90; it was previously rejected by an
+incorrect exact-wire filter. Extraction selects logical control 0x90, not only
+wire 0x91. This does not guarantee completeness for every reader state.
+
+For the current builder validation, use the [read-only retained-capture
+procedure](../tools/windows_material_builder/README.md) before considering a new
+acquisition. CONFIG90 and all typed responses remain mandatory from the same
+qualified target stream and recording.
 
 The extraction logic uses USBPcap link type `249` and bulk endpoints:
 
@@ -402,7 +404,7 @@ The required frame is:
 ```text
 Goodix outer type: A0
 logical control:   0x90
-qualified wire control: 0x91
+eligible wire controls: 0x90 or 0x91 (wire & 0xfe == 0x90)
 body length:       224 bytes
 ```
 
@@ -434,7 +436,8 @@ Require valid Goodix A0 frames with exact typed controls and body lengths:
 | OTP A6 | `0xa6` | 64 bytes | SHA-256(body) |
 
 For these typed responses the wire control is the exact even control shown in
-the table, unlike the odd wire variant used by host commands such as CONFIG90.
+the table. CONFIG90 OUT instead uses the logical-control rule above; either
+wire 0x90 or 0x91 maps to logical 0x90.
 
 Require at least one valid candidate for every class. Repeated byte-identical
 bodies are acceptable; differing valid bodies in one class make the capture

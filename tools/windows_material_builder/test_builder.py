@@ -226,6 +226,81 @@ class ParserTests(Case):
         self.assertEqual(set(e.selected), {'A2', 'CHIP82', 'A6'})
 
 
+class Config90Tests(Case):
+    def body(self):
+        return fixture.synthetic_files()['target-config-90.bin']
+
+    def evidence(self, payload, *, incoming=False, device=2, endpoint=None):
+        rows = records(missing=('CONFIG90',))
+        pair = transfer(payload, 100, incoming, device)
+        if endpoint is not None:
+            pair = [row[:21] + bytes([endpoint]) + row[22:] for row in pair]
+        return capture.analyze_bytes(pcap(rows + pair))
+
+    def test_wire_90_and_91_follow_logical_contract(self):
+        for wire in (0x90, 0x91):
+            payload = frame(wire, self.body())
+            self.assertEqual(capture.parse_a0(payload)[:2], (wire, 0x90))
+            e = self.evidence(payload)
+            e.require_complete()
+            self.assertEqual(e.selected['CONFIG90'], self.body())
+
+    def test_unrelated_logical_controls_are_not_config(self):
+        for wire in (0x8e, 0x8f, 0x92, 0x93, 0xa2):
+            self.assertIn('CONFIG90_MISSING', self.evidence(frame(wire, self.body())).codes)
+
+    def test_direction_endpoint_and_device_binding(self):
+        for wire in (0x90, 0x91):
+            for options in ({'incoming': True}, {'endpoint': 2}, {'device': 3}):
+                self.assertIn('CONFIG90_MISSING', self.evidence(frame(wire, self.body()), **options).codes)
+
+    def test_invalid_framing_and_checksum(self):
+        for wire in (0x90, 0x91):
+            for offset in (3, 5, -1):
+                bad = bytearray(frame(wire, self.body())); bad[offset] ^= 1
+                self.assertIn('CONFIG90_MISSING', self.evidence(bytes(bad)).codes)
+            self.fails(capture.BAD, self.evidence, frame(wire, self.body())[:-1])
+
+    def test_invalid_length_finalizer_and_layout(self):
+        bad_finalizer = bytearray(self.body()); bad_finalizer[-1] ^= 1
+        bad_layout = bytearray(self.body()); bad_layout[117] ^= 1; fixture.config_finalizer(bad_layout)
+        for wire in (0x90, 0x91):
+            for body in (self.body()[:-1], self.body() + b'\0', bytes(bad_finalizer), bytes(bad_layout)):
+                self.assertIn('CONFIG90_MISSING', self.evidence(frame(wire, body)).codes)
+
+    def test_identical_candidates_across_wire_variants(self):
+        rows = records(missing=('CONFIG90',))
+        for irp, wire in enumerate((0x90, 0x90, 0x91), 100):
+            rows += transfer(frame(wire, self.body()), irp)
+        capture.analyze_bytes(pcap(rows)).require_complete()
+
+    def test_distinct_valid_bodies_are_ambiguous(self):
+        changed = bytearray(self.body()); changed[0] ^= 1; fixture.config_finalizer(changed)
+        self.assertTrue(capture.config_valid(changed))
+        rows = records(missing=('CONFIG90',))
+        rows += transfer(frame(0x90, self.body()), 100)
+        rows += transfer(frame(0x91, bytes(changed)), 101)
+        e = capture.analyze_bytes(pcap(rows))
+        self.assertEqual(e.codes, ('CONFIG90_AMBIGUOUS',))
+        self.fails('CONFIG90_AMBIGUOUS', e.require_complete)
+
+    def test_unknown_enumeration_and_wire_90_complete_stream(self):
+        rows = records(missing=('CONFIG90',))
+        first = bytearray(rows[0]); struct.pack_into('<H', first, 19, 255)
+        struct.pack_into('<H', first, 14, 11); rows[0] = bytes(first)
+        rows += transfer(frame(0x90, self.body()), 100)
+        for encode in (pcap, pcapng):
+            capture.analyze_bytes(encode(rows)).require_complete()
+
+    def test_unpaired_or_mismatched_usb_is_not_accepted(self):
+        payload = frame(0x90, self.body())
+        rows = records(missing=('CONFIG90',))
+        self.fails(capture.BAD, capture.analyze_bytes, pcap(rows + [usb(payload, 100)]))
+        pair = transfer(payload, 100)
+        pair[1] = usb(b'', 100, info=1, device=3)
+        self.fails(capture.BAD, capture.analyze_bytes, pcap(rows + pair))
+
+
 class EnumerationTests(Case):
     def rows(self):
         # Reproduce metadata only: UNKNOWN submit, assigned completion, URB 11 -> 8.

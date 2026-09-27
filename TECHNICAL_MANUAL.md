@@ -15,7 +15,7 @@ manual when reviewing, maintaining, or diagnosing the design.
 
 ## Contents
 
-1. [Purpose, scope, and evidence language](#1-purpose-scope-and-evidence-language)
+1. [Purpose and support scope](#1-purpose-and-support-scope)
 2. [Hardware and device identity](#2-hardware-and-device-identity)
 3. [System architecture and ownership](#3-system-architecture-and-ownership)
 4. [libfprint driver architecture](#4-libfprint-driver-architecture)
@@ -37,7 +37,7 @@ manual when reviewing, maintaining, or diagnosing the design.
 20. [Troubleshooting and diagnostic principles](#20-troubleshooting-and-diagnostic-principles)
 21. [Developer invariants, licensing, and references](#21-developer-invariants-licensing-and-references)
 
-## 1. Purpose, scope, and evidence language
+## 1. Purpose and support scope
 
 The project adds one image-based fingerprint reader to Fedora's existing
 `libfprint`/`fprintd` architecture. It is not a generic Goodix driver family and
@@ -59,20 +59,12 @@ Other configurations are **not qualified**. That wording means there is not
 enough evidence to claim support; it does not prove that every other
 configuration is incompatible.
 
-### 1.2 How claims are stated
+### 1.2 Support boundary
 
-This manual distinguishes three kinds of evidence:
-
-| Term | Meaning |
-| --- | --- |
-| Implemented | A property established by the current source and its fail-closed checks |
-| Offline tested | Exercised with synthetic fixtures without real USB, host PAM, or biometric authentication |
-| Qualified or observed | Reported on the stated Fedora/reader target and reviewed against the implementation and available telemetry |
-
-Offline tests are valuable for parser, lifecycle, and recovery invariants, but
-they do not establish recognition accuracy or real-system recovery. Likewise,
-one successful physical qualification does not establish a broad hardware or
-operating-system compatibility matrix.
+The implementation enforces parser, material, lifecycle and ownership checks.
+These checks do not establish statistical recognition accuracy or compatibility
+with unlisted systems. Support is limited to the hardware/software scope above;
+the [validation reference](docs/VALIDATION.md) records the release support basis.
 
 ## 2. Hardware and device identity
 
@@ -289,14 +281,21 @@ See [Device materials](docs/DEVICE_MATERIALS.md) for the complete public
 contract and acquisition boundary. Do not attach these files, their contents,
 raw USB captures, or derived secrets to a bug report.
 
-The Windows material builder remains a development candidate. Source validation,
-USBPcap prerequisites and capture startup have operator-reported live passes;
-clean shutdown, DPAPI and a complete bundle are still unqualified. Its
-[current audit](tools/windows_material_builder/AUDIT.md) identifies the historical
-CONFIG90 source but cannot establish a reproducible Windows trigger or capture
-mode, and records an unresolved wire 0x90/0x91 discrepancy. Missing CONFIG90 is a
-stop for provenance review, not a reason to repeat attachment or wait longer.
-The current gate prescribes no new capture.
+The [Windows material builder](tools/windows_material_builder/README.md) is a
+development candidate. It reads private OEM inputs and retained USBPcap captures;
+its end-to-end Windows shutdown, DPAPI and bundle workflow is not fully qualified.
+The capture parser permits an initial UNKNOWN-to-assigned USB address transition
+only for a successfully completed standard device-descriptor request with a
+structurally valid response. Identity binds to the assigned address; later
+address changes and ambiguous target streams fail closed.
+
+CONFIG90 extraction requires target bulk OUT endpoint `0x01`, successful USB
+pairing, valid A0 framing/checksum and logical control `wire & 0xFE == 0x90`.
+Both wire `0x90` and `0x91` satisfy that logical rule. The body must be exactly
+224 bytes and pass its layout/finalizer checks. Identical repetitions are
+allowed; distinct valid bodies are ambiguous. Missing evidence cannot be borrowed
+from another reader or recording, and missing CONFIG90 does not offer a timed
+retry. Read-only capture diagnosis neither calls DPAPI nor creates a bundle.
 
 ### 5.1 TLS roles and boundaries
 
@@ -618,10 +617,9 @@ device-side cancel command exists. It:
 - waits for callbacks and backend work to drain; and
 - marks the epoch non-reusable if clean quiescence is not demonstrated.
 
-The next action is then performed through teardown and reacquisition. On the
-qualified system, verification was observed to work after cancellation and
-after suspend/resume, but that evidence does not prove arbitrary on-device
-quiescence or all power-loss states.
+The next action uses teardown and reacquisition. Cancellation and suspend/resume
+do not establish arbitrary on-device quiescence or recovery from every power-loss
+state; a new action must still pass its receive and secure-session boundaries.
 
 ### 7.4 Enrollment zero-mask recovery
 
@@ -794,8 +792,8 @@ uses a `0.05` tolerance. The current libfprint cutoff is a score of 40.
 
 That cutoff is an implementation and target-functional threshold. It has **not**
 been calibrated into a universal false-acceptance or false-rejection rate and
-must not be presented as a security-strength measurement. Matching tests on the
-qualified reader establish functional behavior only within the stated scope.
+must not be presented as a security-strength measurement or generalized beyond
+the supported reader/application scope.
 
 ## 10. Enrollment, verification, and identification
 
@@ -940,9 +938,9 @@ or transport error ends that reusable series.
 
 The device is not prepared during libfprint open and stock fprintd does not
 prepare it before PAM starts a biometric action. The secure bootstrap, TLS, FDT,
-and baseline work therefore occurs after the user selects fingerprint. On the
-qualified Plasma Login system, allowing roughly one second before placing the
-finger produced the expected behavior.
+and baseline work therefore occurs after the user selects fingerprint. Allow
+roughly one second for preparation before placing the finger in Plasma Login;
+this is a startup allowance, not a fixed protocol timing guarantee.
 
 Removing that interval would require a consumer/daemon design that prepares the
 reader earlier and safely transfers ownership of the prepared state. The current
@@ -966,7 +964,7 @@ qualification.
 
 ### 13.1 Plasma Login selector
 
-Fedora's observed Plasma Login stack is password-oriented, so the project owns a
+The supported Fedora Plasma Login stack is password-oriented, so the project owns a
 small prefix at `/etc/pam.d/plasmalogin` and a module at
 `/usr/local/lib64/goodix-plasma-login/pam_goodix_login_gate.so`.
 
@@ -1008,11 +1006,11 @@ No project-specific configuration is installed for these consumers. They use
 fingerprint only when the host's current Fedora authentication policy enables
 `pam_fprintd`; the installer does not change authselect or global PAM files.
 
-The qualified fresh Fedora baseline used authselect `with-fingerprint` and
-observed password and fingerprint success for KScreenLocker, ordinary sudo, and
-a KDE PolicyKit dialog. This does not qualify every sudo variant or every
-possible PolicyKit action. Password-encrypted KWallet is independent and may
-still ask for a password after fingerprint login.
+The supported Fedora configuration uses authselect `with-fingerprint` for
+KScreenLocker, ordinary sudo and the KDE PolicyKit agent. Other sudo variants or
+PolicyKit action/agent combinations are outside the stated support scope.
+Password-encrypted KWallet is independent and may still ask for a password after
+fingerprint login.
 
 ## 14. SELinux and host integration
 
@@ -1348,33 +1346,6 @@ threat boundary.
 
 ## 19. Qualification and known limitations
 
-### 19.1 Current qualification evidence
-
-Results are operator-reported observations reviewed against the implementation
-and available telemetry.
-
-| Area | Current evidence | Boundary |
-| --- | --- | --- |
-| Public install | Complete build/import/install passed on fresh and updated Fedora 44 KDE VM and physical target, SELinux Enforcing | One distribution/release, architecture, reader, and application |
-| Enrollment/verification | Enrollment completed; registered finger matched; wrong finger produced clean no-match | Functional evidence, not statistical accuracy |
-| Enrollment zero-mask recovery | A zero-mask third contact preserved its primary, skipped optional/auxiliary acquisition, issued one next 0x32 and completed the same enrollment at 8 stages/8 contacts; final audit showed persistent=0/outstanding=0/drained=1/context_closed=1 | One observed recovery with no late IRQ0200; no general stale-release guarantee |
-| Enrollment regression checks | Ordinary enrollment, verification and duplicate detection were manually reported successful with the recovery enabled | Operator observations; no new multi-user or statistical qualification |
-| Plasma Login | Empty-field fingerprint selection and immediate nonempty-password path reached desktop | Current Fedora vendor PAM layout |
-| KScreenLocker | Password and fingerprint unlock reached desktop | Qualified stock policy only |
-| Ordinary sudo | Password and fingerprint authentication succeeded | Login-shell and all command variants not separately qualified |
-| PolicyKit | Password and fingerprint succeeded through a KDE agent | Not every action/agent combination |
-| Suspend/resume | Verification observed before and after suspend | Not a broad power-management campaign |
-| Cancellation | Waiting and early-action cancellations were followed by a valid reacquired action | Not proof of arbitrary device-side cancellation |
-| Normal removal | Project paths removed; password desktop remained usable | Metadata-based material/template preservation evidence |
-| Emergency removal | Successful console removal with reader connected was reported | Exact final output and every resulting state check were not supplied |
-
-Offline suites additionally cover material validation, unsafe file types,
-binding failures, parser bounds, image checks, enrollment diversity, action
-fences, service quiescence, partial-install rollback, ownership/drift handling,
-and normal/emergency removal with substituted privileged operations.
-
-### 19.2 Known limitations
-
 | Limitation | Consequence |
 | --- | --- |
 | One reader/application and Fedora target | No compatibility claim for other Goodix devices, firmware, distributions, desktops, architectures, or multiple readers |
@@ -1382,7 +1353,7 @@ and normal/emergency removal with substituted privileged operations.
 | No FAR/FRR study | Score 40 is not a universal biometric security calibration |
 | Unknown physical DPI/orientation/polarity | Do not label captures 500 DPI or promise a natural-facing or calibrated-polarity raster |
 | Device material is user-supplied | The Windows VM acquisition tool is a development candidate pending live validation; cross-reader interchangeability is not qualified and a different installed/staged bundle is not silently swapped |
-| Secure preparation starts with the action | Plasma fingerprint selection has about one second of observed startup latency |
+| Secure preparation starts with the action | Allow roughly one second after Plasma fingerprint selection before contact |
 | Stock policy controls most consumers | Altered authselect/PAM may not offer fingerprints; the installer does not rewrite global policy |
 | PAM layout evolves | Future Fedora changes may cause the Plasma selector to fall back to password until reviewed |
 | KWallet is separate | A password-encrypted wallet may prompt after fingerprint login |
@@ -1394,10 +1365,9 @@ and normal/emergency removal with substituted privileged operations.
 | SELinux audit suppression is type-based | The known denied read tuple can be hidden even when caused by a future process path |
 | Factory/Windows proof is incomplete | No exhaustive factory readback, Windows campaign, power-loss campaign, or future-update guarantee |
 
-A concise release qualification boundary is maintained in
-[Validation scope and known limitations](docs/VALIDATION.md); the additional
-protocol observations above retain narrower evidence from the implementation's
-target qualification.
+See [Validation scope and known limitations](docs/VALIDATION.md) for the release
+support basis. The protocol limits in this manual apply independently of a
+successful installation or authentication attempt.
 
 ## 20. Troubleshooting and diagnostic principles
 

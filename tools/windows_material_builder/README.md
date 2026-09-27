@@ -16,19 +16,48 @@ changes firmware or replaces a PSK. USBPcap observes ordinary OEM initialization
 **DO NOT TOUCH THE SENSOR during acquisition.** Captures can contain sensitive
 material and stay private, on failure as well as success. No upload or telemetry.
 
-## Current gate: no new capture yet
+## Current gate: read-only reanalysis of the retained capture
 
-The latest operator run retained a complete 174-record PCAP but reported
-CAPTURE_PROCESS_FAILED. Correcting its initial UNKNOWN-address descriptor pairing
-leads to CONFIG90_MISSING. The historical positive CONFIG90 source is identified,
-but its Windows trigger/capture mode and the historical 0x90 versus current 0x91
-wire-contract discrepancy remain unresolved. See [the provenance audit](AUDIT.md).
+The operator's read-only audit found a valid 224-byte CONFIG90 body on wire 0x90
+in the already-retained 30-second recording. The former exact-wire 0x91 filter
+caused a false negative. The parser now selects logical `wire & 0xfe == 0x90`,
+with all USB, target, frame, checksum, layout and ambiguity checks preserved.
+Wire 0x90 is observed in the real capture; wire 0x91 is covered by the canonical
+logical contract and synthetic tests, not by this live observation.
 
-Replace only the source copy with the reported development SHA if needed. Preserve
-the existing OEM folder, USBPcap installation and raw captures. Do not reinstall
-USBPcap or repeat capture yet. The next input is existing historical command/UI
-metadata, not a new sensor operation. The procedure below is retained as a workflow
-reference for a later explicitly defined gate; it is not the next live instruction.
+Replace only the source copy with the delivered development commit. Preserve the
+OEM folder, installed USBPcap and retained runs. Do not reinstall USBPcap. From a
+normal PowerShell session, run this self-contained command block. Enter the
+updated source root and the full path to the **already-retained current raw**
+when prompted; no variables from an earlier session are needed:
+
+```powershell
+Set-Location -ErrorAction Stop -LiteralPath (Read-Host 'Full path to the updated Goodix source folder')
+& "$env:LOCALAPPDATA\Goodix5125BuilderPython\Scripts\python.exe" -m tools.windows_material_builder --diagnose (Read-Host 'Full path to the already-retained current raw capture')
+if ($LASTEXITCODE -ne 0) { throw 'STOP: read-only reanalysis failed; report the safe diagnostic code.' }
+```
+
+Expected safe CLI output, with exit code zero:
+
+```text
+CONFIG90=PASS
+A2=PASS
+CHIP82=PASS
+A6=PASS
+```
+
+Successful analysis also requires the exact target and APP12509 identity; the CLI
+does not print separate identity lines. This path reads without modifying the raw,
+opens no real USB, starts no capture, calls no DPAPI and creates no bundle.
+Report only the tested commit and safe output/error. A failure is a stop, not a
+reason to capture again or select another reader's material.
+
+The historical positive capture's exact UI and acquisition mode remain unknown,
+but that does not block this retained recording: CONFIG90 is present. Shutdown
+root cause remains unresolved. Only after this reanalysis passes should a separate
+step define shutdown-instrumentation validation and eventual bundle construction.
+The procedure below is reference for that future step, not an instruction to run
+another capture now. See [the audit](AUDIT.md).
 
 ## Before a future Windows operator test
 
@@ -113,8 +142,8 @@ Then launch, also from the source root:
 
 The 30-second settle allowance exceeds the under-eight-second typed-response
 window in the read-only historical audit. It is an engineering bound, **not**
-proof of initialization completeness: that historical capture still lacks
-CONFIG90. The optional 60-second attempt for other missing classes doubles the observation window to test
+proof of initialization completeness: the historical audit reported incomplete
+evidence. The current retained operator recording contains valid CONFIG90. The optional 60-second attempt for other missing classes doubles the observation window to test
 possible late initialization without unbounded waiting. Historical evidence does
 not establish that 60 seconds is necessary or sufficient, nor that CONFIG90 is
 impossible during attach-only capture. All evidence gates remain mandatory. Attach timeout is 90 seconds;

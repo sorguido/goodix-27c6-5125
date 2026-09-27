@@ -3,6 +3,7 @@
 """Public build contract with synthetic compiler/package outputs; no real build."""
 import importlib.util
 import json
+import re
 import os
 from pathlib import Path
 import subprocess
@@ -279,6 +280,36 @@ class PublicBuild(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('--output', result.stdout)
         self.assertFalse(self.output.exists())
+
+
+def manual_report_leaks(text):
+    """Catch obvious reports, not ordinary technical terminology or hex values."""
+    keys = ('HUMAN_REQUIRED|NEXT_OPERATOR_ACTION|PUBLIC_EXPORT_CHECK|'
+            'LIVE_ACTIONS_PERFORMED|BUILDER_TESTS|EXISTING_REGRESSIONS|'
+            'SANITIZER|WORKTREE|PUSH|OUTCOME')
+    patterns = (rf'\b(?:{keys})\s*=', r'\bHEAD\s*=\s*[0-9a-f]{7,40}\b',
+                r'\b\d+\s+(?:(?:builder|deployment|production|recovery|unit|synthetic)\s+)?tests?\s+(?:passed|pass)\b',
+                r'\bRan\s+\d+\s+tests?\b')
+    return [pattern for pattern in patterns if re.search(pattern, text, re.IGNORECASE)]
+
+
+class DocumentationHygieneTests(unittest.TestCase):
+    def test_public_manual_has_no_machine_reports(self):
+        text = (SOURCE.parents[1] / 'TECHNICAL_MANUAL.md').read_text()
+        self.assertEqual(manual_report_leaks(text), [])
+
+    def test_obvious_report_leaks_are_detected(self):
+        for text in ('HUMAN_REQUIRED=REVIEW', 'NEXT_OPERATOR_ACTION=RUN',
+                     'PUBLIC_EXPORT_CHECK=PASS', 'LIVE_ACTIONS_PERFORMED=NONE',
+                     'BUILDER_TESTS=87', 'EXISTING_REGRESSIONS=PASS', 'SANITIZER=PASS',
+                     'WORKTREE=CLEAN', 'PUSH=PASS', 'OUTCOME=PASS', 'HEAD=abcdef1234',
+                     '78 builder tests passed', 'Ran 78 tests in 1s'):
+            self.assertTrue(manual_report_leaks(text), text)
+
+    def test_technical_vocabulary_and_protocol_values_are_allowed(self):
+        self.assertEqual(manual_report_leaks('The test must pass on the qualified target. '
+            'Observed control 0x90, HEAD field, a 224-byte body and 20 contacts. '
+            'These tests cover parser bounds; the checksum must pass validation.'), [])
 
 
 if __name__ == '__main__':

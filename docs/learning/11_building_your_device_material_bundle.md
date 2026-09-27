@@ -4,10 +4,11 @@
 > [Windows VM material builder](../../tools/windows_material_builder/README.md)
 > is available as source for operator validation. It uses USBPcap directly and
 > does not require Wireshark or TShark. It is not yet a supported release.
-> **Current acquisition gate:** no new capture is prescribed pending
-> [CONFIG90 trigger/wire-contract review](../../tools/windows_material_builder/AUDIT.md).
-> Attach-once does not guarantee CONFIG90; the historical positive capture has
-> unknown UI/mode provenance and wire 0x90, whereas this contract requires 0x91.
+> **Current builder validation:** update only the source and use the
+> [read-only retained-capture procedure](../../tools/windows_material_builder/README.md).
+> Valid CONFIG90 wire 0x90 is already present in the retained attach-once capture;
+> extraction accepts logical 0x90 (wire 0x90 or 0x91). No new capture is needed
+> to check this parser correction.
 > The manual reference below remains the independent fallback; its native-Windows
 > steps are outside the candidate app's VM-only scope.
 # 11. 🧰 Building your device-material bundle
@@ -606,9 +607,10 @@ if (Test-Path -LiteralPath $CaptureFile) { throw 'STOP: capture already exists; 
 & $UsbPcap -d $CaptureInterface --capture-from-new-devices -o $CaptureFile
 ```
 
-This sequence describes recording mechanics, not a proven CONFIG90 trigger.
-It is currently on hold at the provenance gate above. When a future gate explicitly
-calls for it, manually attach only the same reader to the guest. Wait for normal OEM
+This sequence describes recording mechanics; completeness still requires all
+material checks. For the current builder correction, first reanalyze the retained
+raw as described above. During an explicitly chosen new acquisition, manually
+attach only the same reader to the guest. Wait for normal OEM
 initialization, do not touch it, and stop with Ctrl+C. Omitting `-A` reduces
 unrelated traffic, capture size and exposure of keyboard/storage activity
 from devices already present. The
@@ -705,9 +707,11 @@ target-config-90.bin (224):          [224-byte BODY]
 
 Goodix A0 frames have a four-byte outer header: marker `A0`, a two-byte
 little-endian payload length, and a tag. The payload contains the wire control,
-two-byte inner length, body, and one checksum byte. The wire control for the
-configuration write is `0x91`; removing its low command bit gives logical
-command `0x90`. These are labels for the same qualified write, not two files.
+two-byte inner length, body, and one checksum byte. CONFIG90 selection requires
+logical control `wireControl & 0xfe == 0x90`, admitting wire `0x90` and `0x91`.
+The retained Windows capture demonstrates wire `0x90`; acceptance of `0x91`
+follows the logical contract and synthetic coverage. Both select the same
+material class, not two files.
 
 USBPcap also records a Windows transfer's submission and completion. Its
 IRP direction is **not** the endpoint's USB direction. Windows uses fields
@@ -801,8 +805,8 @@ OEM OUT commands and the unchanged wireControl for IN replies. Require
 (checksumCoordinate+bodyLength+1+sum(body)+lastByte)&255 == 0xaa.
 
 Require a target A8 IN reply with the exact 22-byte NUL-terminated body
-ASCII GF_ST411SEC_APP_12509 followed by 00. Require configuration OUT exact
-wire91/logical90 body224. Validate sum(first111 LE16 words)+last LE16 word
+ASCII GF_ST411SEC_APP_12509 followed by 00. Require configuration OUT
+logical90 (wire90 or wire91) body224. Validate sum(first111 LE16 words)+last LE16 word
 equals -0xa5a5 modulo65536. At body offsets117,121,125,129 require LE16
 register addresses0220,0236,0238,023a respectively; keep following values
 unchanged, never substitute another reader's tuning.
@@ -1539,9 +1543,10 @@ recording? Does the helper support the capture's packet layout? A missing
 message is not fixed by scanning arbitrary bytes for `0x90`.
 
 Stop and retain the recording. No timing retry is justified for CONFIG90_MISSING
-by the current evidence. The historical source is identified, but its trigger
-and wire-contract discrepancy require review before another acquisition is
-planned. Do not automate capture/reset attempts or use maintenance/firmware
+by the current evidence. The retained builder recording already contains
+CONFIG90; an older exact-wire filter produced a false negative. Reanalyze with
+the corrected logical-control rule first. A genuinely missing result requires
+review of the recording and acquisition state, never material from another run. Do not automate capture/reset attempts or use maintenance/firmware
 commands to trigger it.
 
 ### “I found two different CONFIG90 bodies”

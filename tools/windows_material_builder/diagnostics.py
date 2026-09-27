@@ -118,8 +118,8 @@ for name, description in [('CONFIG90', '224-byte CONFIG90 body'), ('A2', '3-byte
 
 
 _add('CONFIG90_MISSING', 'The target was identified, but no valid 224-byte CONFIG90 body was found.',
-     'The required OEM trigger or state may differ from passive attachment; its provenance remains incomplete.',
-     'Stop and retain the capture. Report CONFIG90_MISSING for provenance review. '
+     'The recording may not include the required initialization command for this target state.',
+     'Stop and retain the capture. Report CONFIG90_MISSING for capture-evidence review. '
      'Do not repeat attachment or extend the wait to try to force CONFIG90.')
 
 

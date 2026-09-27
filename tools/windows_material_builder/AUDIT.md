@@ -89,8 +89,8 @@ known mismatch cannot be hidden by a simultaneous missing class. It repeats deta
 preflight and manual attachment in a fresh run, with no third timing tier. The historical operator also explicitly waited for
 passive initialization to settle; only complete capture evidence permits build.
 
-The candidate parser reproduces the missing-CONFIG90 outcome on that retained
-capture. Like the historical parser, it never scans opaque traffic or physical
+The earlier exact-wire parser reported missing CONFIG90 on that historical
+capture; this is not a logical-control reanalysis of that recording. Like the historical parser, it never scans opaque traffic or physical
 tails for a body; only framed A0 candidates are eligible. It additionally requires
 successful USB submission/completion pairing, an exact NUL-terminated runtime A8
 identity, one target identity/attachment epoch, full packet snapshots, and
@@ -118,9 +118,9 @@ Export validation must exercise the candidate from a copy with no `.git` or
 
 ## Offline verification (2026-09-27)
 
-The 78 builder tests passed using synthetic inputs, including acceptance of
+The 87 builder tests passed using synthetic inputs, including acceptance of
 generated material by the compiled production C loader. Existing deployment
-(76), production (13) and recovery (48) Python tests passed. The C A0 (51),
+(76), production (16) and recovery (48) Python tests passed. The C A0 (51),
 post-TLS (19) and image-device (58) suites each passed both normally and under
 ASan/UBSan using the existing Freedesktop SDK. These results do not validate
 Windows native API behavior or actual reader acquisition.
@@ -128,8 +128,9 @@ Windows native API behavior or actual reader acquisition.
 The corrective pass added 11 tests for timestamp inversions/ranges, explicit
 30/60-second retries and retention, mixed missing/A6-mismatch exclusion, installer
 wording, and safe baseline metadata reporting. The read-only historical capture
-still returns CONFIG90_MISSING, with A2/chip82/A6 and APP12509 passing and raw
-size/mtime unchanged; the timestamp correction did not change its classification.
+then returned CONFIG90_MISSING, with A2/chip82/A6 and APP12509 passing and raw
+size/mtime unchanged. That result predates the logical-control correction below
+and must not be used to classify the current operator recording.
 
 A public source copy without Git history or `development` passed the builder
 tests, CLI entrypoint check and complete source-ledger hash verification.
@@ -162,13 +163,17 @@ CAPTURE_START_AND_MANUAL_ATTACH_GATE=LIVE_PASS
 PCAP_CONTAINER=LIVE_PASS_174_COMPLETE_RECORDS
 USBPCAP_DECODE=LIVE_PASS
 ENUMERATION_255_TO_ASSIGNED_TRANSITION=REAL_OBSERVED
-CURRENT_PARSER_ENUMERATION_POLICY=CORRECTED_OFFLINE_PENDING_LIVE
+ENUMERATION_POLICY=CORRECTED_OFFLINE_PENDING_LIVE_REANALYSIS
 CAPTURE_STOP_STATUS=LIVE_FAILURE_DESPITE_COMPLETE_PCAP
 APP12509=PASS
 A2=PASS
 CHIP82=PASS
 A6=PASS
-CONFIG90=MISSING
+CONFIG90=PASS_BY_READ_ONLY_LOGICAL_CONTROL_AUDIT
+CONFIG90_WIRE=0x90
+CONFIG90_LOGICAL=0x90
+CONFIG90_BODY_LENGTH=224
+CONFIG90_FINALIZER=PASS
 BUNDLE_BUILD=NOT_REACHED
 DPAPI_LIVE_BUILD=NOT_REACHED
 ```
@@ -176,8 +181,10 @@ DPAPI_LIVE_BUILD=NOT_REACHED
 The reported PCAP is 20,959 bytes with no trailing data. UAC and READY worked;
 attachment occurred only after the prompt, without sensor contact. The operator's
 read-only in-memory normalization of the single UNKNOWN-address descriptor pair
-allowed the old parser to reach CONFIG90_MISSING. Current private capture and OEM
-material were not opened in this corrective pass.
+allowed the old parser to reach its CONFIG90 false negative. A subsequent
+operator read-only audit found one valid logical CONFIG90 candidate, wire 0x90,
+224-byte body and valid finalizer in that same recording. The current private
+capture and OEM material were not opened by the agent in either corrective pass.
 
 [USBPcap allocation](https://github.com/desowin/usbpcap/blob/1.5.4.0/USBPcapDriver/USBPcapFilterManager.c)
 starts the address at 255; its
@@ -210,15 +217,17 @@ STOP accepts both LF and Windows text-pipe CRLF. Status writes are serialized;
 failed status/control pipes cannot skip process cleanup or retained diagnostics.
 This is instrumentation, not a claimed fix for the unproven live shutdown cause.
 
-## CONFIG90 provenance and current gate
+## CONFIG90 logical contract and historical trigger provenance
 
 ```text
-CONFIG90_PROVENANCE=PARTIAL
+CONFIG90_HISTORICAL_TRIGGER_PROVENANCE=PARTIAL
 CONFIG90_HISTORICAL_WORKFLOW=UNKNOWN
 CONFIG90_HISTORICAL_CAPTURE_MODE=UNKNOWN
+CONFIG90_WIRE_CONTRACT=CLOSED_LOGICAL_0x90
+CONFIG90_REAL_OBSERVED_WIRE=0x90
 CONFIG90_LATENESS_EVIDENCE=NONE_FOUND
 CONFIG90_60S_POLICY=DISABLED_WHEN_CONFIG90_MISSING
-NEXT_GATE=HISTORICAL_TRIGGER_AND_WIRE_CONTRACT_REVIEW_NO_NEW_CAPTURE
+NEXT_GATE=SOURCE_ONLY_UPDATE_AND_READ_ONLY_REANALYSIS_OF_RETAINED_RAW
 ```
 
 The retained D232 material-provenance report (C3) and D233 runtime-boundary report
@@ -227,7 +236,8 @@ D230 corpus, later reused by D263. This identifies the historical source, not a
 new comparison against the protected installed bundle. The earlier original
 capture is recorded as lost. No private filename, path, digest or body is exported
 here. The historical raw source still exists; only container/USB headers and its
-single command-control byte at the documented boundary were read in this pass.
+single command-control byte at the documented boundary were read during the
+preceding 0c809 pass. No historical raw was reopened for this correction.
 Raw size and modification time were unchanged. No OEM file, PSK, current capture
 or private bundle was read.
 
@@ -240,13 +250,16 @@ The retained census and those reports establish these zero-based packet indices:
 | CONFIG acknowledgement/response | 111, 113 | IN A0 ACK, then logical 0x90 response |
 | Next request | 114 | OUT D1; B0 TLS ClientHello follows at 117 |
 
-**Wire-contract discrepancy:** the historical census, D233 text and the header-only
-recheck agree on wire **0x90** at packet 103. The old extractor at `fa98461`
-accepted logical `wire & 0xfe == 0x90`; its synthetic example used 0x91. The current
-builder/learning contract requires wire 0x91. That rule is unchanged by this pass;
-using the old synthetic example as proof of the historical wire value was
-unjustified. The discrepancy requires a separate contract review, not a permissive
-parser change or a claim that it explains the unread current capture.
+**Resolved parser false negative:** historical census, D233 and the header-only
+recheck agree on wire 0x90. The old extractor selected logical
+`wire & 0xfe == 0x90`; its synthetic example used 0x91. The new builder's exact
+`wire == 0x91` restriction confused that example with the canonical acceptance
+contract. The current operator audit independently confirms a valid wire 0x90
+CONFIG90 in the retained attach-once recording. Selection now uses logical 0x90,
+with unchanged target/OUT pairing, A0 checksum, 224-byte body, layout/finalizer,
+repeat and ambiguity gates. `parse_a0()` is unchanged. Wire 0x91 is compatible
+with this contract and tested synthetically; this audit does not claim it was
+observed in the real recording.
 
 The canonical D274 workflow audit explicitly records that the recovered positive
 capture lacks the acquisition command, UI markers and OEM workflow. Fresh attach,
@@ -257,17 +270,46 @@ CONFIG90. Neither its capture-all/new-device/list/injected-descriptor settings n
 Wireshark/TShark options can be recovered from those reports. Historical D255 used
 a separate TShark-controlled zero-finger workflow and cannot fill this gap.
 
-The docs' attach-once sequence remains a way to record ordinary initialization,
-not an established reproducible CONFIG90 acquisition recipe. D255 and the new
-operator run both lack CONFIG90; neither establishes impossibility or lateness.
-Missing CONFIG90 now offers no default/extended retry in the result screen and
-instructs the operator to stop. The bounded 30 -> 60 mechanism remains only for
-missing A2/chip82/A6 when CONFIG90 and the other gates pass, as an engineering
-option without a completeness guarantee.
+The current attach-once recording contains valid CONFIG90. Unknown historical
+UI/mode provenance does not block its read-only analysis and does not justify a
+new acquisition. The earlier claim that both that recording and D255 lacked
+CONFIG90 is withdrawn. No new claim about D255's logical candidates is made here.
 
-**Next human gate:** source-only replacement may be prepared on the existing VM;
-preserve OEM files, installed USBPcap and both historical/current recordings.
-No new capture is prescribed yet. Supply any existing historical acquisition
-command/UI notes for the D230/D263 positive recording (metadata only), and resolve
-the 0x90/0x91 acceptance boundary before choosing a new live action. Do not invent
-a Hello, service-restart, PnP or firmware procedure to manufacture CONFIG90.
+CONFIG90 was already present during the retained 30-second acquisition; this is
+not lateness evidence. A future genuine CONFIG90_MISSING still offers no default
+or extended retry and remains mandatory/fail-closed. The bounded 30 -> 60 option
+remains only for missing A2/chip82/A6 with CONFIG90 present and all other gates
+passing; it is an engineering allowance, not a completeness guarantee.
+
+**Next human gate:** update only the Windows source and run the existing
+`--diagnose` path against the already-retained current raw. The self-contained
+PowerShell command in README prompts for the source folder and raw path. Expected
+output is CONFIG90/A2/CHIP82/A6 PASS, exit zero; exact target/APP identity is an
+implicit prerequisite. No USB access, new capture, DPAPI, bundle build or raw
+modification occurs. Preserve OEM inputs, USBPcap and retained runs. Only after
+that passes should a separate step define live shutdown validation and eventual
+bundle construction. Shutdown root cause remains UNRESOLVED.
+
+## Post-0c809 verification and public-manual sanitation
+
+Nine new synthetic CONFIG90 groups cover both wire variants, unrelated controls,
+direction/endpoint/device binding, invalid frame/checksum/length/layout/finalizer,
+identical and distinct repetitions, unpaired USB and a complete wire-0x90 stream
+behind the accepted 255-to-assigned enumeration. No private fixture was added.
+The enumeration and lifecycle implementation from 0c809 is preserved.
+
+The entire public TECHNICAL_MANUAL.md, including all 14 fenced blocks, was reviewed.
+Internal qualification-session recaps and the temporary builder gate/history were
+removed. Protocol/state/architecture diagrams, public path layouts and the stable
+service-quiescence predicate remain because they explain operational contracts.
+No implementation/test bodies, debug scripts, private evidence or internal report
+blocks remain. Stable diagnostic field semantics are retained for troubleshooting,
+not as a transcript. The non-public development manual retains useful chronology;
+Git ignores it and source export excludes the whole top-level development tree.
+A compact rule was added to its canonical AGENTS.md documentation section.
+
+The existing production unittest suite now checks exact report-key leakage,
+HEAD=SHA and obvious test-count recap patterns, with positive/negative examples.
+It does not ban ordinary technical vocabulary or protocol hexadecimal values;
+semantic full-file review remains authoritative. Verification uses the same
+normal/sanitizer/native-C/public-copy scope described above.

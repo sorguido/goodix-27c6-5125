@@ -255,7 +255,7 @@ def analyze_bytes(data):
             except ExtractError:
                 continue
             name = None
-            if p.endpoint == 1 and wire == 0x91 and config_valid(body):
+            if p.endpoint == 1 and logical == 0x90 and config_valid(body):
                 name = 'CONFIG90'
             if p.endpoint == 0x81:
                 spec = {0xa2: ('A2', 3), 0x82: ('CHIP82', 4), 0xa6: ('A6', 64)}.get(wire)
