@@ -18,7 +18,7 @@ GUIDE = 'https://github.com/sorguido/goodix-27c6-5125/blob/main/docs/learning/11
 class App:
     def __init__(self, root):
         self.root = root
-        root.title('Goodix 5125 Material Builder — Development candidate')
+        root.title('Goodix 5125 Material Builder')
         root.geometry('800x650')
         root.minsize(680, 550)
         self.events = queue.Queue()
