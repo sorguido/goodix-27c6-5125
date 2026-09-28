@@ -35,6 +35,24 @@ runs. Do not reinstall USBPcap or create a new VM. Initially detach Goodix from
 the guest and disable automatic attachment. Close fingerprint/enrollment settings.
 Use the controller mapping already established in this qualified VM.
 
+Before running the command below, obtain the project source folder:
+
+1. Open the project's GitHub page.
+2. Select the `main` branch.
+3. Choose **Code → Download ZIP**.
+4. Extract the ZIP archive to a local folder.
+5. Copy the full path of the extracted project folder.
+6. When PowerShell shows:
+
+   ```text
+   Full path to the updated Goodix source folder:
+   ```
+
+   paste that full folder path and press **Enter**.
+
+Use the project root folder (the one containing `tools`, `docs`, and the other
+repository files), not the `tools\windows_material_builder` subfolder.
+
 From a normal, unelevated PowerShell session:
 
 ```powershell
