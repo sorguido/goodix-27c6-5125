@@ -98,8 +98,9 @@ copied as OEM material and parsed for producer inputs; Linux does not execute it
 ## DPAPI
 
 Windows Data Protection API. It protects data using a Windows security context.
-Recovering the existing Goodix cache needs the correct original context and
-the exact additional entropy; copying the file to a new Windows VM is not enough.
+For this project, recovering the existing Goodix cache requires the original
+Windows user/DPAPI context inside the qualified Windows VM and the exact
+additional entropy; copying the file to another VM is not enough.
 
 ## Endpoint
 

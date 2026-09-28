@@ -20,12 +20,14 @@ Otherwise, if you already have a valid five-file bundle for your reader, place t
 there and continue with [Installation](INSTALLATION.md).
 
 > [!TIP]
-> **Starting from zero? Use the Windows Material Builder.** The recommended
-> acquisition path is the
-> [Goodix 5125 Windows Material Builder](../tools/windows_material_builder/README.md),
-> which guides the Windows-side capture and prepares the complete five-file bundle
-> required by the Linux installer. Follow that README from the beginning on the
-> qualified OEM Windows environment for your own reader.
+> **Starting from zero? Use the Windows Material Builder.** The supported
+> acquisition environment is a qualified Windows VM with USB passthrough, the
+> qualified Goodix OEM driver, and the original Windows user/DPAPI context for
+> that VM. Use the
+> [Goodix 5125 Windows Material Builder](../tools/windows_material_builder/README.md)
+> inside that VM to capture and prepare the complete five-file bundle required by
+> the Linux installer. Native or bare-metal Windows acquisition is outside the
+> supported workflow.
 >
 > Part II below remains available as the manual acquisition and technical reference
 > for the same material. It is useful for understanding, auditing or troubleshooting
@@ -43,10 +45,11 @@ not a reader-identity value.
 
 The supported Linux release **validates and consumes** an already prepared bundle.
 The [Windows Material Builder](../tools/windows_material_builder/README.md) is the
-recommended Windows-side acquisition path for creating that bundle from the same
-reader and its qualified OEM environment. It performs the acquisition, extraction,
-DPAPI recovery, manifest generation and final five-file validation described by
-the manual reference below.
+supported acquisition path for creating that bundle from the same reader inside
+its qualified Windows VM. That VM uses USB passthrough, the qualified Goodix OEM
+driver, and the original Windows user/DPAPI context. The builder performs the
+acquisition, extraction, DPAPI recovery, manifest generation and final five-file
+validation described by the manual reference below.
 
 The technical reference later in this document describes the formats,
 source locations, protocol evidence and validation rules needed to derive the
@@ -54,7 +57,8 @@ five artifacts manually or with independent tooling. It remains the manual
 reference and troubleshooting/audit path; the public installer and runtime remain
 the final authority on whether a bundle is acceptable.
 
-Use only material lawfully obtained from your own reader/OEM environment. Do
+Use only material lawfully obtained from your own reader inside its qualified
+Windows VM and from the qualified OEM files present in that VM. Do
 not guess missing values, reuse another reader's material, generate a
 replacement PSK, weaken validation, flash firmware, enter IAP, invoke ClearApp,
 write OTP, or change VID:PID.
@@ -100,8 +104,8 @@ app = GF_ST411SEC_APP_12509
 The six SHA-256 values are reader/bundle-specific. The manifest must be at most
 4096 bytes. The runtime rejects missing, duplicate or unknown keys, malformed
 separators, escapes, embedded NUL, invalid digests, trailing data, an unsupported
-schema, or a wrong VID/PID/APP identity. Development-reader hashes are not
-release acceptance criteria.
+schema, or a wrong VID/PID/APP identity. Hashes from any single reference reader
+are not release acceptance criteria.
 
 A canonical shape is:
 
@@ -177,7 +181,7 @@ SHA-256: 904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2
 ```
 
 The qualified package installs the UMDF binary under the INF destination
-`%12%\UMDF\gfusb.dll`. On a standard Windows installation the installed copy is
+`%12%\UMDF\gfusb.dll`. Inside the qualified Windows VM, the installed copy is
 typically available as:
 
 ```text
@@ -276,35 +280,36 @@ The recommended model is:
 ```text
 same physical Goodix reader
         |
-        +-- OEM Windows files ------------------------------+
+        +-- OEM files from qualified Windows VM ------------+
         |                                                   |
         +-- USBPcap capture made during OEM initialization -+---> five files
 ```
 
 All reader-specific inputs must come from the same physical unit.
 
-## Step 1 — Prepare the OEM Windows environment
+## Step 1 — Prepare the qualified Windows VM
 
-Use native Windows or a Windows VM with USB passthrough and the qualified Goodix
-OEM driver. The target is:
+Use an existing qualified Windows VM with USB passthrough, the qualified Goodix
+OEM driver, and the original Windows user/DPAPI context for that VM. Native or
+bare-metal Windows acquisition is outside the supported workflow. The target is:
 
 ```text
 VID_27C6&PID_5125
 GF_ST411SEC_APP_12509
 ```
 
-If using a VM, a clean sequence is:
+The supported acquisition sequence is:
 
-1. boot Windows without attaching the fingerprint reader;
+1. boot the Windows VM without attaching the fingerprint reader to the guest;
 2. start USBPcap capture on the relevant USB controller;
-3. attach the reader once;
+3. attach the physical reader to the VM once;
 4. allow the ordinary OEM driver to initialize it;
 5. stop the capture after initialization has completed.
 
 Do not run Goodix maintenance/provisioning operations.
 
-On Windows, the device identity can be checked with ordinary Device Manager or,
-for example:
+Inside the qualified Windows VM, the device identity can be checked with ordinary
+Device Manager or, for example:
 
 ```powershell
 Get-PnpDevice -PresentOnly | Select-String 'VID_27C6&PID_5125'
@@ -351,19 +356,20 @@ Require the qualified DLL size and SHA-256 listed earlier.
 
 ## Step 3 — Capture the OEM initialization traffic
 
-The manual reference uses Wireshark/TShark with USBPcap support. Start recording
-before initialization to retain early traffic. A retained ordinary attach-once
-Windows VM capture contains a valid CONFIG90; it was previously rejected by an
-incorrect exact-wire filter. Extraction selects logical control 0x90, not only
-wire 0x91. This does not guarantee completeness for every reader state.
+The supported acquisition environment is the qualified Windows VM. Start
+recording while the Goodix reader is detached from the guest, then attach the
+physical reader only after capture is active so the early OEM initialization
+traffic is observable. Extraction selects logical control `0x90` and accepts
+compatible wire values only through the documented framing and logical-control
+rules. CONFIG90 and all typed responses must be valid, unambiguous, and come
+from the same qualified target stream and recording.
 
-For the current builder validation, follow the [single full acquisition
-procedure](../tools/windows_material_builder/README.md), starting detached and
-stopping before bundle construction. After the 30-second window, accept the
-additional TASKKILL UAC prompt. The builder verifies USBPcapCMD absence and
-flushes the retained raw before analysis. CONFIG90
-and all typed responses remain mandatory from the same qualified target stream
-and recording.
+For normal acquisition, use the
+[Goodix 5125 Material Builder](../tools/windows_material_builder/README.md).
+It applies the supported detach-capture-attach sequence, performs the bounded
+capture/shutdown lifecycle, and runs strict material analysis automatically.
+The manual steps below remain the independent technical reference for the same
+qualified Windows VM workflow.
 
 The extraction logic uses USBPcap link type `249` and bulk endpoints:
 
@@ -463,7 +469,8 @@ If that fails, the cache and capture do not describe the same qualified state.
 
 ## Step 6 — Recover the existing 32-byte PSK from `Goodix_Cache.bin`
 
-Use the cache from the same Windows OEM environment:
+Use the cache from the same qualified Windows VM and the same original Windows
+user/DPAPI context:
 
 ```text
 C:\ProgramData\Goodix\Goodix_Cache.bin
@@ -673,7 +680,7 @@ public installer.
 
 ## OEM cache files are absent
 
-The OEM driver may not have initialized the reader in that Windows environment.
+The OEM driver may not have initialized the reader inside the qualified Windows VM.
 Check:
 
 ```text
@@ -700,14 +707,14 @@ from different USB bus/device identities.
 ## Multiple distinct valid candidates exist
 
 Treat the capture as ambiguous. Prefer a new bounded OEM-initialization capture
-rather than selecting the first candidate.
+inside the same qualified Windows VM rather than selecting the first candidate.
 
 ## DPAPI recovery fails
 
-Verify that `Goodix_Cache.bin` came from the OEM environment being used for
-recovery, that the last 8 bytes were treated as the entropy trailer rather than
-part of the DPAPI blob, and that the optional entropy was derived exactly as
-shown. Do not substitute a random PSK.
+Verify that `Goodix_Cache.bin` came from the qualified Windows VM and original
+Windows user/DPAPI context being used for recovery, that the last 8 bytes were
+treated as the entropy trailer rather than part of the DPAPI blob, and that the
+optional entropy was derived exactly as shown. Do not substitute a random PSK.
 
 ## `gfusb.dll` cannot be found or does not match
 

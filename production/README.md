@@ -30,10 +30,10 @@ library's terms.
 
 ## Validation boundary
 
-The public installer performs the checks needed for the supported installation
-path. Additional development and regression analysis is not part of the end-user
-procedure and is not required to install, use, update or remove the driver.
+The public installer performs the checks required for the supported installation
+path. Additional maintainer verification is separate from the end-user procedure
+and is not required to install, use, update or remove the driver.
 
-A successful source build does not by itself prove hardware behavior or every
-Fedora authentication/SELinux path. The current tested scope and remaining limits
-are documented in [Validation](../docs/VALIDATION.md).
+A successful source build does not by itself establish hardware behavior or every
+Fedora authentication/SELinux path. The qualified scope and remaining limits are
+documented in [Validation](../docs/VALIDATION.md).

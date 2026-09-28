@@ -4,11 +4,9 @@
 ## Supported configuration
 
 Fedora 44 KDE on x86_64, a local user account, Goodix USB `27c6:5125` running
-`GF_ST411SEC_APP_12509`, and Fedora's stock fprintd, PAM and Plasma Login.
-Other hardware, firmware, distributions and network accounts are unsupported.
-The complete installer has been exercised successfully on a freshly installed and
-updated Fedora 44 KDE VM and on the physical Fedora 44 KDE qualification system
-with SELinux Enforcing; see [validation](VALIDATION.md) for the evidence boundary.
+`GF_ST411SEC_APP_12509`, Fedora's stock fprintd, PAM and Plasma Login, and SELinux
+Enforcing. Other hardware, firmware, distributions and network accounts are
+unsupported. See [validation](VALIDATION.md) for the qualification boundary.
 
 ## Prerequisites
 
@@ -49,13 +47,17 @@ installer checks names, metadata, formats and file bindings before importing
 anything; another reader's bundle is not a substitute.
 If you do not already have the complete five-file bundle, follow the detailed
 [device-material acquisition reference](DEVICE_MATERIALS.md) before continuing.
-That procedure is documented separately because it uses the reader's OEM Windows
-environment and capture evidence; the Linux installer itself does not extract
-secrets or open USB to manufacture the bundle.
+The supported acquisition environment is a qualified Windows VM with USB
+passthrough, the qualified Goodix OEM driver, and the original Windows user/DPAPI
+context for that VM; the Linux installer itself does not extract secrets or open
+USB to manufacture the bundle.
 
-An English-language [Windows VM material builder candidate](../tools/windows_material_builder/README.md)
-is available separately for development validation. It does not change this Linux
-installation procedure or the five-file contract, and is not yet live-qualified.
+The recommended acquisition path is the
+[Goodix 5125 Material Builder](../tools/windows_material_builder/README.md).
+It runs inside that qualified Windows VM, prepares the same canonical five-file
+bundle, and does not change this Linux installation procedure or the material
+contract. Native or bare-metal Windows acquisition is outside the supported
+workflow.
 
 ## Install, update or reinstall
 
@@ -145,9 +147,9 @@ password and report the result. Do not start repeated test series or add a fourt
 attempt. A password-encrypted KWallet may ask for its own password after login.
 Other consumers offer fingerprint where the current Fedora authentication
 configuration enables it. The installer does not modify authselect or global PAM
-policy. The qualified fresh Fedora baseline had authselect `with-fingerprint`
-enabled; systems with an altered Fedora authentication policy may not offer
-fingerprint to those consumers until that host policy is corrected.
+policy. The supported Fedora configuration uses authselect `with-fingerprint`;
+systems with an altered Fedora authentication policy may not offer fingerprint
+to those consumers until that host policy is corrected.
 
 ## If installation or authentication fails
 

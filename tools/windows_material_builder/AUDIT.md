@@ -4,10 +4,12 @@
 This document records the stable technical, provenance and safety properties of
 the Goodix 5125 Windows Material Builder.
 
-The builder has been validated end-to-end on the qualified Windows environment:
-embedded USBPcap acquisition, target and APP validation, CONFIG90/A2/CHIP82/A6
-extraction, A6/FDT binding, DPAPI recovery, transport-material generation,
-manifest generation and final five-file validation all completed successfully.
+The supported acquisition environment is the qualified Windows VM with USB
+passthrough, the qualified Goodix OEM driver, and the original Windows user/DPAPI
+context. The builder's qualified workflow covers embedded USBPcap acquisition,
+target and APP validation, CONFIG90/A2/CHIP82/A6 extraction, A6/FDT binding,
+DPAPI recovery, transport-material generation, manifest generation and final
+five-file validation.
 
 A five-file bundle produced by the application was subsequently accepted by a
 clean Fedora installation of the driver. The Linux installer/runtime remains the
@@ -81,7 +83,7 @@ The normal USBPcap stop is:
 %SystemRoot%\System32\taskkill.exe /F /T /IM USBPcapCMD.exe
 ```
 
-It is launched elevated through native Windows `ShellExecuteExW` with the
+It is launched elevated through the Win32 `ShellExecuteExW` API with the
 `runas` verb while the main GUI remains unelevated.
 
 The numeric TASKKILL exit code is diagnostic telemetry. It is **not** the
@@ -153,8 +155,8 @@ A missing or ambiguous required material class does not produce a valid bundle.
 
 ## DPAPI and transport material
 
-`Goodix_Cache.bin` is opened only in the original qualified Windows user
-context through Windows DPAPI.
+`Goodix_Cache.bin` is opened only in the original Windows user/DPAPI context
+inside the qualified Windows VM.
 
 The recovered existing 32-byte PSK is not displayed or written as a loose key
 file.
@@ -217,17 +219,19 @@ The Material Builder does not:
 - enroll a fingerprint;
 - modify persistent reader state.
 
-Its role is limited to observing ordinary OEM Windows initialization and
-constructing the private material bundle required by the Linux driver.
+Its role is limited to observing ordinary OEM initialization inside the qualified
+Windows VM and constructing the private material bundle required by the Linux
+driver.
 
 ## Qualification scope
 
-The validated path covers the tested qualified Windows environment and the
-Goodix `27c6:5125` / `GF_ST411SEC_APP_12509` target with the qualified OEM
-driver and DLL.
+The qualified path requires the existing Windows VM with USB passthrough, the
+Goodix `27c6:5125` / `GF_ST411SEC_APP_12509` target, the qualified OEM driver
+and DLL, and the original Windows user/DPAPI context.
 
-The project does not claim generic qualification for every Windows version,
-Goodix firmware revision, OEM package or physical reader variant.
+Native or bare-metal Windows acquisition is outside the supported workflow.
+The project does not claim generic qualification for other Windows VM versions,
+Goodix firmware revisions, OEM packages or physical reader variants.
 
 Material success on Windows does not bypass Linux-side validation. The Linux
 installer/runtime remains authoritative.

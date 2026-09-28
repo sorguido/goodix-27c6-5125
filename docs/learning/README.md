@@ -22,7 +22,7 @@ does.
 You do not need to read source code. Optional source links are included for
 curious readers, but the story stands on its own.
 
-The project-specific parts describe the tested Goodix USB `27c6:5125` reader,
+The project-specific parts describe the supported Goodix USB `27c6:5125` target,
 firmware `GF_ST411SEC_APP_12509`, and Fedora 44 KDE setup. Other Linux systems
 may arrange the upper layers differently.
 
@@ -56,7 +56,7 @@ You can stop after any chapter and still keep a useful mental picture.
 8. [Login, lock screen, sudo, and PolicyKit](08_desktop_authentication.md) — one fingerprint stack, different experiences.
 9. [What is stored, and where](09_what_is_stored.md) — sensor state, device material, and host templates.
 10. [Safety and factory preservation](10_safety_and_factory_preservation.md) — why Linux support does not mean reprogramming the reader.
-11. [Building your device-material bundle](11_building_your_device_material_bundle.md) — a practical, from-zero walkthrough for collecting the Windows inputs, making a USB capture, deriving the protected transport material, and assembling the final bundle.
+11. [Building your device-material bundle](11_building_your_device_material_bundle.md) — a practical, from-zero walkthrough for collecting the inputs inside the qualified Windows VM, making the USB capture, deriving the protected transport material, and assembling the final bundle.
 12. [Glossary](glossary.md) — plain-English definitions for the important terms.
 
 ## 🔬 Optional deep dive

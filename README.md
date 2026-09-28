@@ -12,11 +12,10 @@ keys and persistent reader state.
 - Goodix USB `27c6:5125`, firmware `GF_ST411SEC_APP_12509`.
 - Fedora-provided fprintd, PAM, Plasma Login, KScreenLocker, sudo and PolicyKit.
 
-Enrollment, verification, screen unlocking, ordinary sudo, PolicyKit, Plasma
-fingerprint login and password fallback have worked on the tested configuration.
-The complete public installer has also passed installation on a freshly installed
-and updated Fedora VM and on the physical Fedora 44 KDE qualification system with
-SELinux Enforcing. Evidence covers one reader; see
+Within the supported Fedora 44 KDE scope, the project integrates enrollment,
+verification, screen unlocking, ordinary sudo, PolicyKit, Plasma fingerprint
+login and password fallback through Fedora's existing authentication stack.
+Qualification is limited to the documented target and one reader; see
 [validation and limitations](docs/VALIDATION.md).
 
 ## Installation
@@ -30,15 +29,18 @@ sudo authentication when needed. The reader stays connected throughout.
 You need a working password login and administrative access. The first installation,
 when no valid installed material exists, also needs your own
 [five-file device-material bundle](docs/DEVICE_MATERIALS.md). If you do not
-already have that bundle, that page contains the detailed acquisition reference
-for deriving the five final files from the same reader and qualified OEM Windows
-environment. Place the finished files in `$HOME/goodix-5125-materials/`, outside
-the clone. The project does not distribute protected material. An English-language
-[Windows VM material builder candidate](tools/windows_material_builder/README.md)
-is available as source for operator validation; it is not yet a supported release.
-The manual acquisition reference remains available. Fedora prerequisites are included in the
-installation flow; separate build instructions are unnecessary. Git must be available
-to run the bootstrap block.
+already have that bundle, the supported acquisition environment is a qualified
+Windows VM with USB passthrough, the qualified Goodix OEM driver, and the original
+Windows user/DPAPI context for that VM. Place the finished files in
+`$HOME/goodix-5125-materials/`, outside the clone. The project does not distribute
+protected material. The recommended acquisition tool is the
+[Goodix 5125 Material Builder](tools/windows_material_builder/README.md), which
+runs inside that VM and prepares the canonical five-file bundle. Native or
+bare-metal Windows acquisition is outside the supported workflow. The manual
+acquisition reference remains available for audit and troubleshooting of the same
+VM workflow. Fedora prerequisites are included in the installation flow; separate
+build instructions are unnecessary. Git must be available to run the bootstrap
+block.
 
 After a successful installation, the repository clone may be removed; a later run
 of the same bootstrap block clones it again automatically. Ordinary updates and
@@ -87,9 +89,9 @@ fingerprint images, templates and raw USB captures out of source trees and
 issue reports. [Security and privacy](docs/SECURITY.md) describes the boundary.
 
 The supported path excludes flashing, firmware replacement, PSK provisioning,
-OTP writes and persistent factory changes. Compatibility with every future Fedora
-update, exhaustive Windows testing and broad independent hardware validation
-remain unproven.
+OTP writes and persistent factory changes. Compatibility with future Fedora
+releases, other Windows VM/OEM configurations, and broader hardware remains
+outside the qualified scope.
 
 ## Documentation
 
@@ -102,7 +104,7 @@ remain unproven.
 - [Validation scope and known limitations](docs/VALIDATION.md)
 - [Licensing and provenance](docs/LICENSING_AND_PROVENANCE.md)
 - [Upstream references](docs/REFERENCES.md)
-- [Source build and offline checks](production/README.md)
+- [Source build and validation checks](production/README.md)
 
 ## License and acknowledgements
 

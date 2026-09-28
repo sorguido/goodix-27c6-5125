@@ -1,35 +1,36 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 
-> **Development candidate:** an English-language
-> [Windows VM material builder](../../tools/windows_material_builder/README.md)
-> is available as source for operator validation. It uses USBPcap directly and
-> does not require Wireshark or TShark. It is not yet a supported release.
-> **Current builder validation:** update only the source and follow the
-> [single full acquisition procedure](../../tools/windows_material_builder/README.md).
-> Begin with Goodix detached, attach only at the prompt, and use the normal
-> 30-second window, then accept TASKKILL UAC. Stop at Diagnose and build, before
-> bundle construction. The backend already passed with retained input; this
-> final gate qualifies only embedded capture shutdown.
-> The manual reference below remains the independent fallback; its native-Windows
-> steps are outside the candidate app's VM-only scope.
+> [!TIP]
+> The supported acquisition environment is a qualified Windows VM with USB
+> passthrough, the qualified Goodix OEM driver, and the original Windows
+> user/DPAPI context for that VM. The recommended acquisition path is the
+> [Goodix 5125 Material Builder](../../tools/windows_material_builder/README.md).
+> It uses USBPcap directly, does not require Wireshark or TShark, and creates and
+> validates the canonical five-file bundle.
+>
+> The manual procedure below remains the independent acquisition reference for
+> auditing, troubleshooting, or reconstructing the same VM-based material flow.
+> Native or bare-metal Windows acquisition is outside the supported workflow.
 # 11. 🧰 Building your device-material bundle
 
 You have the right fingerprint reader. Linux still needs a small, private
-folder of information from that reader's existing Windows environment. This
-chapter explains how to assemble it, starting with ordinary Windows tools.
+folder of information obtained from that reader inside its qualified Windows VM.
+This chapter explains how to assemble it using ordinary Windows tools inside
+that VM.
 
 This is a practical companion to the [device-material contract](../DEVICE_MATERIALS.md),
 not a replacement for it. The release **consumes and validates** a finished
-bundle; it does not ship supported acquisition scripts. The helper prompts
-below describe independently generated, locally run code. A helper reporting
-PASS is not a certification of that code or a promise that installation will
-succeed. The installer and runtime remain the final acceptance authority.
+bundle. The Windows Material Builder is the recommended acquisition tool; the
+helper prompts below document an independent manual alternative using locally
+run code inside the same qualified Windows VM. A helper reporting PASS is not a
+certification of that code or a promise that installation will succeed. The
+installer and runtime remain the final acceptance authority.
 
 > [!WARNING]
-> Work only with your own `27c6:5125` reader and its qualified OEM Windows
-> environment. Do not borrow another reader's files, invent missing values,
-> replace a key, flash firmware, enter IAP, invoke ClearApp, write OTP, or
-> change the USB identity. Stop when a check fails.
+> Work only with your own `27c6:5125` reader inside its qualified Windows VM
+> running the qualified Goodix OEM driver. Do not borrow another reader's files,
+> invent missing values, replace a key, flash firmware, enter IAP, invoke
+> ClearApp, write OTP, or change the USB identity. Stop when a check fails.
 
 ## 👀 1. The destination: five files, not five mysteries
 
@@ -112,27 +113,27 @@ have the right name and even the right length.
 
 ## 🧰 3. What you need
 
-You need the same physical Goodix USB `27c6:5125`, a functioning OEM Windows
-installation for it, the qualified Goodix driver `1.1.125.14`, permission to
-read your files, and Windows administrator access for capture setup and device
-disable/enable. Keep several gigabytes of private free space available; a
-root-hub capture can include unrelated USB traffic and grow quickly.
+You need the same physical Goodix USB `27c6:5125`, an existing qualified Windows
+VM with USB passthrough, the qualified Goodix driver `1.1.125.14`, permission
+to read the OEM source files, the original Windows user/DPAPI context for that
+VM, and Windows administrator access for USBPcap setup. Keep several gigabytes
+of private free space available; a root-hub capture can include unrelated USB
+traffic and grow quickly.
 
 The qualified application identity is `GF_ST411SEC_APP_12509`. A friendly
 Windows device name does not prove that firmware identity: the captured A8
 reply and eventual runtime validation supply that check. This procedure is
 not a way to upgrade another firmware or driver into the supported target.
 
-**Native Windows** means Windows runs directly on the computer. A **Windows
-virtual machine (VM)** runs inside another operating system. USB passthrough
-temporarily gives the real reader to the guest; a virtual device with a
-similar name is not enough. Only one operating system may own the reader at
-a time.
+The supported acquisition workflow requires the Windows VM. USB passthrough
+temporarily gives the physical reader to the guest, and the capture begins while
+the reader is detached from that guest. The reader is attached only after capture
+is active so the early OEM initialization traffic can be observed. Native or
+bare-metal Windows acquisition is outside the supported procedure.
 
-Use an already qualified environment. Merely copying a cache into a new VM
-does not copy its Windows DPAPI protection context. If you no longer have the
-original usable context, stop at the DPAPI boundary; administrator access
-alone is not a cure.
+Merely copying a cache into another VM does not copy its Windows DPAPI protection
+context. If the original user/DPAPI context inside the qualified VM is no longer
+usable, stop at the DPAPI boundary; administrator access alone is not a cure.
 
 This chapter uses Windows PowerShell for commands and Python 3 for local
 helpers. Python makes the binary parsing manageable; one additional library,
@@ -514,14 +515,13 @@ interfaces appear after reboot, stop and repair the official installation.
 
 ## 🔌 10. Record one clean OEM initialization
 
-**Preferred when available:** use an existing qualified Windows VM and attach
-the reader manually **after capture has started**. This most directly follows
-the canonical “capture first, attach reader second” sequence. A VM is not
-mandatory: for native Windows or an integrated reader that cannot be passed
-through, use the exact-device disable/enable procedure below as the fallback.
-It may trigger useful OEM initialization, but is not guaranteed to reproduce
-every cold-start message. In either path, success means the extractor finds
-all required, unambiguous evidence—not simply that the procedure completed.
+Use the existing qualified Windows VM. The Goodix reader must be detached from
+the guest before capture starts and attached manually **only after capture is
+active**. This “capture first, attach reader second” sequence is the supported
+acquisition path because it exposes the early OEM initialization traffic.
+Native or bare-metal Windows acquisition is outside the supported procedure.
+Success still requires all required, unambiguous evidence; completing the
+capture sequence alone is not sufficient.
 
 ### Find the controller rather than guessing its number
 
@@ -542,64 +542,13 @@ Write down the **observed** root-hub interface. Press Ctrl+C to leave the
 interactive listing without recording. Do not infer that `USBPcap2` will mean
 USB bus ID 2 inside the saved file. If the mapping is unclear, stop here.
 
-### Native Windows: start recording before restarting the device
-
-The following uses normal Windows disable/enable on the exact Goodix parent.
-It causes an OEM driver-start attempt, not a guaranteed cold hardware reset.
-Some setups may not repeat every required message; completeness is checked
-afterwards, never assumed.
-
-1. Leave the reader untouched. Close fingerprint settings and enrollment
-   dialogs. Keep password sign-in available.
-2. In a **second** administrator PowerShell window, restore the variables,
-   repeat the reader-identification command from section 5, and check the one
-   printed instance again. Keep this window open.
-3. In that second window, disable **only that parent**:
-
-   ```powershell
-   Disable-PnpDevice -InstanceId $ReaderId -Confirm:$true
-   ```
-
-   Read the confirmation carefully. If the target is not your exact Goodix
-   reader, cancel. Never disable its parent hub or controller.
-4. In the first window, enter the observed capture interface and start:
-
-   ```powershell
-   $CaptureInterface = Read-Host 'Paste the observed root-hub path, for example \\.\USBPcap2'
-   $CaptureFile = Join-Path $Work 'captures\oem-init.pcap'
-   if (Test-Path -LiteralPath $CaptureFile) { throw 'STOP: capture already exists; choose a new attempt name.' }
-   & $UsbPcap -d $CaptureInterface -A --capture-from-new-devices --inject-descriptors -o $CaptureFile
-   ```
-
-   Leave this window running. `-A` includes the root hub's devices; the next
-   option includes newly attached devices; injected descriptors aid identity
-   mapping. This broad capture is another reason to keep it short and private.
-5. In the second window, re-enable the same reader:
-
-   ```powershell
-   Enable-PnpDevice -InstanceId $ReaderId -Confirm:$true
-   Get-PnpDevice -InstanceId $ReaderId | Format-List Status,FriendlyName,InstanceId
-   ```
-
-6. Allow ordinary OEM initialization to settle, without touching the reader
-   or opening an enrollment flow. Stop the capture promptly with **Ctrl+C**
-   in the first window. Restore the reader to enabled even if recording fails.
-
-Microsoft documents the administrator requirement for
-[Disable-PnpDevice](https://learn.microsoft.com/en-us/powershell/module/pnpdevice/disable-pnpdevice)
-and [Enable-PnpDevice](https://learn.microsoft.com/en-us/powershell/module/pnpdevice/enable-pnpdevice).
-The capture flags are documented by the
-[USBPcap command implementation](https://github.com/desowin/usbpcap/blob/master/USBPcapCMD/cmd.c).
-These are operator instructions, not commands for a remote assistant to run
-against your hardware.
-
-### Existing qualified Windows VM: attach after capture starts
+### Qualified Windows VM: attach after capture starts
 
 Use capture tools **inside the guest**. Map the guest's virtual controller
 while Goodix is attached, then detach only Goodix through the hypervisor's
 USB menu. Prevent automatic attachment from happening before recording starts.
 With Goodix still detached, start USBPcap in the guest on the mapped controller
-using this narrower command instead of the native Windows command above:
+using the supported attach-after-capture sequence:
 
 ```powershell
 $CaptureInterface = Read-Host 'Paste the observed guest root-hub path, for example \\.\USBPcap2'
@@ -609,10 +558,9 @@ if (Test-Path -LiteralPath $CaptureFile) { throw 'STOP: capture already exists; 
 ```
 
 This sequence describes recording mechanics; completeness still requires all
-material checks. For the current builder correction, first reanalyze the retained
-raw as described above. During an explicitly chosen new acquisition, manually
-attach only the same reader to the guest. Wait for normal OEM
-initialization, do not touch it, and stop with Ctrl+C. Omitting `-A` reduces
+material checks. For a manual acquisition, attach only the same reader to the
+guest. Wait for normal OEM initialization, do not touch it, and stop with
+Ctrl+C. Omitting `-A` reduces
 unrelated traffic, capture size and exposure of keyboard/storage activity
 from devices already present. The
 [USBPcap command implementation](https://github.com/desowin/usbpcap/blob/master/USBPcapCMD/cmd.c)
@@ -621,8 +569,6 @@ support this mode without an existing-device selection. Descriptor injection
 is unnecessary for the reader's actual post-start attachment. This is not a
 VID/PID filter: other devices newly attached or re-enumerated on that root hub
 can also be included, so keep the capture private and attach no other devices.
-The native fallback retains `-A` because disabling/enabling the PnP device
-does not guarantee a new USB attachment.
 
 For VirtualBox, manual attachment is under **Devices → USB**; enabled matching
 USB filters can attach devices automatically. This ordering follows from the
@@ -710,9 +656,7 @@ Goodix A0 frames have a four-byte outer header: marker `A0`, a two-byte
 little-endian payload length, and a tag. The payload contains the wire control,
 two-byte inner length, body, and one checksum byte. CONFIG90 selection requires
 logical control `wireControl & 0xfe == 0x90`, admitting wire `0x90` and `0x91`.
-The retained Windows capture demonstrates wire `0x90`; acceptance of `0x91`
-follows the logical contract and synthetic coverage. Both select the same
-material class, not two files.
+Both wire values select the same material class, not two files.
 
 USBPcap also records a Windows transfer's submission and completion. Its
 IRP direction is **not** the endpoint's USB direction. Windows uses fields
@@ -899,8 +843,9 @@ Keep this intermediate private; do not paste it into a chat.
 This cache is not the final transport record. It contains a Windows-protected
 blob followed by an eight-byte trailer. **DPAPI**, Windows' Data Protection
 API, protects data using a Windows security context. A valid encrypted blob
-is not enough by itself: it must be opened in the appropriate original
-Windows context, with the same additional input used when it was protected.
+is not enough by itself: it must be opened in the original Windows user/DPAPI
+context inside the qualified Windows VM, with the same additional input used
+when it was protected.
 
 That additional input is called **optional entropy** in the API. Here
 “optional” is the API's terminology; the qualified Goodix recipe requires
@@ -910,7 +855,7 @@ Do not replace it with random bytes because “entropy” sounds random.
 ```text
 Goodix_Cache.bin = [DPAPI ciphertext, variable length][8-byte trailer]
                                                         ↓ hash recipe
-original Windows context + ciphertext + 48-byte entropy
+original VM user/DPAPI context + ciphertext + 48-byte entropy
                             ↓ CryptUnprotectData
                    existing 32-byte PSK, in memory
 ```
@@ -933,7 +878,7 @@ workflow and allows a clear checkpoint before the more complex derivation.
 
 ```text
 Write one complete Python 3 standard-library script check_dpapi.py for the
-original qualified Windows environment. Do not ask me to upload the source
+qualified Windows VM and its original Windows user/DPAPI context. Do not ask me to upload the source
 files or secret bytes. The script must run locally. Do not print the PSK or
 other protected values. No network/telemetry, byte dumps, temporary key files,
 key-bearing command lines/environment variables, or secret-bearing errors.
@@ -964,7 +909,7 @@ Return the full script and exact Notepad/save/run PowerShell instructions
 under $Work\helpers, using $Work\.venv\Scripts\python.exe.
 ```
 
-Save, then run in the original Windows account/context:
+Save, then run under the original Windows user/DPAPI context inside the qualified VM:
 
 ```powershell
 notepad (Join-Path $Helpers 'check_dpapi.py')
@@ -977,11 +922,11 @@ if ($LASTEXITCODE -ne 0) { throw 'STOP: DPAPI helper self-test failed.' }
 if ($LASTEXITCODE -ne 0) { throw 'STOP: original cache could not be recovered.' }
 ```
 
-If it fails, retain the non-secret failure code. A copied cache on another
-Windows installation, different logon context, corrupted copy or unexpected
-OEM format may explain failure. Do not repeatedly change accounts or permissions,
+If it fails, retain the non-secret failure code. A copied cache in another VM,
+a different Windows logon/DPAPI context, a corrupted copy, or an unexpected OEM
+format may explain failure. Do not repeatedly change accounts or permissions,
 strip arbitrary bytes, brute-force entropy, or ask an LLM to “recover it”
-from an uploaded blob. Resolve the original-environment question first.
+from an uploaded blob. Resolve the qualified-VM user/context question first.
 
 > [!NOTE]
 > **Checkpoint:** `PSK_RECOVERY=PASS`, no separate PSK file, no printed key.
@@ -1510,10 +1455,11 @@ No complete bundle yet
 ### “I cannot find `Goodix_Cache.bin`”
 
 Paste the full ProgramData path into Explorer, with hidden files visible.
-Confirm this is the original qualified OEM Windows environment and that the
-copy is not blocked by access rights. If the file truly is absent, do not
-create one, use someone else's, or modify factory state to force its creation.
-The PSK branch is blocked until a valid source and context are available.
+Confirm this is the qualified Windows VM and the original Windows user/DPAPI
+context used for the reader, and that the copy is not blocked by access rights.
+If the file truly is absent, do not create one, use someone else's, or modify
+factory state to force its creation. The PSK branch is blocked until a valid
+source and context are available.
 
 ### “I cannot find `goodix.dat`”
 
@@ -1538,17 +1484,16 @@ disable Windows security controls or install an unknown capture driver.
 ### “My capture has no CONFIG90”
 
 Check that the right root hub was recorded and the actual reader appeared in
-descriptor evidence. Was capture running **before** attach/re-enable? Did the
+descriptor evidence. Was capture running **before** attaching the reader to the VM? Did the
 OEM driver initialize the reader, or was it already initialized before the
 recording? Does the helper support the capture's packet layout? A missing
 message is not fixed by scanning arbitrary bytes for `0x90`.
 
-Stop and retain the recording. No timing retry is justified for CONFIG90_MISSING
-by the current evidence. The retained builder recording already contains
-CONFIG90; an older exact-wire filter produced a false negative. Reanalyze with
-the corrected logical-control rule first. A genuinely missing result requires
-review of the recording and acquisition state, never material from another run. Do not automate capture/reset attempts or use maintenance/firmware
-commands to trigger it.
+Stop and retain the recording. `CONFIG90_MISSING` has no timed retry path.
+Reanalyze with the documented logical-control rule before treating the recording
+as incomplete. A genuinely missing result requires review of the recording and
+acquisition state, never material from another run. Do not automate capture/reset
+attempts or use maintenance/firmware commands to trigger it.
 
 ### “I found two different CONFIG90 bodies”
 
@@ -1559,15 +1504,16 @@ Resolve the provenance or seek help using counts and redacted metadata only.
 
 ### “DPAPI recovery fails”
 
-Confirm the cache is intact and recovery runs in its original Windows context.
-A new VM or another account is not equivalent. Administrator rights do not
-automatically supply the original protection keys. Do not upload the blob,
-disable the entropy check or generate a replacement PSK.
+Confirm the cache is intact and recovery runs under the original Windows
+user/DPAPI context inside the qualified VM. Another VM or another account is not
+equivalent. Administrator rights do not automatically supply the original
+protection keys. Do not upload the blob, disable the entropy check or generate
+a replacement PSK.
 
 ### “A6 does not match the first 64 bytes of the cache”
 
 Treat this as a same-reader binding failure. Check that `goodix.dat` and the
-capture belong to the same physical reader and qualified environment. Do not
+capture belong to the same physical reader and qualified Windows VM. Do not
 edit the cache, replace the captured pin with the cache's hash, or repair its
 CRC to make the mismatch disappear.
 

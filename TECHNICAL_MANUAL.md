@@ -282,11 +282,12 @@ contract and acquisition boundary. Do not attach these files, their contents,
 raw USB captures, or derived secrets to a bug report.
 
 The [Windows Material Builder](tools/windows_material_builder/README.md) is the
-recommended acquisition path for creating the protected five-file bundle from
-the reader's qualified OEM Windows environment. It validates the captured
-reader/application identity and required material, recovers the existing PSK
-through Windows DPAPI, verifies same-reader bindings, builds the canonical
-bundle, and validates all five files before publication.
+supported acquisition path for creating the protected five-file bundle inside
+the reader's qualified Windows VM. That VM uses USB passthrough, the qualified
+Goodix OEM driver, and the original Windows user/DPAPI context. The builder
+validates the captured reader/application identity and required material,
+recovers the existing PSK through Windows DPAPI, verifies same-reader bindings,
+builds the canonical bundle, and validates all five files before publication.
 
 The Linux installer independently validates the bundle before import. The
 canonical material contract and acquisition boundary remain defined in
@@ -1350,7 +1351,7 @@ threat boundary.
 | Local-account qualification only | Network/LDAP/AD account behavior is not established |
 | No FAR/FRR study | Score 40 is not a universal biometric security calibration |
 | Unknown physical DPI/orientation/polarity | Do not label captures 500 DPI or promise a natural-facing or calibrated-polarity raster |
-| Device material is user-supplied | The Windows Material Builder creates the bundle from the reader's qualified OEM Windows environment; cross-reader interchangeability is not qualified and a different installed/staged bundle is not silently swapped |
+| Device material is user-supplied | The Windows Material Builder creates the bundle inside the reader's qualified Windows VM using USB passthrough, the qualified OEM driver and the original Windows user/DPAPI context; native or bare-metal Windows acquisition and cross-reader interchangeability are outside the qualified scope, and a different installed/staged bundle is not silently swapped |
 | Secure preparation starts with the action | Allow roughly one second after Plasma fingerprint selection before contact |
 | Stock policy controls most consumers | Altered authselect/PAM may not offer fingerprints; the installer does not rewrite global policy |
 | PAM layout evolves | Future Fedora changes may cause the Plasma selector to fall back to password until reviewed |

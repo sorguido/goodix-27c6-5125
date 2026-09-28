@@ -5,19 +5,16 @@ The Goodix 5125 Material Builder is a Python/Tkinter application that prepares
 the private five-file device-material bundle required by the Linux driver for a
 Goodix USB fingerprint reader `27c6:5125`.
 
-The tested workflow has been validated end-to-end on the qualified Windows
-environment: embedded USBPcap acquisition, target and APP validation,
-CONFIG90/A2/CHIP82/A6 extraction, DPAPI recovery, transport-material generation,
-manifest generation and final five-file validation all completed successfully.
-A bundle produced by the application was then accepted by a clean Fedora
-installation of the driver.
-
-The Linux installer/runtime remains the final authority on bundle validity.
+The supported workflow runs inside the qualified Windows VM and covers embedded
+USBPcap acquisition, target and APP validation, CONFIG90/A2/CHIP82/A6 extraction,
+DPAPI recovery, transport-material generation, manifest generation and final
+five-file validation. The Linux installer/runtime independently validates the
+resulting bundle and remains the final authority on bundle validity.
 
 The application does **not** flash firmware, enter IAP, invoke ClearApp, write
 OTP, replace or reprovision the PSK, change VID:PID, enroll a fingerprint, or
 send maintenance commands to the reader. USBPcap observes the ordinary OEM
-initialization performed by Windows.
+initialization performed inside the qualified Windows VM.
 
 ## What the application produces
 
@@ -45,10 +42,10 @@ folder.
 
 The source files, raw USB capture and final bundle are private material.
 
-- Use only material from your own reader and its qualified OEM Windows
-  environment.
-- Run the application as the original normal Windows user. DPAPI recovery
-  depends on that user/context.
+- Use only material from your own reader inside its qualified Windows VM running
+  the qualified Goodix OEM driver.
+- Run the application as the original normal Windows user inside that VM. DPAPI
+  recovery depends on that exact user/context.
 - **DO NOT TOUCH THE SENSOR during acquisition.**
 - Do not upload the capture, `Goodix_Cache.bin`, `goodix.dat`, `gfusb.dll`,
   the generated bundle, PSK material or reader-specific hashes.
@@ -60,8 +57,10 @@ For the canonical material contract, see
 
 ## Requirements
 
-Use the same physical Goodix reader and the qualified OEM Windows environment
-where that reader works normally.
+Use the same physical Goodix reader inside the existing qualified Windows VM
+with USB passthrough, the qualified Goodix OEM driver, and the original Windows
+user/DPAPI context. Native or bare-metal Windows acquisition is outside the
+supported workflow.
 
 Current qualified OEM baseline:
 
@@ -188,7 +187,7 @@ The manual acquisition guide contains additional controller-mapping guidance:
 
 ### 4. Start with Goodix detached
 
-Detach the Goodix reader from the Windows guest/environment and disable automatic
+Detach the Goodix reader from the Windows VM guest and disable automatic
 reattachment if your hypervisor provides that feature.
 
 Close Windows fingerprint/enrollment settings.
@@ -241,7 +240,7 @@ Build private bundle
 The application then:
 
 - cross-checks A6 against the FDT cache;
-- recovers the existing PSK through Windows DPAPI in the original user context;
+- recovers the existing PSK through Windows DPAPI in the original user context inside the qualified VM;
 - derives the canonical transport binding;
 - creates `transport-material.bin`;
 - creates the canonical ten-field manifest;
