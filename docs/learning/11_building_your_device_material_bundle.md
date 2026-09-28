@@ -481,7 +481,7 @@ Close unrelated applications and avoid typing passwords while capture runs.
 ## 📦 9. Install and verify Wireshark, USBPcap and TShark
 
 1. Visit [Wireshark's official download page](https://www.wireshark.org/download.html).
-   On the x64 Windows environment used here, choose the Windows x64 **`.exe`
+   Inside the qualified x64 Windows VM, choose the Windows x64 **`.exe`
    installer**, not a portable package.
 2. Run it, approve the Windows administrator prompt, and follow the wizard.
    On **Choose Components**, keep **TShark** selected along with Wireshark.
@@ -1069,10 +1069,11 @@ once in entire DLL, including overlapping occurrences. seedB=instruction[3:7]
 DPAPI: cache 8<size<=1048576; last8 trailer not all zero, all prior bytes
 ciphertext. h1=SHA256(trailer); mix=04e0b0f3f5598417dde298e467c795f7;
 h2=SHA256(h1[0:16]||mix); entropy=h1[16:32]||h2 (48 bytes).
-CryptUnprotectData with matching original Windows context, this entropy,
-correct ctypes DATA_BLOB signatures, null reserved/prompt, UI_FORBIDDEN;
-check return/GetLastError, output exactly32 and not all zero. Never bypass
-the Windows context. The output is the existing PSK, not a new key.
+CryptUnprotectData with the matching original Windows user/DPAPI context inside
+the qualified VM, this entropy, correct ctypes DATA_BLOB signatures, null
+reserved/prompt, UI_FORBIDDEN; check return/GetLastError, output exactly32 and
+not all zero. Never bypass or substitute that VM user/DPAPI context. The output
+is the existing PSK, not a new key.
 
 Implement goodix_d190_bind_validator exactly as the following public recipe.
 All slices below are Python-style half-open. || denotes byte concatenation.
@@ -1443,10 +1444,10 @@ See [Security and privacy](../SECURITY.md).
 
 ```text
 No complete bundle yet
-  ├─ Missing source or wrong DLL? → resolve the qualified OEM environment
+  ├─ Missing source or wrong DLL? → resolve the qualified Windows VM/OEM setup
   ├─ Capture identity/frames missing? → check mapping and start-before-attach order
   ├─ Conflicting bodies or cache/A6 mismatch? → stop; resolve provenance
-  ├─ DPAPI failure? → check original Windows protection context
+  ├─ DPAPI failure? → check the original Windows user/DPAPI context in that VM
   ├─ Derivation self-test fails? → correct helper against public recipe
   └─ All local checks pass but installer rejects?
        → preserve its non-secret error; use the current technical contract

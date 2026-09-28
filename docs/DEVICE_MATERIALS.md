@@ -233,10 +233,11 @@ seed is read from the qualified cache layout after those OTP bytes.
 The manifest also carries per-reader SHA-256 pins for the typed A2, chip82 and
 OTP A6 responses. During the secure-session path, live typed responses are
 checked against those pins. E4 and concrete DAC values are derived from the
-validated bundle rather than fixed to the development reader.
+validated bundle rather than fixed to a single reference reader.
 
-These checks make the runtime device-dynamic. The acquisition candidate remains
-separately gated on Windows VM validation.
+These checks make the runtime device-dynamic. Bundle acquisition is performed
+inside the reader's qualified Windows VM, and the Linux installer independently
+validates the resulting bundle before import.
 
 ## Protected filesystem contract
 
