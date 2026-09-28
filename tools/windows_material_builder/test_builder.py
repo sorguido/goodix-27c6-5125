@@ -383,7 +383,7 @@ class LifecycleTests(Case):
         def exit_code(handle, code):
             self.assertEqual(handle, 123)
             order.append('exit')
-            code._obj.value = 1 if mode == 'nonzero' else 0
+            code._obj.value = {'exit128': 128, 'exit37': 37, 'remains128': 128}.get(mode, 0)
             return mode != 'exit_error'
         kernel.GetExitCodeProcess.side_effect = exit_code
         def present(kernel_arg, deadline):
@@ -391,12 +391,13 @@ class LifecycleTests(Case):
             self.assertEqual(order[:3], ['launch', 'wait', 'exit'])
             order.append('verify')
             if mode == 'enumeration_error': raise Failure('CAPTURE_PROCESS_FAILED')
-            return mode == 'remains'
+            return mode in ('remains', 'remains128')
         return kernel, shell, ole, present, order
 
     def test_elevated_absolute_taskkill_wait_then_verification_and_failures(self):
-        for mode in ('valid', 'denied', 'launch_error', 'no_handle', 'timeout', 'wait_error',
-                     'exit_error', 'nonzero', 'enumeration_error', 'remains'):
+        for mode in ('valid', 'exit128', 'exit37', 'denied', 'launch_error', 'no_handle',
+                     'timeout', 'wait_error', 'exit_error', 'enumeration_error', 'remains',
+                     'remains128'):
             with self.subTest(mode=mode):
                 kernel, shell, ole, present, order = self.native(mode)
                 with patch.object(capture_worker.ctypes, 'WinDLL', side_effect=[kernel, shell, ole], create=True), \
@@ -404,7 +405,7 @@ class LifecycleTests(Case):
                         patch.object(capture_worker, 'usbpcap_present', side_effect=present), \
                         patch.object(capture_worker.time, 'monotonic', side_effect=[0, 6]), \
                         patch.object(capture_worker, 'report') as report:
-                    if mode == 'valid': capture_worker.elevated_taskkill()
+                    if mode in ('valid', 'exit128', 'exit37'): capture_worker.elevated_taskkill()
                     else: self.fails('CAPTURE_PROCESS_FAILED', capture_worker.elevated_taskkill)
                 shell.ShellExecuteExW.assert_called_once()
                 ole.CoUninitialize.assert_called_once()
@@ -414,8 +415,13 @@ class LifecycleTests(Case):
                 statuses = [c.args[0] for c in report.call_args_list]
                 self.assertTrue(all(diagnostics.safe_lifecycle_status(s) for s in statuses))
                 if mode == 'denied': self.assertIn('TASKKILL_ELEVATION_CANCELLED', statuses)
-                if mode == 'remains': self.assertIn('USBPCAP_REMAINS', statuses)
-                if mode == 'valid': self.assertEqual(order, ['launch', 'wait', 'exit', 'verify'])
+                if mode in ('remains', 'remains128'):
+                    self.assertIn('USBPCAP_REMAINS', statuses)
+                if mode in ('valid', 'exit128', 'exit37'):
+                    expected = {'valid': 0, 'exit128': 128, 'exit37': 37}[mode]
+                    self.assertIn('TASKKILL_EXIT=' + str(expected), statuses)
+                    self.assertIn('USBPCAP_ABSENT', statuses)
+                    self.assertEqual(order, ['launch', 'wait', 'exit', 'verify'])
 
     def test_system_directory_or_com_failure_never_launches(self):
         for mode in ('directory_error', 'relative_directory', 'com_error'):

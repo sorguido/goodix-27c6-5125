@@ -61,8 +61,10 @@ during shutdown; it never proceeds to material success.
 
 Report the tested commit, Windows/Python versions, the GUI's four material results
 and safe `diagnostics\lifecycle.txt` fields. Successful stop requires
-`TASKKILL_EXIT=0`, `USBPCAP_ABSENT`, `CAPTURE_HANDLES_CLOSED`, `RAW_CLOSED`,
+`TASKKILL_EXIT=<value>`, `USBPCAP_ABSENT`, `CAPTURE_HANDLES_CLOSED`, `RAW_CLOSED`,
 `WORKER_EXIT=0`, `EOF`, `RAW_FLUSHED` and `STOPPED`, without failure or timeout.
+The TASKKILL exit code is diagnostic telemetry; verified `USBPCAP_ABSENT` is the
+authoritative stop result after TASKKILL launches and completes within its bound.
 The native USBPcap forced exit has no private marker and is accepted only after
 explicit stop; an earlier exit fails even if the file parses. The GUI's
 container/target/APP and four material results remain mandatory.

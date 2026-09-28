@@ -71,14 +71,16 @@ flags include NOCLOSEPROCESS, NOASYNC, FLAG_NO_UI and NO_CONSOLE, with SW_HIDE.
 Windows still shows the security consent prompt. The GUI remains unelevated;
 no PowerShell is involved in elevation and no taskkill output is captured as
 user-visible diagnostics. The returned process handle must signal within 15 s.
-Its exit code is checked and its handle is closed, including on error.
+Its bounded numeric exit code is retained as telemetry and its handle is closed,
+including on error.
 
 After taskkill completes, [Toolhelp process enumeration](https://learn.microsoft.com/en-us/windows/win32/toolhelp/taking-a-snapshot-and-viewing-processes)
 checks exact `USBPcapCMD.exe` names, case-insensitively, under a five-second
 budget with 50 ms polling. Each snapshot closes, bounds its entry walk and
 requires NO_MORE_FILES for a complete negative result; API errors fail closed.
-Only taskkill exit zero plus verified absence permits acceptance. A successful
-exit alone never suffices. This follows the documented
+Verified absence is the authoritative success postcondition after taskkill has
+launched and completed; its numeric exit code does not gate that result. An exit
+code alone never suffices. This follows the documented
 [TASKKILL switches](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/taskkill)
 without adding another executable name or stop retry.
 

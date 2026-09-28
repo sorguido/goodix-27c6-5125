@@ -117,7 +117,6 @@ def elevated_taskkill():
                 raise Failure('CAPTURE_PROCESS_FAILED')
             time.sleep(0.05)
         report('USBPCAP_ABSENT')
-        require(code.value == 0, 'CAPTURE_PROCESS_FAILED')
     finally:
         try:
             if info.process:
