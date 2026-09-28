@@ -35,6 +35,39 @@ runs. Do not reinstall USBPcap or create a new VM. Initially detach Goodix from
 the guest and disable automatic attachment. Close fingerprint/enrollment settings.
 Use the controller mapping already established in this qualified VM.
 
+### First-time Python setup
+
+The Material Builder is a Python/Tkinter application, so install Python for
+Windows before trying to launch it.
+
+The project's currently validated baseline is **64-bit Python 3.10+ with
+Tkinter**, and that is the recommended choice. This is a recommendation, not a
+hard version gate: the project does not intentionally block other Python 3
+versions, although versions outside the validated baseline may not have been
+tested.
+
+1. Download Python for Windows from the official Python site:
+   <https://www.python.org/downloads/windows/>
+2. Install Python normally.
+3. Close and reopen PowerShell after installation.
+4. Confirm that the Python launcher is available:
+
+   ```powershell
+   py --version
+   ```
+
+5. Prepare the Material Builder's private Python environment once and install
+   its only non-standard Python dependency:
+
+   ```powershell
+   py -3 -m venv "$env:LOCALAPPDATA\Goodix5125BuilderPython"
+   & "$env:LOCALAPPDATA\Goodix5125BuilderPython\Scripts\python.exe" -m pip install cryptography
+   if ($LASTEXITCODE -ne 0) { throw 'Python dependency installation failed.' }
+   ```
+
+After that one-time setup, obtain the project source folder and launch the
+builder as described below.
+
 Before running the command below, obtain the project source folder:
 
 1. Open the project's GitHub page.
