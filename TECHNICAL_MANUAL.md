@@ -53,7 +53,7 @@ does not replace Fedora's authentication stack.
 | Accounts | Local accounts |
 | Mandatory access control | SELinux Enforcing |
 | Daemon and consumers | Fedora `fprintd`, PAM, Plasma, KScreenLocker, sudo, and PolicyKit |
-| Reader population | One integrated reader represented by the tested device |
+| Reader population | One integrated reader within the qualified target scope |
 
 Other configurations are **not qualified**. That wording means there is not
 enough evidence to claim support; it does not prove that every other
@@ -281,21 +281,18 @@ See [Device materials](docs/DEVICE_MATERIALS.md) for the complete public
 contract and acquisition boundary. Do not attach these files, their contents,
 raw USB captures, or derived secrets to a bug report.
 
-The [Windows material builder](tools/windows_material_builder/README.md) is a
-development candidate. It reads private OEM inputs and retained USBPcap captures;
-its end-to-end Windows shutdown, DPAPI and bundle workflow is not fully qualified.
-The capture parser permits an initial UNKNOWN-to-assigned USB address transition
-only for a successfully completed standard device-descriptor request with a
-structurally valid response. Identity binds to the assigned address; later
-address changes and ambiguous target streams fail closed.
+The [Windows Material Builder](tools/windows_material_builder/README.md) is the
+recommended acquisition path for creating the protected five-file bundle from
+the reader's qualified OEM Windows environment. It validates the captured
+reader/application identity and required material, recovers the existing PSK
+through Windows DPAPI, verifies same-reader bindings, builds the canonical
+bundle, and validates all five files before publication.
 
-CONFIG90 extraction requires target bulk OUT endpoint `0x01`, successful USB
-pairing, valid A0 framing/checksum and logical control `wire & 0xFE == 0x90`.
-Both wire `0x90` and `0x91` satisfy that logical rule. The body must be exactly
-224 bytes and pass its layout/finalizer checks. Identical repetitions are
-allowed; distinct valid bodies are ambiguous. Missing evidence cannot be borrowed
-from another reader or recording, and missing CONFIG90 does not offer a timed
-retry. Read-only capture diagnosis neither calls DPAPI nor creates a bundle.
+The Linux installer independently validates the bundle before import. The
+canonical material contract and acquisition boundary remain defined in
+[Device materials](docs/DEVICE_MATERIALS.md); implementation details of the
+Windows acquisition tool are documented in the
+[builder audit](tools/windows_material_builder/AUDIT.md).
 
 ### 5.1 TLS roles and boundaries
 
@@ -1057,8 +1054,9 @@ service sandbox. Its only current setting is the private runtime
 The builder runs as the invoking unprivileged user and requires Fedora 44
 x86_64. It constructs a source inventory by content, so a source-only copy does
 not depend on Git history. It builds the Goodix-enabled libfprint, selector, and
-native material checker; verifies ABI and stock-fprintd symbol resolution; runs
-offline suites; and records relevant package versions and source digests.
+native material checker; verifies ABI and stock-fprintd symbol resolution;
+performs validation checks; and records relevant package versions and source
+digests.
 
 ### 15.2 Private and system libraries
 
@@ -1070,7 +1068,7 @@ prevents unrelated modules from entering the link closure.
 Fedora's `libgusb`, OpenSSL, GLib, PAM, and remaining system libraries continue
 to resolve from system locations. The build verifies that `/usr/libexec/fprintd`
 loads the intended private libfprint without unresolved symbols and that
-test-only symbols are absent.
+non-production helper symbols are not exported.
 
 The installed source/provenance records are content and package evidence, not a
 claim of a byte-reproducible build or an exhaustive software bill of materials.
@@ -1088,7 +1086,7 @@ uses sudo to install Fedora prerequisites.
 ```mermaid
 flowchart TD
     Material["Privileged read-only material selection"] --> Packages["Fedora prerequisites"]
-    Packages --> Build["Normal-user source build<br/>and offline checks"]
+    Packages --> Build["Normal-user source build<br/>and validation checks"]
     Build --> Preflight["Privileged host and authentication preflight"]
     Preflight --> Existing["Validate selected material again;<br/>native binding check for installed set"]
     Existing --> Lock["Exclusive lifecycle lock"]
@@ -1101,7 +1099,7 @@ flowchart TD
     Native --> Deploy["Labels, runtime, selector,<br/>PAM entry last"]
     Deploy --> Verify["Verify receipts and stopped service"]
     Verify --> ReleaseSuccess["Restore verified<br/>activation-mask state"]
-    ReleaseSuccess -- Success --> Done["Installation PASS<br/>fprintd remains stopped"]
+    ReleaseSuccess -- Success --> Done["Installation complete<br/>fprintd remains stopped"]
     ReleaseSuccess -- Failure --> Cleanup["Final cleanup incomplete<br/>installed state may remain; recovery retained"]
     Replace -- Body failure --> Rollback["Restore prior project state<br/>or report incomplete rollback"]
     Recovery -- Body failure --> Rollback
@@ -1109,7 +1107,7 @@ flowchart TD
     Deploy -- Body failure --> Rollback
     Verify -- Body failure --> Rollback
     Rollback --> ReleaseFailure["Restore verified<br/>activation-mask state"]
-    ReleaseFailure -- Success --> Failed["Installation STOP"]
+    ReleaseFailure -- Success --> Failed["Installation failed"]
     ReleaseFailure -- Failure --> Cleanup
 ```
 
@@ -1169,9 +1167,9 @@ operation is removed only after its inode and target still prove ownership.
 Unknown ownership is retained and reported rather than deleted by assumption.
 
 The integrated reader remains connected. Lifecycle tools do not enumerate it,
-open USB, send commands, or initiate capture. Stopping an already active daemon
-may allow that daemon to perform its normal cleanup, but the installer itself
-does not start a biometric action or post-install fingerprint test.
+open USB, send commands, initiate capture, or start any post-install biometric
+action. Stopping an already active daemon may allow that daemon to perform its
+normal cleanup.
 
 ### 16.3 Installed paths
 
@@ -1352,7 +1350,7 @@ threat boundary.
 | Local-account qualification only | Network/LDAP/AD account behavior is not established |
 | No FAR/FRR study | Score 40 is not a universal biometric security calibration |
 | Unknown physical DPI/orientation/polarity | Do not label captures 500 DPI or promise a natural-facing or calibrated-polarity raster |
-| Device material is user-supplied | The Windows VM acquisition tool is a development candidate pending live validation; cross-reader interchangeability is not qualified and a different installed/staged bundle is not silently swapped |
+| Device material is user-supplied | The Windows Material Builder creates the bundle from the reader's qualified OEM Windows environment; cross-reader interchangeability is not qualified and a different installed/staged bundle is not silently swapped |
 | Secure preparation starts with the action | Allow roughly one second after Plasma fingerprint selection before contact |
 | Stock policy controls most consumers | Altered authselect/PAM may not offer fingerprints; the installer does not rewrite global policy |
 | PAM layout evolves | Future Fedora changes may cause the Plasma selector to fall back to password until reviewed |
@@ -1361,9 +1359,9 @@ threat boundary.
 | Hotplug and physical removal | Disconnect/reconnect during an action or lifecycle operation is not qualified |
 | Concurrency beyond stock serialization | Competing low-level clients or bypass of fprintd's claim model is not qualified |
 | Late IRQ0200 after zero-mask recovery | One release before the valid new IRQ2 is consumed passively; same-byte stale/current release in a later compatible slot is not distinguishable (section 7.4) |
-| Fault/stale-traffic stress | Process crash, injected faults, and exhaustive late-byte or cross-generation stress are not qualified |
+| Fault/stale-traffic boundary | Process crashes, injected faults, and exhaustive late-byte or cross-generation behavior are outside the qualified scope |
 | SELinux audit suppression is type-based | The known denied read tuple can be hidden even when caused by a future process path |
-| Factory/Windows proof is incomplete | No exhaustive factory readback, Windows campaign, power-loss campaign, or future-update guarantee |
+| Factory/Windows boundary | No exhaustive factory-state readback or guarantee across Windows interoperability, power-loss scenarios, or future OS updates |
 
 See [Validation scope and known limitations](docs/VALIDATION.md) for the release
 support basis. The protocol limits in this manual apply independently of a
@@ -1382,8 +1380,8 @@ matching.
 | Material rejected | Staging/import contract | Exact validator error and file metadata, never file contents |
 | TLS/bootstrap failure | Target binding or protocol phase | Exact phase/error name with protected bytes redacted |
 | Capture but processing error | Image bounds/preprocessing/template parser | Error class and action, never image/template data |
-| Enrollment A0 mismatch after accepted contacts | Expected enrollment event and contextual FDT flags | Exact mismatch, contact/stage counters and cleanup audit; see section 20.3 |
-| Clean no-match | Biometric result | Which explicit attempt and enrolled finger label; do not recast as transport failure |
+| Enrollment A0 mismatch after accepted contacts | Expected enrollment event and contextual FDT flags | Exact mismatch, contact/stage counters and cleanup state; see section 20.3 |
+| Clean no-match | Biometric result | Authentication-attempt context and enrolled finger label; do not recast as transport failure |
 | Plasma password works, fingerprint path does not | Empty-field selection, PAM compatibility, preparation timing | Whether input was empty and the first non-secret PAM/fprintd error |
 | Other consumers omit fingerprint | Fedora authselect/PAM policy | Current host policy; no manual project workaround |
 | Removal refuses drift | Receipt/ownership protection | Use the exact reported path; choose documented emergency removal only when needed |
@@ -1391,7 +1389,7 @@ matching.
 ### 20.1 Safe operating rules
 
 - Stop at the first meaningful error and preserve its exact non-secret text.
-- Treat missing final `PASS` markers or incomplete rollback as failure.
+- Treat a missing final success marker or an incomplete rollback as failure.
 - Do not disable SELinux, bypass a preflight check, hide/disconnect the reader,
   edit Fedora PAM manually, or delete material/templates as a diagnostic shortcut.
 - Do not run KDE enrollment, `fprintd-enroll`, and verification clients
@@ -1464,10 +1462,9 @@ boundaries unless it explicitly redesigns and requalifies them:
 13. preservation of protected material and fprintd templates; and
 14. no expansion of qualification claims without matching evidence.
 
-Protocol and biometric changes need both focused offline tests and target
-qualification. Installer changes need fresh-install, update, rollback, normal
-removal, and emergency-removal review. Authentication changes need password as
-well as fingerprint tests for every affected consumer.
+Changes must preserve the invariants above and remain within the qualification
+boundary defined in [Validation scope and known limitations](docs/VALIDATION.md).
+Expanding that boundary requires corresponding technical evidence.
 
 ### 21.2 Licensing and provenance
 
@@ -1492,7 +1489,7 @@ Use these public references for further detail:
 - [Protected device-material contract](docs/DEVICE_MATERIALS.md)
 - [Licensing and provenance](docs/LICENSING_AND_PROVENANCE.md)
 - [External references](docs/REFERENCES.md)
-- [Build and offline checks](production/README.md)
+- [Build and validation checks](production/README.md)
 - [Driver source overview](libfprint-driver/README.md)
 - [Learning guide](docs/learning/README.md)
 
