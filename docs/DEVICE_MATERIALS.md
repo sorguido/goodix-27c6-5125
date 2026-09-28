@@ -17,17 +17,23 @@ $HOME/goodix-5125-materials/
 If `/var/lib/goodix-5125-poc/` already contains a valid installed set, ordinary
 updates and reinstalls reuse it automatically; no Home staging copy is required.
 Otherwise, if you already have a valid five-file bundle for your reader, place those files
-there and continue with [Installation](INSTALLATION.md). If you do not yet have
-the bundle, Part II below documents how each final file is derived from the same
-reader and its qualified OEM Windows environment.
+there and continue with [Installation](INSTALLATION.md).
 
 > [!TIP]
-> **Starting from zero?** Follow the
-> [beginner device-material walkthrough](learning/11_building_your_device_material_bundle.md)
-> for step-by-step Windows file collection, USB capture, local helper prompts,
-> and final bundle checks. This page remains the canonical technical contract;
-> the walkthrough and builder candidate do not change the supported Linux release's
-> validation boundary.
+> **Starting from zero? Use the Windows Material Builder.** The recommended
+> acquisition path is the
+> [Goodix 5125 Windows Material Builder](../tools/windows_material_builder/README.md),
+> which guides the Windows-side capture and prepares the complete five-file bundle
+> required by the Linux installer. Follow that README from the beginning on the
+> qualified OEM Windows environment for your own reader.
+>
+> Part II below remains available as the manual acquisition and technical reference
+> for the same material. It is useful for understanding, auditing or troubleshooting
+> the individual derivation steps, but normal users do not need to reproduce those
+> manual steps when using the Material Builder.
+
+This page remains the canonical technical contract for the bundle format and
+Linux-side validation boundary.
 
 The reader-specific files must describe the same physical reader. `gfusb.dll`
 is different: it is the qualified OEM implementation compatibility boundary,
@@ -36,17 +42,17 @@ not a reader-identity value.
 ## Supported release scope
 
 The supported Linux release **validates and consumes** an already prepared bundle.
-A [Windows VM material builder development candidate](../tools/windows_material_builder/README.md)
-now provides acquisition, extraction, DPAPI recovery and manifest generation in
-source form. It is **not supported or live-qualified** until the Windows operator
-gate passes. The manual acquisition reference below remains available unchanged.
+The [Windows Material Builder](../tools/windows_material_builder/README.md) is the
+recommended Windows-side acquisition path for creating that bundle from the same
+reader and its qualified OEM environment. It performs the acquisition, extraction,
+DPAPI recovery, manifest generation and final five-file validation described by
+the manual reference below.
 
 The technical reference later in this document describes the formats,
 source locations, protocol evidence and validation rules needed to derive the
-five artifacts with independent tooling or automation. That acquisition
-procedure is informational and outside the supported release surface: the
-public installer and runtime remain the final authority on whether a bundle
-is acceptable.
+five artifacts manually or with independent tooling. It remains the manual
+reference and troubleshooting/audit path; the public installer and runtime remain
+the final authority on whether a bundle is acceptable.
 
 Use only material lawfully obtained from your own reader/OEM environment. Do
 not guess missing values, reuse another reader's material, generate a
