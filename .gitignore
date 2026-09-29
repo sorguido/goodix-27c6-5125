@@ -19,7 +19,6 @@ __pycache__/
 # Protected user-supplied material must remain outside this repository.
 /development/
 /AGENTS.md
-/Goodix 27c6 5125 manuale tecnico.md
 /START_PROMPT.md
 
 # Protected user-supplied material: forbidden anywhere inside the repository.
