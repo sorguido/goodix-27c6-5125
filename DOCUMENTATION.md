@@ -4,18 +4,6 @@
 This page is the complete thematic index for the Goodix `27c6:5125` Fedora KDE
 project.
 
-The repository's main [`README.md`](README.md) remains the recommended guided
-entry point for first-time users. Use this index when you already know what you
-are looking for, want to return to a specific topic, or want to browse the
-documentation by subject rather than by reading path.
-
-> [!IMPORTANT]
-> The supported target is intentionally narrow: Goodix USB `27c6:5125`,
-> firmware `GF_ST411SEC_APP_12509`, Fedora 44 KDE x86_64, and local accounts.
-> See [Validation scope and known limitations](docs/VALIDATION.md) before
-> generalizing any result to other hardware, firmware, distributions, or future
-> Fedora versions.
-
 ## Quick access
 
 | I want to... | Go to |
