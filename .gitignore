@@ -9,7 +9,6 @@ __pycache__/
 *.tmp
 *~
 
-
 # Windows Material Builder local Python environments/build output.
 /tools/windows_material_builder/.venv/
 /tools/windows_material_builder/venv/
@@ -19,9 +18,14 @@ __pycache__/
 
 # Protected user-supplied material must remain outside this repository.
 /development/
-/goodix-5125-materials/
-/target-material-manifest.json
-/transport-material.bin
-/target-config-90.bin
-/gfusb.dll
-/fdt-cache.bin
+/AGENTS.md
+/Goodix 27c6 5125 manuale tecnico.md
+/START_PROMPT.md
+
+# Protected user-supplied material: forbidden anywhere inside the repository.
+**/goodix-5125-materials/
+**/target-material-manifest.json
+**/transport-material.bin
+**/target-config-90.bin
+**/gfusb.dll
+**/fdt-cache.bin
