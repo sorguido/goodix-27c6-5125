@@ -28,7 +28,7 @@
   },
   "canonical_routing": {
     "governance": "AGENTS.md",
-    "bootstrap": "START_PROMPT.md",
+    "bootstrap": "START.md",
     "roadmap": "ROADMAP.md",
     "state_cache": "PROJECT_STATE.json",
     "technical_reference": "TECHNICAL_MANUAL.md",
@@ -70,7 +70,7 @@
       ]
     },
     {
-      "path": "START_PROMPT.md",
+      "path": "START.md",
       "git_status": "added",
       "role": "CANONICAL_BOOTSTRAP",
       "relevance": [
