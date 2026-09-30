@@ -9,7 +9,7 @@
   },
   "execution_path": "PRIMARY",
   "phase": "P6",
-  "phase_status": "HUMAN_REQUIRED",
+  "phase_status": "AWAITING_LIVE_EVIDENCE",
   "completed_gates": [
     "SELF_CONTAINED_ARCHITECTURE_APPROVAL",
     "ARTIFACT_INDEX_BASELINE_RECONCILED",
@@ -17,10 +17,10 @@
     "CONFIG90_AND_BB010002_OFFLINE",
     "FDT_ZERO_SEED_OFFLINE",
     "STATE_V2_AND_MIGRATION_OFFLINE",
-    "COORDINATOR_HOST_VM"
+    "COORDINATOR_HOST_VM",
+    "LIVE_NO_FINGER_APPROVAL"
   ],
   "pending_gates": [
-    "LIVE_NO_FINGER_APPROVAL",
     "SELF_CONTAINED_LIVE_NO_FINGER",
     "WINDOWS_INTEROP_APPROVAL",
     "WINDOWS_LINUX_PING_PONG",
@@ -76,7 +76,10 @@
       "FEDORA44_SELINUX_ENFORCING_STATE_V2_ONLY_HOST_LIFECYCLE_VM",
       "UPDATE_REINSTALL_UNINSTALL_ROLLBACK_AND_RECOVERY_VM",
       "PASSWORD_SUDO_AND_KDE_SURVIVABILITY_VM",
-      "PRODUCTION_PAIRING_WRITER_DISABLED"
+      "PRODUCTION_PAIRING_WRITER_DISABLED",
+      "P6_READ_ONLY_PREFLIGHT_INTEGRATED_OFFLINE",
+      "P6_ZERO_SEED_HANDOFF_INTEGRATED_OFFLINE",
+      "P6_ONE_SHOT_PAIRING_BOUNDARY_OFFLINE"
     ],
     "inferred": [
       "REPEATED_REUSE_OF_SAME_LINUX_PSK_AFTER_WINDOWS_RETURN",
@@ -113,6 +116,12 @@
     "libfprint-driver/tests/test_goodix_self_state.c",
     "libfprint-driver/goodix_runtime_coordinator.c",
     "libfprint-driver/goodix_runtime_coordinator.h",
+    "libfprint-driver/goodix_live_preflight.c",
+    "libfprint-driver/goodix_live_preflight.h",
+    "libfprint-driver/tests/test_goodix_live_preflight.c",
+    "libfprint-driver/goodix_pairing_provision.c",
+    "libfprint-driver/goodix_pairing_provision.h",
+    "libfprint-driver/tests/test_goodix_pairing_provision.c",
     "libfprint-driver/goodix_fpimage_device.c",
     "libfprint-driver/tests/test_goodix_fpimage_device.c",
     "deployment/install.py",
@@ -126,19 +135,9 @@
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "Await explicit LIVE_NO_FINGER_APPROVAL before ROADMAP P6. P6 requires the real APP12509 target and must proceed in the canonical bounded order from read-only identity/config/state evidence through no-finger FDT and, only after those checks pass, the single-write pairing transaction and read-only recovery proof.",
-  "active_human_gate": {
-    "gate": "LIVE_NO_FINGER_APPROVAL",
-    "reason": "ROADMAP P6 requires access to the real Goodix USB target, protected live identity/state evidence and a bounded transaction that may issue at most one pairing write E0. P5 used no reader and grants no authority for those actions.",
-    "excluded": [
-      "REAL_GOODIX_USB_OR_SENSOR_ACCESS",
-      "REAL_PSK_OR_PROTECTED_STATE_ACCESS",
-      "PAIRING_WRITE_E0",
-      "LIVE_NO_FINGER_EXECUTION"
-    ]
-  },
-  "last_verified_head": "5fd8e64c877815789a9b03ade6fe95e217869d91",
-  "state_note": "P0A through P5 are accepted. The production coordinator activates only for an explicit allowlisted libfprint action, remains read-only with respect to pairing and supports fail-closed legacy/state-v2 selection while no pairing writer is linked. COORDINATOR_HOST_VM passed on a clean Fedora 44 KDE x86_64 VM with SELinux Enforcing and the reader absent: state-v2-only fresh install, update, normal uninstall, reinstall, controlled transaction rollback and damaged-install emergency recovery preserved the empty root-only state-v2 location, Fedora-owned fprintd/PAM boundaries, password sudo and KDE usability across the required reboots. No USB passthrough, real PSK access, biometric action or E0 occurred. P6 has not started and remains behind LIVE_NO_FINGER_APPROVAL. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
+  "next_action": "Run the first user-executed P6 live checkpoint on the exact APP12509 target with the qualified legacy material still available: bounded read-only identity/chip/OTP/BB010002/E4, generated CONFIG90 equality and zero-seed no-finger FDT. Stop immediately after the sanitized GOODIX_ZERO_SEED_FDT_READY evidence. The production E0 call site remains absent and PREPARED journaling, E0, reopen and recovery must not run until this checkpoint passes.",
+  "last_verified_head": "fd556c653d6b4cdff88781559549d458ed0e9704",
+  "state_note": "P0A through P5 are accepted. LIVE_NO_FINGER_APPROVAL was explicitly granted for P6 after the P5 closure commit was pushed to origin/development. The first P6 candidate integrates an enrollment-only, seven-command read-only APP12509 preflight, exact legacy-boundary and generated-CONFIG90 comparisons, and the zero-seed no-finger lifecycle handoff. Its separately tested pairing module constructs exactly one E0 and requires strict ACK/completion, unchanged BB010002, validator match and TLS proof, but no production code references that module yet: writer_enabled and pairing_write_count remain zero. Normal and ASan/UBSan component tests, the full 60-case production integration suite and the Fedora public payload build pass offline. No P6 USB command, protected-material access, pairing write or biometric action has yet occurred. The next checkpoint stops after read-only/config/zero-seed live evidence; PREPARED and E0 remain unreachable until that evidence passes. Firmware/IAP/ClearApp/OTP/factory writes, biometric tests and any E0 retry remain excluded. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }

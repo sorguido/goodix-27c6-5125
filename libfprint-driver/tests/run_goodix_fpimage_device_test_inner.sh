@@ -120,6 +120,12 @@ gcc $strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_runtime_coordinator.c" \
   -o "$build_dir/goodix_runtime_coordinator.o"
 gcc $strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_bb010002.c" \
+  -o "$build_dir/goodix_bb010002.o"
+gcc $strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_live_preflight.c" \
+  -o "$build_dir/goodix_live_preflight.o"
+gcc $strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_secure_session.c" \
   -o "$build_dir/goodix_secure_session.o"
 gcc $strict_flags $glib_cflags $includes -c \
@@ -198,6 +204,8 @@ gcc -Wl,--gc-sections "$build_dir/metrics.o" -lstdc++ \
   "$build_dir/goodix_config90.o" \
   "$build_dir/goodix_self_state.o" \
   "$build_dir/goodix_runtime_coordinator.o" \
+  "$build_dir/goodix_bb010002.o" \
+  "$build_dir/goodix_live_preflight.o" \
   "$build_dir/goodix_secure_session.o" \
   "$build_dir/goodix_image_decoder.o" \
   "$build_dir/goodix_post_tls_lifecycle.o" \
@@ -287,6 +295,12 @@ gcc $san_strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_runtime_coordinator.c" \
   -o "$build_dir/goodix_runtime_coordinator_san.o"
 gcc $san_strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_bb010002.c" \
+  -o "$build_dir/goodix_bb010002_san.o"
+gcc $san_strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_live_preflight.c" \
+  -o "$build_dir/goodix_live_preflight_san.o"
+gcc $san_strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_secure_session.c" \
   -o "$build_dir/goodix_secure_session_san.o"
 gcc $san_strict_flags $glib_cflags $includes -c \
@@ -354,6 +368,8 @@ gcc $san_common -Wl,--gc-sections "$build_dir/metrics_san.o" -lstdc++ \
   "$build_dir/goodix_config90_san.o" \
   "$build_dir/goodix_self_state_san.o" \
   "$build_dir/goodix_runtime_coordinator_san.o" \
+  "$build_dir/goodix_bb010002_san.o" \
+  "$build_dir/goodix_live_preflight_san.o" \
   "$build_dir/goodix_secure_session_san.o" \
   "$build_dir/goodix_image_decoder_san.o" \
   "$build_dir/goodix_post_tls_lifecycle_san.o" \

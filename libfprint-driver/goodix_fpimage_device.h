@@ -10,6 +10,7 @@
 #include "goodix_secure_session.h"
 #include "goodix_post_tls_lifecycle.h"
 #include "goodix_runtime_coordinator.h"
+#include "goodix_live_preflight.h"
 #include "goodix_enrollment_fpi_usb_binding.h"
 
 G_BEGIN_DECLS
@@ -106,6 +107,7 @@ typedef struct
   guint terminal_enroll_completion_abort_count;
   gboolean terminal_enroll_completion_held;
   GoodixPreSessionRxSyncAudit pre_session_rx_sync;
+  GoodixLivePreflightAudit live_preflight;
   GoodixRuntimeCoordinatorAudit runtime_coordinator;
   GoodixRuntimeMaterialAudit runtime_material;
   GoodixSecureSessionAudit secure;

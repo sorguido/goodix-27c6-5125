@@ -249,6 +249,82 @@
       ]
     },
     {
+      "path": "libfprint-driver/goodix_live_preflight.c",
+      "git_status": "added",
+      "role": "BOUNDED_READ_ONLY_APP12509_LIVE_PREFLIGHT",
+      "relevance": [
+        "P6",
+        "P10"
+      ]
+    },
+    {
+      "path": "libfprint-driver/goodix_live_preflight.h",
+      "git_status": "added",
+      "role": "READ_ONLY_LIVE_PREFLIGHT_INTERFACE",
+      "relevance": [
+        "P6",
+        "P10"
+      ]
+    },
+    {
+      "path": "libfprint-driver/goodix_pairing_provision.c",
+      "git_status": "added",
+      "role": "ONE_SHOT_PAIRING_WRITE_AND_PROOF_BOUNDARY",
+      "relevance": [
+        "P6",
+        "P7",
+        "P10"
+      ]
+    },
+    {
+      "path": "libfprint-driver/goodix_pairing_provision.h",
+      "git_status": "added",
+      "role": "PAIRING_PROVISION_BOUNDARY_INTERFACE",
+      "relevance": [
+        "P6",
+        "P7",
+        "P10"
+      ]
+    },
+    {
+      "path": "libfprint-driver/tests/run_goodix_live_preflight_test.sh",
+      "git_status": "added",
+      "role": "P6_READ_ONLY_PREFLIGHT_OFFLINE_TEST_RUNNER",
+      "relevance": [
+        "P6",
+        "P10"
+      ]
+    },
+    {
+      "path": "libfprint-driver/tests/test_goodix_live_preflight.c",
+      "git_status": "added",
+      "role": "P6_READ_ONLY_PREFLIGHT_CONTRACT_TESTS",
+      "relevance": [
+        "P6",
+        "P10"
+      ]
+    },
+    {
+      "path": "libfprint-driver/tests/run_goodix_pairing_provision_test.sh",
+      "git_status": "added",
+      "role": "P6_ONE_SHOT_PAIRING_OFFLINE_TEST_RUNNER",
+      "relevance": [
+        "P6",
+        "P7",
+        "P10"
+      ]
+    },
+    {
+      "path": "libfprint-driver/tests/test_goodix_pairing_provision.c",
+      "git_status": "added",
+      "role": "P6_E0_ONE_SHOT_RESPONSE_AND_PROOF_TESTS",
+      "relevance": [
+        "P6",
+        "P7",
+        "P10"
+      ]
+    },
+    {
       "path": "production/host-test-only-symbols.txt",
       "git_status": "modified",
       "role": "PRODUCTION_TEST_SEAM_DENYLIST",
@@ -426,6 +502,24 @@
         "docs/LICENSING_AND_PROVENANCE.md"
       ],
       "note": "The module is host-only: it contains no USB or pairing writer and reconciliation never recommends a speculative E0."
+    },
+    "P6": {
+      "purpose": "Integrated read-only preflight, generated CONFIG90/zero-seed qualification, then journaled single-E0 and recovery proof.",
+      "load": [
+        "libfprint-driver/goodix_live_preflight.c",
+        "libfprint-driver/goodix_live_preflight.h",
+        "libfprint-driver/goodix_pairing_provision.c",
+        "libfprint-driver/goodix_pairing_provision.h",
+        "libfprint-driver/goodix_fpimage_device.c",
+        "libfprint-driver/goodix_runtime_coordinator.c",
+        "libfprint-driver/goodix_self_state.c",
+        "libfprint-driver/goodix_post_tls_lifecycle.c",
+        "libfprint-driver/tests/run_goodix_live_preflight_test.sh",
+        "libfprint-driver/tests/run_goodix_pairing_provision_test.sh",
+        "development/psk/README.md",
+        "docs/LICENSING_AND_PROVENANCE.md"
+      ],
+      "note": "The writer boundary is compiled but remains unreachable from production until PREPARED journaling, exact action gating and post-write recovery are integrated and verified offline."
     },
     "P10": {
       "purpose": "Publication cleanup and classification.",
