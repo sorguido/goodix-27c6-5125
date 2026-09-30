@@ -8,17 +8,17 @@
     "qualified_host": "Fedora 44 KDE x86_64"
   },
   "execution_path": "PRIMARY",
-  "phase": "P4",
+  "phase": "P5",
   "phase_status": "IN_PROGRESS",
   "completed_gates": [
     "SELF_CONTAINED_ARCHITECTURE_APPROVAL",
     "ARTIFACT_INDEX_BASELINE_RECONCILED",
     "PAIRING_CRYPTO_OFFLINE",
     "CONFIG90_AND_BB010002_OFFLINE",
-    "FDT_ZERO_SEED_OFFLINE"
+    "FDT_ZERO_SEED_OFFLINE",
+    "STATE_V2_AND_MIGRATION_OFFLINE"
   ],
   "pending_gates": [
-    "STATE_V2_AND_MIGRATION_OFFLINE",
     "COORDINATOR_HOST_VM",
     "LIVE_NO_FINGER_APPROVAL",
     "SELF_CONTAINED_LIVE_NO_FINGER",
@@ -66,7 +66,10 @@
       "OEM_EQUIVALENT_WHITE_BOX_PSK_DERIVATION",
       "EXACT_TYPE12_CONFIG90_FROM_OTP",
       "GENERALIZED_STRUCTURAL_BB010002_ACCEPTANCE",
-      "BOUNDED_ZERO_SEED_FDT_MODEL_OFFLINE"
+      "BOUNDED_ZERO_SEED_FDT_MODEL_OFFLINE",
+      "CRASH_SAFE_PER_READER_STATE_V2_OFFLINE",
+      "READ_ONLY_PAIRING_RECONCILIATION_OFFLINE",
+      "SIDE_BY_SIDE_LEGACY_MIGRATION_OFFLINE"
     ],
     "inferred": [
       "REPEATED_REUSE_OF_SAME_LINUX_PSK_AFTER_WINDOWS_RETURN",
@@ -97,15 +100,18 @@
     "libfprint-driver/goodix_post_tls_lifecycle.c",
     "libfprint-driver/goodix_post_tls_lifecycle.h",
     "libfprint-driver/tests/test_goodix_post_tls_lifecycle.c",
+    "libfprint-driver/goodix_self_state.c",
+    "libfprint-driver/goodix_self_state.h",
+    "libfprint-driver/tests/test_goodix_self_state.c",
     "TECHNICAL_MANUAL.md",
     "docs/LICENSING_AND_PROVENANCE.md"
   ],
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "Execute ROADMAP P4 offline: implement per-reader state-v2 PREPARED-to-ACTIVE transitions, durable no-follow atomic storage, read-only crash reconciliation, and byte-preserving legacy import with exhaustive fault-boundary tests.",
-  "last_verified_head": "d1575fc6a8539c08d7251622955385ab0bf327fd",
-  "state_note": "P0A through P3 are accepted offline. P3 explicitly represents absent seed as a zero-table first request, accepts exactly three consistent no-finger samples with zero automatic retry, and exposes only the learned 12-byte FDT table for future persistence. Real-target zero-seed behavior remains for the later live gate. The P1/P2 modules and P3 absent-seed selector are not yet integrated into the production activation path. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
+  "next_action": "Execute ROADMAP P5: integrate the identity/config/state coordinator read-only with respect to pairing, retain legacy/state-v2 coexistence, keep the production writer disabled, and close Fedora 44 VM install/update/uninstall/rollback behavior before the live gate.",
+  "last_verified_head": "393e5e5691d34712b468194bd1b9283f932fa469",
+  "state_note": "P0A through P4 are accepted offline. State-v2 uses two root-only authenticated generation slots, file and directory fsync, full reader/config binding, deterministic read-only crash reconciliation and side-by-side legacy import. All eight persistence boundaries, authenticated corruption fallback and unchanged legacy source are covered with synthetic secrets; no USB or real PSK was accessed. The P1-P4 components are not yet integrated into the production activation path, and the production pairing writer remains absent/disabled. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }
