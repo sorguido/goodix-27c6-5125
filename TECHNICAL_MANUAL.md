@@ -148,10 +148,12 @@ authentication, compression, or key layer beyond TLS itself.
 Only one physical OUT is outstanding. For B0, the next 64-byte staging chunk is
 submitted only after the preceding completion succeeds for the active action
 generation; the record is complete only after every chunk completion. Stale
-generation callbacks cannot advance the current record. On receive, the single
-router similarly owns one outstanding bulk IN, tolerates fragmented or
-coalesced USB completions, and delivers a frame only after its complete bounded
-logical length is present.
+generation callbacks cannot advance the current record. Consecutive outbound
+B0 logical records are separated by 10 ms after the preceding record completes;
+this processing interval is required between records, not between the 64-byte
+chunks of one record. On receive, the single router similarly owns one
+outstanding bulk IN, tolerates fragmented or coalesced USB completions, and
+delivers a frame only after its complete bounded logical length is present.
 
 ## 3. System architecture and ownership
 
