@@ -52,6 +52,8 @@ libfprint-driver/goodix_runtime_material.c	LGPL-2.1-or-later	LOCAL_GOODIX
 libfprint-driver/goodix_runtime_material.h	LGPL-2.1-or-later	LOCAL_GOODIX
 libfprint-driver/goodix_secure_session.c	LGPL-2.1-or-later	LOCAL_GOODIX
 libfprint-driver/goodix_secure_session.h	LGPL-2.1-or-later	LOCAL_GOODIX
+libfprint-driver/goodix_self_state.c	LGPL-2.1-or-later	LOCAL_GOODIX
+libfprint-driver/goodix_self_state.h	LGPL-2.1-or-later	LOCAL_GOODIX
 libfprint-driver/goodix_sigfm_metrics.cpp	LGPL-2.1-or-later	LOCAL_GOODIX
 libfprint-driver/goodix_sigfm_metrics.h	LGPL-2.1-or-later	LOCAL_GOODIX
 libfprint-driver/goodix_sigfm_preprocess.c	GPL-2.0-or-later	ROCKY_PREPROCESS_ADAPTATION

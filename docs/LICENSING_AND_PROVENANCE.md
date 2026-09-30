@@ -13,6 +13,7 @@ change the original copyright or grant of any source file.
 | APP12509 pairing crypto | Project source; focused refactor of the project-authored D190 implementation and qualified PSK PoC | LGPL-2.1-or-later; pure fixed-profile BB010003/BB020003 derivation, with no USB, persistence, DLL loading or external implementation copied |
 | APP12509 CONFIG90 derivation | Adapted from Rockytkg, commit `227eba219fa9e3fbac5bd59aca79f624f67cd11b`, `src/goodix_init.c` and `src/goodix_otp.c` | GPL-2.0-or-later; pure ChicagoHS type-12 template, OTP patch mapping and finalizer only |
 | APP12509 BB010002 parser | Project source; structure qualified from multiple legitimate opaque Windows values | LGPL-2.1-or-later; validation only, with no decryption, protected-byte synthesis or embedded private fixture |
+| APP12509 state-v2 | Project source | LGPL-2.1-or-later; host-only root-protected PSK/receipt generations, authenticated crash recovery and side-by-side legacy-state import, with no USB or pairing writer |
 | SIGFM | Rockytkg's materialized libfprint fork, commit `7ebe0c809b4d1df3400e84299a4ec4acdea84590` | LGPL-2.1-or-later; feature extraction and matching |
 | Image preprocessing | Adapted from Rockytkg, commit `227eba219fa9e3fbac5bd59aca79f624f67cd11b` | GPL-2.0-or-later; device-independent preprocessing subset |
 | OpenCV | Fedora OpenCV 4 packages (actual installed version recorded at build) | Fedora expression `BSD-3-Clause AND Apache-2.0 AND ISC`; required runtime libraries |
@@ -75,6 +76,14 @@ It retains GPL-2.0-or-later and excludes USB transport, provisioning, firmware
 and persistence behavior. `libfprint-driver/goodix_bb010002.[ch]` is a
 project-authored structural validator derived from comparison of legitimate
 opaque values; no protected value or decryption implementation is included.
+
+`libfprint-driver/goodix_self_state.[ch]` is project-authored. It stores the
+PSK separately from a PSK-authenticated fixed-size receipt, uses two atomic
+generation slots with file and directory synchronization, and binds state to
+the target, application, chip profile, OTP digest and CONFIG90 digest. It has
+no USB transport or pairing-write implementation. Its legacy-import boundary
+accepts only already validated caller-owned material and leaves the original
+bundle untouched for rollback.
 
 ## Excluded material
 

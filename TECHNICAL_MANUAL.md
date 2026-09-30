@@ -280,6 +280,23 @@ them. The current production runtime deliberately continues to use the
 validated five-file bundle until the later state/coordinator integration gates
 replace these offline components.
 
+The host-only state-v2 boundary uses two fixed-size generations. Each generation
+contains a 32-byte PSK record and a receipt authenticated by that PSK. The
+receipt binds VID:PID, exact application, chip profile, OTP digest and CONFIG90
+digest, and records `PREPARED`, `ACTIVE` or `RECOVERY_REQUIRED` transaction
+state plus the minimum optional 12-byte FDT table. Files are regular,
+non-linked, root-owned mode `0600` below a root-owned mode `0700` directory;
+loads use no-follow opens and writes synchronize each temporary file, atomic
+rename and containing directory. A complete older generation remains the only
+choice until the replacement secret and receipt both validate. After an
+interrupted pairing attempt, reconciliation only compares the live validator
+with the candidate and optional prior validator: candidate match retries TLS,
+prior match uses the prior state, and any other result requires recovery. It
+never authorizes a speculative second pairing write. Legacy import is
+side-by-side and records the source digest without changing or removing the
+old bundle. This boundary is qualified offline and is not yet selected by the
+production activation path.
+
 The manifest binds the bundle to `27c6:5125`, the supported application, the
 other four files, and target responses used during initialization. File names,
 types, modes, ownership, hard-link count, sizes, formats, and digests are checked

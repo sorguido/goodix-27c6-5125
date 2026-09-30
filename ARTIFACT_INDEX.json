@@ -129,6 +129,46 @@
       ]
     },
     {
+      "path": "libfprint-driver/goodix_self_state.c",
+      "git_status": "added",
+      "role": "CRASH_SAFE_PER_READER_STATE_V2",
+      "relevance": [
+        "P4",
+        "P5",
+        "P6",
+        "P10"
+      ]
+    },
+    {
+      "path": "libfprint-driver/goodix_self_state.h",
+      "git_status": "added",
+      "role": "STATE_V2_AND_READ_ONLY_RECONCILIATION_INTERFACE",
+      "relevance": [
+        "P4",
+        "P5",
+        "P6",
+        "P10"
+      ]
+    },
+    {
+      "path": "libfprint-driver/tests/run_goodix_self_state_test.sh",
+      "git_status": "added",
+      "role": "P4_OFFLINE_FAULT_INJECTION_RUNNER",
+      "relevance": [
+        "P4",
+        "P10"
+      ]
+    },
+    {
+      "path": "libfprint-driver/tests/test_goodix_self_state.c",
+      "git_status": "added",
+      "role": "STATE_V2_CRASH_MIGRATION_AND_POLICY_TESTS",
+      "relevance": [
+        "P4",
+        "P10"
+      ]
+    },
+    {
       "path": "libfprint-driver/goodix_config90.c",
       "git_status": "added",
       "role": "PURE_TYPE12_CONFIG90_DERIVATION",
@@ -374,6 +414,18 @@
         "libfprint-driver/tests/run_goodix_post_tls_test.sh"
       ],
       "note": "The current runtime explicitly selects the supplied legacy seed; state-v2/coordinator integration may select the proven absent-zero mode later."
+    },
+    "P4": {
+      "purpose": "Crash-safe per-reader state-v2 and side-by-side legacy migration.",
+      "load": [
+        "development/SELF_CONTAINED_DRIVER_AUDIT.md",
+        "libfprint-driver/goodix_self_state.c",
+        "libfprint-driver/goodix_self_state.h",
+        "libfprint-driver/tests/test_goodix_self_state.c",
+        "libfprint-driver/tests/run_goodix_self_state_test.sh",
+        "docs/LICENSING_AND_PROVENANCE.md"
+      ],
+      "note": "The module is host-only: it contains no USB or pairing writer and reconciliation never recommends a speculative E0."
     },
     "P10": {
       "purpose": "Publication cleanup and classification.",
