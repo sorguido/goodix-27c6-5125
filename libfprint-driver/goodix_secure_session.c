@@ -160,6 +160,21 @@ goodix_protocol_failure_kind_name (GoodixProtocolFailureKind kind)
   return (guint) kind < G_N_ELEMENTS (names) ? names[kind] : "INVALID";
 }
 
+const gchar *
+goodix_e4_contract_result_name (GoodixE4ContractResult result)
+{
+  static const gchar *const names[] = {
+    "NOT_EVALUATED",
+    "BODY_LENGTH_MISMATCH",
+    "PREFIX_MISMATCH",
+    "VALIDATOR_MISMATCH",
+    "DIGEST_MISMATCH",
+    "MATCH",
+  };
+
+  return (guint) result < G_N_ELEMENTS (names) ? names[result] : "INVALID";
+}
+
 static gboolean
 phase_ack_status_allowed (GoodixSecurePhase phase,
                           guint8            status)
@@ -913,15 +928,18 @@ goodix_secure_session_start (GoodixSecureSession *session,
   return try_submit_phase (session, error);
 }
 
+static GoodixE4ContractResult
+check_e4_contract (const guint8 *body,
+                   gsize         body_length,
+                   const guint8  expected_validator[32],
+                   const guint8  expected_validator_sha256[32]);
+
 static gboolean
 validate_typed (GoodixSecureSession *session,
                 guint8               control,
                 const guint8        *body,
                 gsize                body_length)
 {
-  static const guint8 e4_prefix[] = {
-    0x00, 0x03, 0x00, 0x02, 0xbb, 0x20, 0x00, 0x00, 0x00
-  };
   guint8 expected_control = phase_control (session->phase);
 
   if (control != expected_control)
@@ -936,12 +954,16 @@ validate_typed (GoodixSecureSession *session,
       return body_length == sizeof app12509_identity &&
              memcmp (body, app12509_identity, body_length) == 0;
     case GOODIX_SECURE_PHASE_E4:
-      return body_length == sizeof e4_prefix + 32u &&
-             memcmp (body, e4_prefix, sizeof e4_prefix) == 0 &&
-             CRYPTO_memcmp (body + sizeof e4_prefix,
-                            session->e4_validator, 32) == 0 &&
-             digest_matches (body + sizeof e4_prefix, 32,
-                             session->material.e4_validator_sha256);
+      {
+        GoodixE4ContractResult result =
+          check_e4_contract (
+            body, body_length, session->e4_validator,
+            session->material.e4_validator_sha256);
+
+        if (session->audit != NULL)
+          session->audit->e4_contract_result = result;
+        return result == GOODIX_E4_CONTRACT_MATCH;
+      }
     case GOODIX_SECURE_PHASE_OEM_COLD_START_A2_1:
     case GOODIX_SECURE_PHASE_OEM_COLD_START_A2_2:
       return body_length == 3 &&
@@ -961,6 +983,46 @@ validate_typed (GoodixSecureSession *session,
       return FALSE;
     }
 }
+
+static GoodixE4ContractResult
+check_e4_contract (
+  const guint8 *body,
+  gsize body_length,
+  const guint8 expected_validator[32],
+  const guint8 expected_validator_sha256[32])
+{
+  static const guint8 e4_prefix[] = {
+    0x00, 0x03, 0x00, 0x02, 0xbb, 0x20, 0x00, 0x00, 0x00
+  };
+  const guint8 *validator;
+
+  if (body_length != sizeof e4_prefix + 32u)
+    return GOODIX_E4_CONTRACT_BODY_LENGTH_MISMATCH;
+  if (body == NULL || expected_validator == NULL ||
+      expected_validator_sha256 == NULL)
+    return GOODIX_E4_CONTRACT_NOT_EVALUATED;
+  if (memcmp (body, e4_prefix, sizeof e4_prefix) != 0)
+    return GOODIX_E4_CONTRACT_PREFIX_MISMATCH;
+  validator = body + sizeof e4_prefix;
+  if (CRYPTO_memcmp (validator, expected_validator, 32) != 0)
+    return GOODIX_E4_CONTRACT_VALIDATOR_MISMATCH;
+  if (!digest_matches (validator, 32, expected_validator_sha256))
+    return GOODIX_E4_CONTRACT_DIGEST_MISMATCH;
+  return GOODIX_E4_CONTRACT_MATCH;
+}
+
+#ifdef GOODIX_ENABLE_TEST_SEAMS
+GoodixE4ContractResult
+goodix_secure_session_test_check_e4_contract (
+  const guint8 *body,
+  gsize body_length,
+  const guint8 expected_validator[32],
+  const guint8 expected_validator_sha256[32])
+{
+  return check_e4_contract (body, body_length, expected_validator,
+                            expected_validator_sha256);
+}
+#endif
 
 void
 goodix_secure_session_handle_a0 (GoodixSecureSession *session,

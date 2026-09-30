@@ -1095,7 +1095,7 @@ goodix_fpimage_device_log_production_audit (
     "secure_commands=%u secure_acks=%u secure_typed=%u "
     "secure_failure=%u secure_phase=%s secure_failure_kind=%s "
     "secure_control=%d secure_ack_echo=%d secure_ack_status=%d "
-    "secure_body_length=%" G_GSSIZE_FORMAT " "
+    "secure_body_length=%" G_GSSIZE_FORMAT " secure_e4_contract=%s "
     "secure_retry=%u post_retry=%u reopen=%u explicit_verify_reopen=%u "
     "explicit_identify_reopen=%u "
     "reset=%u clear_halt=%u persistent=%u coordinator_source=%u "
@@ -1141,6 +1141,7 @@ goodix_fpimage_device_log_production_audit (
     audit->secure.observed_ack_echo,
     audit->secure.observed_ack_status,
     audit->secure.observed_body_length,
+    goodix_e4_contract_result_name (audit->secure.e4_contract_result),
     audit->secure.retry_count,
     audit->post_tls.retry_count,
     reopen_count,

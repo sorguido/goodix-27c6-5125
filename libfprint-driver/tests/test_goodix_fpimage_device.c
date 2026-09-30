@@ -2241,6 +2241,45 @@ test_d279_28_production_non_enrollment_rejected (void)
 }
 
 static void
+test_p6_e4_contract_diagnostics (void)
+{
+  guint8 body[41] = {
+    0x00, 0x03, 0x00, 0x02, 0xbb, 0x20, 0x00, 0x00, 0x00
+  };
+  guint8 validator[32];
+  guint8 validator_sha256[32];
+
+  memset (validator, 0xa5, sizeof validator);
+  memcpy (body + 9, validator, sizeof validator);
+  production_digest (validator, sizeof validator, validator_sha256);
+  g_assert_cmpint (goodix_secure_session_test_check_e4_contract (
+                     body, sizeof body, validator, validator_sha256),
+                   ==, GOODIX_E4_CONTRACT_MATCH);
+
+  body[0] ^= 1u;
+  g_assert_cmpint (goodix_secure_session_test_check_e4_contract (
+                     body, sizeof body, validator, validator_sha256),
+                   ==, GOODIX_E4_CONTRACT_PREFIX_MISMATCH);
+  body[0] ^= 1u;
+
+  body[9] ^= 1u;
+  g_assert_cmpint (goodix_secure_session_test_check_e4_contract (
+                     body, sizeof body, validator, validator_sha256),
+                   ==, GOODIX_E4_CONTRACT_VALIDATOR_MISMATCH);
+  body[9] ^= 1u;
+
+  validator_sha256[0] ^= 1u;
+  g_assert_cmpint (goodix_secure_session_test_check_e4_contract (
+                     body, sizeof body, validator, validator_sha256),
+                   ==, GOODIX_E4_CONTRACT_DIGEST_MISMATCH);
+  validator_sha256[0] ^= 1u;
+
+  g_assert_cmpint (goodix_secure_session_test_check_e4_contract (
+                     body, sizeof body - 1u, validator, validator_sha256),
+                   ==, GOODIX_E4_CONTRACT_BODY_LENGTH_MISMATCH);
+}
+
+static void
 test_d279_55_production_identify_single_acquisition (void)
 {
   ProductionOpenSeam seam = { 0 };
@@ -3278,6 +3317,8 @@ main (int argc, char **argv)
                    test_p5_coordinator_migration_selection);
   g_test_add_func ("/p5-coordinator/active-state",
                    test_p5_coordinator_active_state);
+  g_test_add_func ("/p6/e4-contract-diagnostics",
+                   test_p6_e4_contract_diagnostics);
 
   g_test_add_func ("/goodix-fpimage-device/lifecycle-base-capture",
                    test_lifecycle_base_capture);

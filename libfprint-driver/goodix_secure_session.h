@@ -48,6 +48,16 @@ typedef enum
 
 typedef enum
 {
+  GOODIX_E4_CONTRACT_NOT_EVALUATED = 0,
+  GOODIX_E4_CONTRACT_BODY_LENGTH_MISMATCH,
+  GOODIX_E4_CONTRACT_PREFIX_MISMATCH,
+  GOODIX_E4_CONTRACT_VALIDATOR_MISMATCH,
+  GOODIX_E4_CONTRACT_DIGEST_MISMATCH,
+  GOODIX_E4_CONTRACT_MATCH,
+} GoodixE4ContractResult;
+
+typedef enum
+{
   GOODIX_REENTRY_RECOVERY_A2_NOT_STARTED = 0,
   GOODIX_REENTRY_RECOVERY_A2_SUBMITTED,
   GOODIX_REENTRY_RECOVERY_A2_ACK_STRICT,
@@ -117,6 +127,7 @@ typedef struct
   gint observed_ack_echo;
   gint observed_ack_status;
   gssize observed_body_length;
+  GoodixE4ContractResult e4_contract_result;
 } GoodixSecureSessionAudit;
 
 typedef struct _GoodixSecureSession GoodixSecureSession;
@@ -177,8 +188,18 @@ gboolean          goodix_secure_session_needs_receive (const GoodixSecureSession
 const gchar      *goodix_secure_phase_name (GoodixSecurePhase phase);
 const gchar      *goodix_protocol_failure_kind_name (
   GoodixProtocolFailureKind kind);
+const gchar      *goodix_e4_contract_result_name (
+  GoodixE4ContractResult result);
 const gchar      *goodix_reentry_recovery_a2_result_class_name (
   GoodixReentryRecoveryA2ResultClass result_class);
+
+#ifdef GOODIX_ENABLE_TEST_SEAMS
+GoodixE4ContractResult goodix_secure_session_test_check_e4_contract (
+  const guint8 *body,
+  gsize body_length,
+  const guint8 expected_validator[32],
+  const guint8 expected_validator_sha256[32]);
+#endif
 
 G_END_DECLS
 

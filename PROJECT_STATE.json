@@ -79,17 +79,19 @@
       "PRODUCTION_PAIRING_WRITER_DISABLED",
       "P6_READ_ONLY_PREFLIGHT_INTEGRATED_OFFLINE",
       "P6_ZERO_SEED_HANDOFF_INTEGRATED_OFFLINE",
-      "P6_ONE_SHOT_PAIRING_BOUNDARY_OFFLINE"
+      "P6_ONE_SHOT_PAIRING_BOUNDARY_OFFLINE",
+      "P6_LIVE_E4_TYPED_RESPONSE_CONTRACT_MISMATCH"
     ],
     "inferred": [
       "REPEATED_REUSE_OF_SAME_LINUX_PSK_AFTER_WINDOWS_RETURN",
       "L1_W1_L1_W2_L1_STABLE_PING_PONG",
-      "ZERO_SEED_FDT_BOOTSTRAP_ON_REAL_TARGET"
+      "ZERO_SEED_FDT_BOOTSTRAP_ON_REAL_TARGET",
+      "P6_LIVE_E4_VALIDATOR_DIFFERS_FROM_LEGACY_MATERIAL"
     ],
     "initial_blockers": []
   },
   "current_blockers": [
-    "P6_FIRST_LIVE_IDENTIFY_PRECHECK_PROTOCOL_MISMATCH"
+    "P6_LIVE_E4_CONTRACT_COMPONENT_NOT_YET_DISCRIMINATED"
   ],
   "host_modified": false,
   "relevant_artifacts": [
@@ -137,9 +139,9 @@
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "Install the sanitized secure-failure telemetry update and repeat the same bounded no-finger fprintd-enroll once. The changed diagnostic method must identify the exact read-only secure phase and response mismatch before any implementation correction. Do not repeat again, touch the sensor, journal PREPARED or enable E0.",
-  "last_verified_head": "51843e6bf0c1738a79a22b78ca0b7de81d7a982a",
-  "state_note": "P0A through P5 are accepted. LIVE_NO_FINGER_APPROVAL is active for bounded P6 execution. The first P6 physical-target attempt installed source ID 69c34d99de03e4a16407d8ac3a5f96e4895b6719baa714cbe3204f072826046e with LEGACY_VALID and entered fprintd's IDENTIFY-for-enroll precheck, not the ENROLL action. It failed closed with phase-specific A0 response mismatch before TLS and before the enrollment-only live preflight: preflight_complete=0, tls=0, persistent=0, pairing_writer=0, pairing_writes=0, drained=1 and context_closed=1. Ten real submits after the quiet boundary are consistent with an E4 typed-response mismatch after successful A2/A8, but that classification remains INFERRED until phase-level telemetry is observed. No biometric contact or pairing write occurred. The candidate now adds sanitized secure phase/failure telemetry only; payload bytes and secrets remain unlogged. PREPARED and E0 remain unreachable. Firmware/IAP/ClearApp/OTP/factory writes, biometric tests and any E0 retry remain excluded. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
+  "next_action": "Install the component-level E4 diagnostic update and repeat the same bounded no-finger fprintd-enroll exactly once. Return the single GOODIX_PRODUCTION_EPOCH_AUDIT line containing secure_e4_contract. Do not repeat after that result, touch the sensor, journal PREPARED or enable E0.",
+  "last_verified_head": "f7554fac0d1572f3562980942883f7a39a449708",
+  "state_note": "P0A through P5 are accepted. LIVE_NO_FINGER_APPROVAL is active for bounded P6 execution. The latest target attempt installed source ID bffcf2cc9c9330aeb8276c152c9cf2a0994607ad9c26b969e000165986ab457e with LEGACY_VALID and entered fprintd's IDENTIFY-for-enroll precheck, not ENROLL. Evidence now proves a typed E4 contract failure after successful A2/A8: secure_commands=3, secure_acks=3, secure_typed=2, secure_phase=E4, secure_failure_kind=TYPED_SHAPE_MISMATCH, secure_control=228 and secure_body_length=41. TLS and the enrollment-only preflight were not reached; persistent=0, pairing_writer=0, pairing_writes=0, outstanding=0, drained=1 and context_closed=1. A differing live validator is the leading inference, but prefix, validator and digest were not separately observable. The candidate adds only a sanitized E4 component classification; no response bytes, hashes or secrets are logged. PREPARED and E0 remain unreachable. Firmware/IAP/ClearApp/OTP/factory writes, biometric tests and any E0 retry remain excluded. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }
