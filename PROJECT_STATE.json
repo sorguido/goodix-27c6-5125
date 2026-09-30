@@ -80,7 +80,7 @@
   },
   "host_modified": false,
   "relevant_artifacts": [
-    "START_PROMPT.md",
+    "START.md",
     "AGENTS.md",
     "ROADMAP.md",
     "PROJECT_STATE.json",
