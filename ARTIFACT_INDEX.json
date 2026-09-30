@@ -18,13 +18,13 @@
   "baseline": {
     "base_ref": "main",
     "indexed_ref": "development",
-    "base_head": "4cba03e67be3d357262d5c713ec0f9481c87ba37",
-    "indexed_head": "4683e66d6dcbcc386e017d2519b9aa51872344a8",
+    "base_head": "2a8ae714c0b847be6d92316191d9a6189a50a76e",
+    "indexed_head": "3d91e76fd9552b7804d0555d49becb15d7d6db12",
     "merge_base": "2a8ae714c0b847be6d92316191d9a6189a50a76e",
-    "relationship": "diverged",
-    "development_ahead_by": 18,
-    "development_behind_main_by": 2,
-    "note": "The development artifact inventory below is based on the development side of the merge-base diff. Main-only work is tracked separately so it is not mistaken for development-produced material."
+    "relationship": "development_ahead_of_main",
+    "development_ahead_by": 28,
+    "development_behind_main_by": 0,
+    "note": "The development artifact inventory below is based on the development side of the merge-base diff. There are no main-only commits at this baseline."
   },
   "canonical_routing": {
     "governance": "AGENTS.md",
@@ -49,6 +49,14 @@
       "path": "AGENTS.md",
       "git_status": "added",
       "role": "CANONICAL_GOVERNANCE",
+      "relevance": [
+        "ALL_PHASES"
+      ]
+    },
+    {
+      "path": "ARTIFACT_INDEX.json",
+      "git_status": "added",
+      "role": "NON_AUTHORITATIVE_CONTEXT_ROUTER",
       "relevance": [
         "ALL_PHASES"
       ]
@@ -170,17 +178,7 @@
       ]
     }
   ],
-  "main_only_delta_at_baseline": [
-    {
-      "path": "tools/windows_material_builder/README.md",
-      "role": "MAIN_ONLY_DOCUMENTATION_DELTA",
-      "relevance": [
-        "P10",
-        "P11"
-      ],
-      "note": "Present on current main after the merge base but not on development at index bootstrap. Do not silently overwrite; reconcile deliberately when preparing publication/documentation."
-    }
-  ],
+  "main_only_delta_at_baseline": [],
   "phase_routes": {
     "P0A": {
       "purpose": "Reconcile this index against the real Git delta before implementation resumes.",

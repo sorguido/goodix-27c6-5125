@@ -8,13 +8,13 @@
     "qualified_host": "Fedora 44 KDE x86_64"
   },
   "execution_path": "PRIMARY",
-  "phase": "P0A",
+  "phase": "P1",
   "phase_status": "NOT_STARTED",
   "completed_gates": [
-    "SELF_CONTAINED_ARCHITECTURE_APPROVAL"
+    "SELF_CONTAINED_ARCHITECTURE_APPROVAL",
+    "ARTIFACT_INDEX_BASELINE_RECONCILED"
   ],
   "pending_gates": [
-    "ARTIFACT_INDEX_BASELINE_RECONCILED",
     "PAIRING_CRYPTO_OFFLINE",
     "CONFIG90_AND_BB010002_OFFLINE",
     "FDT_ZERO_SEED_OFFLINE",
@@ -93,9 +93,9 @@
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "Execute ROADMAP P0A only: determine the current checked-out branch, compare main...CURRENT_CHECKED_OUT_BRANCH with three-dot/merge-base semantics, reconcile ARTIFACT_INDEX.json to that real delta (including main-only deltas separately), then mark ARTIFACT_INDEX_BASELINE_RECONCILED=PASS and advance to P1.",
-  "last_verified_head": "de952da548c3cfc24a254f705a88b4c00244c4f7",
-  "state_note": "Git/evidence/ROADMAP.md are authoritative. ARTIFACT_INDEX.json is a non-authoritative context router and must first be reconciled by ROADMAP P0A against the actual three-dot diff from main. The operational branch is always the current branch explicitly selected by the user; if ambiguous, stop with HUMAN_REQUIRED/BRANCH_SELECTION_REQUIRED.",
+  "next_action": "Execute ROADMAP P1: inspect the qualified pairing PoC and provenance, extract a pure internal WB/BB010003/BB020003 derivation, add complete positive and negative offline KAT coverage, and keep every runtime path independent of the new implementation until review closes PAIRING_CRYPTO_OFFLINE.",
+  "last_verified_head": "3d91e76fd9552b7804d0555d49becb15d7d6db12",
+  "state_note": "P0A was reconciled against main...development at development HEAD 3d91e76fd9552b7804d0555d49becb15d7d6db12 and merge-base/main HEAD 2a8ae714c0b847be6d92316191d9a6189a50a76e. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }
