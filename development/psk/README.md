@@ -51,7 +51,7 @@ transition, and the no-retry guard.
 The commit path is gated by:
 - exact USB target `27c6:5125`
 - exact firmware `GF_ST411SEC_APP_12509`
-- exact live pairing-E baseline (`BB010002` and `BB020003`)
+- exact live pairing-F baseline (`BB010002` and `BB020003`)
 - qualified WB self-test
 - exact local OEM-shaped `E0` frame validation
 - explicit `--commit` plus confirmation phrase
@@ -74,11 +74,11 @@ Preflight reads both pairing fields before evaluating the exact baseline, so a
 baseline mismatch still produces complete read-only evidence while remaining
 fail-closed before PSK generation or any `E0` path.
 
-The current pre-write gate is pairing E, established by Windows A recovery:
+The current pre-write gate is pairing F, established by Windows A recovery:
 
 ```text
-BB010002 SHA256 = a77e1a3d591fee18f874ce7ec3209ea8765f123dbf673c297655c03c96e51c8f
-BB020003        = d5eb3b43b18b3cb40a962c519e204717992851dffaa7f381667ae295fc524885
+BB010002 SHA256 = d33c4758d7c44ab4f8fab210b5cb8b62382ee18cf93c9382ee1b9a4bd3c3856a
+BB020003        = f7dee3d7050c4e08aab9dbb6964dc85d5ec6ba6a8636c7152caf3f5ac5cdb688
 ```
 
 Do not run commit mode unless the live preflight has just passed and the operator
