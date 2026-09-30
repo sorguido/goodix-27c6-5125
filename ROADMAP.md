@@ -3,9 +3,10 @@
 
 ## 0. Scopo e autorità
 
-Questa roadmap è la state machine operativa canonica del ramo `development` per
-portare il progetto dalla release attuale, dipendente dal bundle Windows, a un
-driver autonomo e convivente con Windows.
+Questa roadmap è la state machine operativa canonica del progetto per portare
+la release attuale, dipendente dal bundle Windows, a un driver autonomo e
+convivente con Windows. Il branch operativo non è hard-coded qui: vale il branch
+correntemente selezionato dall'Utente secondo `AGENTS.md`.
 
 Goal finale:
 
@@ -40,7 +41,9 @@ Stack:        libfprint -> stock fprintd -> PAM/KDE
 
 `AGENTS.md` possiede la governance permanente. Questo file possiede soltanto
 sequenza, gate e criteri di uscita. `PROJECT_STATE.json` è una cache operativa
-non autoritativa e deve seguire questa roadmap.
+non autoritativa e deve seguire questa roadmap. `ARTIFACT_INDEX.json` è il
+router non autoritativo del contesto: Git resta la fonte della sua struttura
+reale e l'indice va riparato quando diventa stale.
 
 ## 1. Invarianti di progetto
 
@@ -138,6 +141,68 @@ Adottare come baseline l'architettura emersa da
 **EXIT_GATE**
 
 `SELF_CONTAINED_ARCHITECTURE_APPROVAL=PASS`
+
+**NEXT**
+
+P0A.
+
+---
+
+## P0A — Artifact index baseline reconciliation
+
+**PURPOSE**
+
+Prima di riprendere l'implementazione, riconciliare `ARTIFACT_INDEX.json` con
+il delta Git reale introdotto sul branch operativo rispetto a `main`.
+
+Per il bootstrap corrente il riferimento iniziale è il lavoro prodotto su
+`development`, quindi il confronto canonico è:
+
+```text
+main...development
+```
+
+con semantica three-dot/merge-base: deve descrivere ciò che è stato introdotto
+sul lato `development` senza confondere i commit presenti solo su `main` con
+lavoro del branch di sviluppo.
+
+Per sessioni future, se l'Utente ha selezionato un diverso branch operativo,
+AI PM deve usare:
+
+```text
+main...CURRENT_CHECKED_OUT_BRANCH
+```
+
+senza cambiare branch autonomamente.
+
+**PRIMARY_ARTIFACT**
+
+`ARTIFACT_INDEX.json`
+
+**EXIT_GATE**
+
+`ARTIFACT_INDEX_BASELINE_RECONCILED=PASS` solo se:
+
+- il branch operativo è determinato senza ambiguità;
+- il confronto three-dot con `main` è stato osservato realmente;
+- ogni file aggiunto/modificato/rinominato dal lato operativo è indicizzato o
+  esplicitamente classificato come non utile al routing;
+- gli eventuali delta presenti soltanto su `main` sono registrati
+  separatamente e non sovrascritti implicitamente;
+- i file canonici, state cache, decision artifact, PoC/evidenze e artefatti
+  rilevanti per la fase corrente sono instradabili senza scansione completa del
+  repository;
+- l'indice registra HEAD/merge-base usati per la riconciliazione;
+- `PROJECT_STATE.json` viene aggiornato con il gate chiuso e il prossimo passo
+  P1.
+
+L'indice non deve ricostruire retroattivamente tutta la storia del progetto e
+non deve creare directory/file per completezza.
+
+**STOP_IF**
+
+Il branch è ambiguo, il confronto non è determinabile, oppure un file necessario
+al routing non può essere classificato con sufficiente certezza.
 
 **NEXT**
 
