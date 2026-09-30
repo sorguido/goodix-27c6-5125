@@ -8,15 +8,15 @@
     "qualified_host": "Fedora 44 KDE x86_64"
   },
   "execution_path": "PRIMARY",
-  "phase": "P2",
+  "phase": "P3",
   "phase_status": "IN_PROGRESS",
   "completed_gates": [
     "SELF_CONTAINED_ARCHITECTURE_APPROVAL",
     "ARTIFACT_INDEX_BASELINE_RECONCILED",
-    "PAIRING_CRYPTO_OFFLINE"
+    "PAIRING_CRYPTO_OFFLINE",
+    "CONFIG90_AND_BB010002_OFFLINE"
   ],
   "pending_gates": [
-    "CONFIG90_AND_BB010002_OFFLINE",
     "FDT_ZERO_SEED_OFFLINE",
     "STATE_V2_AND_MIGRATION_OFFLINE",
     "COORDINATOR_HOST_VM",
@@ -63,19 +63,17 @@
       "TLS1_2_PSK_AES128_GCM_SHA256",
       "TLS_B0_INTER_RECORD_10MS_INTERVAL",
       "WINDOWS_RECOVERY_AFTER_LINUX_ORIGINATED_PAIRING",
-      "OEM_EQUIVALENT_WHITE_BOX_PSK_DERIVATION"
+      "OEM_EQUIVALENT_WHITE_BOX_PSK_DERIVATION",
+      "EXACT_TYPE12_CONFIG90_FROM_OTP",
+      "GENERALIZED_STRUCTURAL_BB010002_ACCEPTANCE"
     ],
     "inferred": [
       "REPEATED_REUSE_OF_SAME_LINUX_PSK_AFTER_WINDOWS_RETURN",
       "L1_W1_L1_W2_L1_STABLE_PING_PONG",
-      "ZERO_SEED_FDT_BOOTSTRAP_IN_PRODUCTION_PATH",
-      "FULL_CONFIG90_FROM_TYPE12_TEMPLATE_PLUS_OTP",
-      "GENERALIZED_STRUCTURAL_BB010002_ACCEPTANCE"
+      "ZERO_SEED_FDT_BOOTSTRAP_IN_PRODUCTION_PATH"
     ],
     "initial_blockers": [
-      "EXACT_GENERATED_CONFIG90_EQUIVALENCE",
-      "ZERO_SEED_FIRST_RUN_FDT_QUALIFICATION",
-      "GENERAL_BB010002_STRUCTURAL_ACCEPTANCE"
+      "ZERO_SEED_FIRST_RUN_FDT_QUALIFICATION"
     ]
   },
   "host_modified": false,
@@ -90,15 +88,22 @@
     "libfprint-driver/goodix_pairing_crypto.c",
     "libfprint-driver/goodix_pairing_crypto.h",
     "libfprint-driver/tests/test_goodix_pairing_crypto.c",
+    "libfprint-driver/goodix_config90.c",
+    "libfprint-driver/goodix_config90.h",
+    "libfprint-driver/goodix_bb010002.c",
+    "libfprint-driver/goodix_bb010002.h",
+    "libfprint-driver/tests/test_goodix_config90_bb010002.c",
+    "libfprint-driver/goodix_enrollment_fdt_state.c",
+    "libfprint-driver/goodix_fdt_irq_policy.c",
     "TECHNICAL_MANUAL.md",
     "docs/LICENSING_AND_PROVENANCE.md"
   ],
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "Execute approved ROADMAP P2 offline: inspect the local protected CONFIG90/OTP/BB010002 evidence, implement the attributed GPL-2.0-or-later type-12 CONFIG90 derivation and narrow BB010002 parser, and close exact differential and negative coverage without USB, privileges, PSK access or pairing writes.",
-  "last_verified_head": "81973f1c27b18db2be0acd3bdb0b87ab79e52234",
-  "state_note": "P0A is reconciled and P1 pairing crypto is accepted offline. The user explicitly approved read/write access to development/ and the P2 protected-evidence plus GPL-template gate; all other Human Gates remain unchanged. The P1 module is not used by any runtime path. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
+  "next_action": "Execute ROADMAP P3 offline: model explicit zero-seed FDT initialization with bounded no-finger sampling, reject contact, timeout, temperature/drift, duplicate and malformed observations, and persist at most the minimal 12-byte FDT table.",
+  "last_verified_head": "5fbbbf14f5085a28e78e72616b83350fb3972231",
+  "state_note": "P0A through P2 are accepted offline. P2 derives the qualified CONFIG90 byte-for-byte and one structural parser accepts all five distinct legitimate BB010002 values without decrypting or synthesizing protected bytes. The P1/P2 modules are not yet used by a runtime path; integration remains deferred to later roadmap phases. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }
