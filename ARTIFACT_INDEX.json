@@ -95,6 +95,86 @@
       "note": "Current development delta records stable qualified PSK/TLS facts. Do not use as a development diary."
     },
     {
+      "path": "docs/LICENSING_AND_PROVENANCE.md",
+      "git_status": "modified",
+      "role": "PUBLIC_LICENSE_AND_PROVENANCE_REFERENCE",
+      "relevance": [
+        "P1",
+        "P10",
+        "P11"
+      ]
+    },
+    {
+      "path": "libfprint-driver/goodix_pairing_crypto.c",
+      "git_status": "added",
+      "role": "PURE_APP12509_PAIRING_CRYPTO",
+      "relevance": [
+        "P1",
+        "P4",
+        "P5",
+        "P6",
+        "P10"
+      ]
+    },
+    {
+      "path": "libfprint-driver/goodix_pairing_crypto.h",
+      "git_status": "added",
+      "role": "PURE_APP12509_PAIRING_CRYPTO_INTERFACE",
+      "relevance": [
+        "P1",
+        "P4",
+        "P5",
+        "P6",
+        "P10"
+      ]
+    },
+    {
+      "path": "libfprint-driver/tests/run_goodix_pairing_crypto_test.sh",
+      "git_status": "added",
+      "role": "PAIRING_CRYPTO_OFFLINE_TEST_RUNNER",
+      "relevance": [
+        "P1",
+        "P10"
+      ]
+    },
+    {
+      "path": "libfprint-driver/tests/test_goodix_pairing_crypto.c",
+      "git_status": "added",
+      "role": "PAIRING_CRYPTO_KAT_AND_NEGATIVE_TESTS",
+      "relevance": [
+        "P1",
+        "P10"
+      ]
+    },
+    {
+      "path": "production/host-test-only-symbols.txt",
+      "git_status": "modified",
+      "role": "PRODUCTION_TEST_SEAM_DENYLIST",
+      "relevance": [
+        "P1",
+        "P5",
+        "P10"
+      ]
+    },
+    {
+      "path": "production/source-files.sha256",
+      "git_status": "modified",
+      "role": "PUBLIC_SOURCE_DIGEST_MANIFEST",
+      "relevance": [
+        "P1",
+        "P10"
+      ]
+    },
+    {
+      "path": "production/source-files.tsv",
+      "git_status": "modified",
+      "role": "PUBLIC_SOURCE_PROVENANCE_MANIFEST",
+      "relevance": [
+        "P1",
+        "P10"
+      ]
+    },
+    {
       "path": "development/SELF_CONTAINED_DRIVER_AUDIT.md",
       "git_status": "added",
       "role": "ARCHITECTURE_DECISION_ARTIFACT",
@@ -198,6 +278,10 @@
         "development/psk/goodix_psk_response.c",
         "development/psk/goodix_psk_response.h",
         "development/psk/test_goodix_psk_response.c",
+        "libfprint-driver/goodix_pairing_crypto.c",
+        "libfprint-driver/goodix_pairing_crypto.h",
+        "libfprint-driver/tests/run_goodix_pairing_crypto_test.sh",
+        "libfprint-driver/tests/test_goodix_pairing_crypto.c",
         "libfprint-driver/goodix_action_binding.c",
         "libfprint-driver/goodix_action_binding.h",
         "docs/LICENSING_AND_PROVENANCE.md"

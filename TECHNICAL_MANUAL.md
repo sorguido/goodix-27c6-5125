@@ -266,6 +266,14 @@ compatible environment. They stay outside the source tree and are imported into
 | `gfusb.dll` | Provides a qualified OEM compatibility data source | Parsed as inert bounded data; never loaded or executed |
 | `fdt-cache.bin` | Supplies the validated FDT seed/cache associated with the target | Length, CRC, manifest binding, and live reader binding checked |
 
+The source tree also contains a pure fixed-profile APP12509 derivation for the
+102-byte `BB010003` envelope and its 32-byte `BB020003` SHA-256 validator. Its
+offline contract matches the five non-circular D190 OEM-oracle known answers
+and the qualified complete-envelope vector. It has no USB or persistence
+surface. The current production runtime deliberately continues to use the
+validated five-file bundle until the later state/coordinator integration gates
+replace that path.
+
 The manifest binds the bundle to `27c6:5125`, the supported application, the
 other four files, and target responses used during initialization. File names,
 types, modes, ownership, hard-link count, sizes, formats, and digests are checked

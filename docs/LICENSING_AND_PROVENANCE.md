@@ -10,6 +10,7 @@ change the original copyright or grant of any source file.
 | --- | --- | --- |
 | libfprint base | Fedora libfprint 1.94.100 | Upstream per-file terms, predominantly LGPL-2.1-or-later; public library ABI and core |
 | Goodix driver | Project source | Per-file SPDX, predominantly LGPL-2.1-or-later; device, transport, secure session and image integration |
+| APP12509 pairing crypto | Project source; focused refactor of the project-authored D190 implementation and qualified PSK PoC | LGPL-2.1-or-later; pure fixed-profile BB010003/BB020003 derivation, with no USB, persistence, DLL loading or external implementation copied |
 | SIGFM | Rockytkg's materialized libfprint fork, commit `7ebe0c809b4d1df3400e84299a4ec4acdea84590` | LGPL-2.1-or-later; feature extraction and matching |
 | Image preprocessing | Adapted from Rockytkg, commit `227eba219fa9e3fbac5bd59aca79f624f67cd11b` | GPL-2.0-or-later; device-independent preprocessing subset |
 | OpenCV | Fedora OpenCV 4 packages (actual installed version recorded at build) | Fedora expression `BSD-3-Clause AND Apache-2.0 AND ISC`; required runtime libraries |
@@ -56,6 +57,14 @@ Local lifecycle and recovery code uses this project's ownership/receipt formats;
 no new external implementation or license boundary is introduced by the removal
 tools. The Plasma selector uses public Linux-PAM interfaces without copying
 PAM, fprintd or Plasma source into a private replacement component.
+
+`libfprint-driver/goodix_pairing_crypto.[ch]` refactors the existing
+project-authored `goodix_action_binding.c` algorithm into a fixed APP12509
+profile. The producer/KDF key and GCM AAD are protocol constants already
+qualified by the five non-circular D190 OEM-oracle known answers and the
+project-authored single-write PoC. Rockytkg is retained as a differential
+reference at commit `227eba219fa9e3fbac5bd59aca79f624f67cd11b`; no Rockytkg
+or OEM source expression is copied into this LGPL module.
 
 ## Excluded material
 
