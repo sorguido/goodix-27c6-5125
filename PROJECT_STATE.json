@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "authoritative": false,
+  "project": "Goodix 27c6:5125",
+  "target": {
+    "vid_pid": "27c6:5125",
+    "app": "GF_ST411SEC_APP_12509",
+    "qualified_host": "Fedora 44 KDE x86_64"
+  },
+  "branch": "development",
+  "execution_path": "PRIMARY",
+  "phase": "P1",
+  "phase_status": "NOT_STARTED",
+  "completed_gates": [
+    "SELF_CONTAINED_ARCHITECTURE_APPROVAL"
+  ],
+  "pending_gates": [
+    "PAIRING_CRYPTO_OFFLINE",
+    "CONFIG90_AND_BB010002_OFFLINE",
+    "FDT_ZERO_SEED_OFFLINE",
+    "STATE_V2_AND_MIGRATION_OFFLINE",
+    "COORDINATOR_HOST_VM",
+    "LIVE_NO_FINGER_APPROVAL",
+    "SELF_CONTAINED_LIVE_NO_FINGER",
+    "WINDOWS_INTEROP_APPROVAL",
+    "WINDOWS_LINUX_PING_PONG",
+    "SELF_CONTAINED_BIOMETRIC_STACK",
+    "SELF_CONTAINED_RELEASE_CANDIDATE",
+    "PUBLICATION_CLEANUP",
+    "FINAL_DOCUMENTATION_AND_RELEASE_READINESS"
+  ],
+  "goal": "Self-contained Goodix 27c6:5125 driver for Fedora 44 KDE with automatic first-use initialization, Windows interoperability, factory-preserving safety, stock fprintd/PAM/KDE integration, rollback and update survivability.",
+  "safety_invariants": [
+    "NO_FIRMWARE_FLASH",
+    "NO_IAP",
+    "NO_CLEARAPP",
+    "NO_OTP_WRITE",
+    "NO_FACTORY_DATA_WRITE",
+    "NO_PERSISTENT_VID_PID_OR_MODE_CHANGE",
+    "FAIL_CLOSED_ON_UNKNOWN_OR_AMBIGUOUS_STATE",
+    "PASSWORD_AND_DESKTOP_SURVIVE_FINGERPRINT_FAILURE",
+    "WINDOWS_INTEROPERABILITY_REQUIRED",
+    "NO_SECRET_OR_BIOMETRIC_DATA_IN_PUBLIC_ARTIFACTS"
+  ],
+  "qualified_pairing_write_boundary": {
+    "allowed_only_after_human_gate": true,
+    "max_logical_e0_per_transaction": 1,
+    "automatic_retry": false,
+    "preserve_live_bb010002_byte_for_byte": true,
+    "required_proofs": [
+      "QUALIFIED_ACK_AND_PROTOCOL_COMPLETION",
+      "BB010002_UNCHANGED",
+      "BB020003_MATCH",
+      "TLS1_2_PSK_PROOF"
+    ]
+  },
+  "evidence": {
+    "proven": [
+      "LINUX_PSK_PROVISIONING",
+      "SINGLE_E0_END_TO_END",
+      "BB010002_UNCHANGED_ON_QUALIFIED_WRITE",
+      "BB020003_SHA256_BB010003_RELATION",
+      "TLS1_2_PSK_AES128_GCM_SHA256",
+      "TLS_B0_INTER_RECORD_10MS_INTERVAL",
+      "WINDOWS_RECOVERY_AFTER_LINUX_ORIGINATED_PAIRING",
+      "OEM_EQUIVALENT_WHITE_BOX_PSK_DERIVATION"
+    ],
+    "inferred": [
+      "REPEATED_REUSE_OF_SAME_LINUX_PSK_AFTER_WINDOWS_RETURN",
+      "L1_W1_L1_W2_L1_STABLE_PING_PONG",
+      "ZERO_SEED_FDT_BOOTSTRAP_IN_PRODUCTION_PATH",
+      "FULL_CONFIG90_FROM_TYPE12_TEMPLATE_PLUS_OTP",
+      "GENERALIZED_STRUCTURAL_BB010002_ACCEPTANCE"
+    ],
+    "initial_blockers": [
+      "EXACT_GENERATED_CONFIG90_EQUIVALENCE",
+      "ZERO_SEED_FIRST_RUN_FDT_QUALIFICATION",
+      "GENERAL_BB010002_STRUCTURAL_ACCEPTANCE"
+    ]
+  },
+  "host_modified": false,
+  "relevant_artifacts": [
+    "ROADMAP.md",
+    "AGENTS.md",
+    "PROJECT_STATE.json",
+    "development/SELF_CONTAINED_DRIVER_AUDIT.md",
+    "development/psk/README.md",
+    "TECHNICAL_MANUAL.md",
+    "docs/LICENSING_AND_PROVENANCE.md"
+  ],
+  "relevant_corroborations": [
+    "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
+  ],
+  "next_action": "Execute ROADMAP P1 only: implement/refactor pure pairing WB/validator logic offline, preserve the current runtime path, pass all qualified differential and negative KATs, then update this state cache.",
+  "last_verified_head": "582fc1240dc57d373d8f2eac7649f36e852cc485",
+  "state_note": "Git and qualified evidence are authoritative. If this cache conflicts with repository state or evidence, repair PROJECT_STATE.json before continuing."
+}
