@@ -69,7 +69,11 @@
       "BOUNDED_ZERO_SEED_FDT_MODEL_OFFLINE",
       "CRASH_SAFE_PER_READER_STATE_V2_OFFLINE",
       "READ_ONLY_PAIRING_RECONCILIATION_OFFLINE",
-      "SIDE_BY_SIDE_LEGACY_MIGRATION_OFFLINE"
+      "SIDE_BY_SIDE_LEGACY_MIGRATION_OFFLINE",
+      "ACTIVATION_ONLY_READ_ONLY_RUNTIME_COORDINATOR_HOST",
+      "LEGACY_STATE_V2_COEXISTENCE_HOST",
+      "FRESH_INSTALL_WITHOUT_READER_OR_LEGACY_BUNDLE_SYNTHETIC",
+      "PRODUCTION_PAIRING_WRITER_DISABLED"
     ],
     "inferred": [
       "REPEATED_REUSE_OF_SAME_LINUX_PSK_AFTER_WINDOWS_RETURN",
@@ -78,6 +82,9 @@
     ],
     "initial_blockers": []
   },
+  "current_blockers": [
+    "P5_FEDORA44_SELINUX_ENFORCING_VM_UNAVAILABLE"
+  ],
   "host_modified": false,
   "relevant_artifacts": [
     "START.md",
@@ -103,15 +110,23 @@
     "libfprint-driver/goodix_self_state.c",
     "libfprint-driver/goodix_self_state.h",
     "libfprint-driver/tests/test_goodix_self_state.c",
+    "libfprint-driver/goodix_runtime_coordinator.c",
+    "libfprint-driver/goodix_runtime_coordinator.h",
+    "libfprint-driver/goodix_fpimage_device.c",
+    "libfprint-driver/tests/test_goodix_fpimage_device.c",
+    "deployment/install.py",
+    "deployment/test_install.py",
+    "deployment/recovery/remove.py",
+    "deployment/recovery/test_remove.py",
     "TECHNICAL_MANUAL.md",
     "docs/LICENSING_AND_PROVENANCE.md"
   ],
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "Execute ROADMAP P5: integrate the identity/config/state coordinator read-only with respect to pairing, retain legacy/state-v2 coexistence, keep the production writer disabled, and close Fedora 44 VM install/update/uninstall/rollback behavior before the live gate.",
-  "last_verified_head": "393e5e5691d34712b468194bd1b9283f932fa469",
-  "state_note": "P0A through P4 are accepted offline. State-v2 uses two root-only authenticated generation slots, file and directory fsync, full reader/config binding, deterministic read-only crash reconciliation and side-by-side legacy import. All eight persistence boundaries, authenticated corruption fallback and unchanged legacy source are covered with synthetic secrets; no USB or real PSK was accessed. The P1-P4 components are not yet integrated into the production activation path, and the production pairing writer remains absent/disabled. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
+  "next_action": "Complete the remaining ROADMAP P5 evidence on an available Fedora 44 KDE x86_64 VM with SELinux Enforcing: fresh install without reader or legacy bundle, stock fprintd boundary, update, reinstall, uninstall and rollback while password/desktop remain usable. Do not advance to LIVE_NO_FINGER until COORDINATOR_HOST_VM passes.",
+  "last_verified_head": "907c41f6cbddf6dce8754d5593ee2fcb41092132",
+  "state_note": "P0A through P4 are accepted offline. P5 host implementation is committed: discovery/open and uninitialized login are inert; an explicit allowlisted libfprint action is the only resource trigger; the read-only coordinator supports legacy/state-v2 coexistence, ACTIVE and PREPARED-candidate selection from complete live evidence, and fail-closed ambiguity; no production pairing writer is linked. Fresh install without reader or legacy bundle plus state preservation across synthetic update/reinstall/removal are covered, and all host normal/sanitizer regressions pass without USB or real PSK access. COORDINATOR_HOST_VM is not complete because this Fedora 44 host has SELinux Disabled and its libvirt session has no VM or installation image; the required Fedora 44 SELinux Enforcing VM evidence remains pending. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }
