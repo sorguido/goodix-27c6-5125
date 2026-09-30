@@ -26,16 +26,20 @@ All'avvio assumi il ruolo **AI PM / Recovery Reviewer**.
 
 Prima di modificare il repository:
 
-1. determina Git root, branch, HEAD e stato del worktree;
-2. leggi integralmente `/AGENTS.md`, `/START_PROMPT.md` e `/ROADMAP.md`;
-3. leggi `/PROJECT_STATE.json`, confrontalo con Git/evidenze e riparalo se stale;
-4. individua la fase attiva della roadmap, gli EXIT_GATE già soddisfatti e il primo requisito ancora aperto;
-5. usa `TECHNICAL_MANUAL.md` come reference della conoscenza tecnica consolidata e carica solo le sezioni pertinenti alla fase/task;
-6. ispeziona storia Git recente, diff non committato, codice, test ed evidenze realmente pertinenti per ricostruire lo stato corrente;
-7. consulta `development/Goodix 27c6 5125 manuale tecnico.md` **solo tramite ricerca mirata** quando servono precedenti storici, failure già osservati o provenance;
-8. ricostruisci eventuale lavoro parziale senza cancellarlo, resettarlo, stasharlo o sovrascriverlo;
-9. identifica il più piccolo passo tecnicamente giustificato **dentro la fase attiva**;
-10. applica i gate di `AGENTS.md` e `ROADMAP.md` prima di qualunque azione protetta.
+1. determina Git root, branch corrente, HEAD e stato del worktree;
+2. se il branch corrente non è determinabile con certezza o l'ambiente presenta
+   segnali discordanti, fermati con `HUMAN_REQUIRED` /
+   `GATE=BRANCH_SELECTION_REQUIRED`; non inferire il branch e non eseguire
+   checkout/switch autonomamente;
+3. leggi integralmente `/AGENTS.md`, `/START_PROMPT.md` e `/ROADMAP.md`;
+4. leggi `/PROJECT_STATE.json`, confrontalo con Git/evidenze e riparalo se stale;
+5. individua la fase attiva della roadmap, gli EXIT_GATE già soddisfatti e il primo requisito ancora aperto;
+6. usa `TECHNICAL_MANUAL.md` come reference della conoscenza tecnica consolidata e carica solo le sezioni pertinenti alla fase/task;
+7. ispeziona storia Git recente, diff non committato, codice, test ed evidenze realmente pertinenti per ricostruire lo stato corrente;
+8. consulta `development/Goodix 27c6 5125 manuale tecnico.md` **solo tramite ricerca mirata** quando servono precedenti storici, failure già osservati o provenance;
+9. ricostruisci eventuale lavoro parziale senza cancellarlo, resettarlo, stasharlo o sovrascriverlo;
+10. identifica il più piccolo passo tecnicamente giustificato **dentro la fase attiva**;
+11. applica i gate di `AGENTS.md` e `ROADMAP.md` prima di qualunque azione protetta.
 
 L'archivio storico non va letto integralmente e non è autorità sul presente. Un claim storico va confrontato con evidenze successive prima di essere riutilizzato; memoria e session summary non sono autorità tecniche.
 
@@ -49,7 +53,11 @@ Prima del primo task il PM deve sapere almeno:
 - quali assunzioni richiedono verifica sul target reale;
 - qual è il più piccolo passo che produce avanzamento senza superare un Human Gate.
 
-Se il branch non è `development`, oppure stato/provenienza del worktree sono materialmente ambigui e una scelta può distruggere lavoro, usa `HUMAN_REQUIRED` secondo `AGENTS.md`.
+Il branch operativo è il branch corrente selezionato dall'Utente nell'ambiente.
+Non esiste un nome di branch hard-coded nel bootstrap. Se il branch non è
+osservabile in modo univoco, oppure stato/provenienza del worktree sono
+materialmente ambigui e una scelta può distruggere lavoro, usa
+`HUMAN_REQUIRED` secondo `AGENTS.md`.
 
 ---
 
