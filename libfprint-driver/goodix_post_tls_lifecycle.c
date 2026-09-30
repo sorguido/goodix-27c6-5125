@@ -49,10 +49,12 @@ struct _GoodixPostTlsLifecycle
   gboolean framework_await;
   gboolean rearm_submitted;
   gboolean fresh_down_valid;
-  guint8 current_fdt_table[12];
-  guint8 first_up_table[12];
-  guint8 fresh_down_table[12];
-  guint16 fdt_raw[3][6];
+  gboolean learned_fdt_valid;
+  guint8 current_fdt_table[GOODIX_POST_TLS_FDT_TABLE_LENGTH];
+  guint8 learned_fdt_table[GOODIX_POST_TLS_FDT_TABLE_LENGTH];
+  guint8 first_up_table[GOODIX_POST_TLS_FDT_TABLE_LENGTH];
+  guint8 fresh_down_table[GOODIX_POST_TLS_FDT_TABLE_LENGTH];
+  guint16 fdt_raw[GOODIX_POST_TLS_FDT_SAMPLE_LIMIT][GOODIX_FDT_CHANNEL_COUNT];
   guint fdt_raw_count;
   guint8 fdt_threshold;
   gboolean fdt_threshold_valid;
@@ -93,11 +95,15 @@ lifecycle_fail (GoodixPostTlsLifecycle *lifecycle,
                                  "post-TLS lifecycle failed");
   lifecycle->phase = GOODIX_POST_TLS_PHASE_TERMINAL;
   lifecycle->fresh_down_valid = FALSE;
+  lifecycle->learned_fdt_valid = FALSE;
+  memset (lifecycle->learned_fdt_table, 0,
+          sizeof lifecycle->learned_fdt_table);
   clear_byte_array (lifecycle->plaintext_pending);
   if (lifecycle->audit != NULL)
     {
       lifecycle->audit->terminal = TRUE;
       lifecycle->audit->fresh_down_table = FALSE;
+      lifecycle->audit->learned_fdt_ready = FALSE;
     }
   lifecycle->error = error;
   goodix_fpi_usb_backend_cancel (lifecycle->backend);
@@ -196,7 +202,7 @@ static gboolean
 record_fdt_raw (GoodixPostTlsLifecycle *lifecycle,
                 const guint8            raw[12])
 {
-  if (lifecycle->fdt_raw_count >= 3u)
+  if (lifecycle->fdt_raw_count >= GOODIX_POST_TLS_FDT_SAMPLE_LIMIT)
     return FALSE;
   for (guint i = 0; i < 6u; i++)
     lifecycle->fdt_raw[lifecycle->fdt_raw_count][i] =
@@ -486,6 +492,23 @@ goodix_post_tls_lifecycle_new (
                            "unsupported post-TLS capture profile");
       return NULL;
     }
+  if (material->fdt_seed_mode != GOODIX_POST_TLS_FDT_SEED_PROVIDED &&
+      material->fdt_seed_mode != GOODIX_POST_TLS_FDT_SEED_ABSENT_ZERO)
+    {
+      g_set_error_literal (error, GOODIX_POST_TLS_ERROR,
+                           GOODIX_POST_TLS_ERROR_ARGUMENT,
+                           "unsupported post-TLS FDT seed mode");
+      return NULL;
+    }
+  if (material->fdt_seed_mode == GOODIX_POST_TLS_FDT_SEED_ABSENT_ZERO)
+    for (guint i = 0; i < GOODIX_POST_TLS_FDT_TABLE_LENGTH; i++)
+      if (material->initial_fdt_table[i] != 0u)
+        {
+          g_set_error_literal (error, GOODIX_POST_TLS_ERROR,
+                               GOODIX_POST_TLS_ERROR_ARGUMENT,
+                               "absent FDT seed must have an explicit zero table");
+          return NULL;
+        }
   lifecycle = g_new0 (GoodixPostTlsLifecycle, 1);
   lifecycle->backend = backend;
   lifecycle->generation = generation;
@@ -499,11 +522,17 @@ goodix_post_tls_lifecycle_new (
   lifecycle->user_data = user_data;
   lifecycle->audit = audit;
   lifecycle->plaintext_pending = g_byte_array_new ();
-  memcpy (lifecycle->current_fdt_table, material->initial_fdt_table, 12);
+  if (material->fdt_seed_mode == GOODIX_POST_TLS_FDT_SEED_PROVIDED)
+    memcpy (lifecycle->current_fdt_table, material->initial_fdt_table,
+            sizeof lifecycle->current_fdt_table);
   if (audit != NULL)
     {
       memset (audit, 0, sizeof *audit);
       audit->generation = generation;
+      audit->fdt_sample_limit = GOODIX_POST_TLS_FDT_SAMPLE_LIMIT;
+      audit->fdt_retry_limit = GOODIX_POST_TLS_FDT_RETRY_LIMIT;
+      audit->zero_seed_initialization =
+        material->fdt_seed_mode == GOODIX_POST_TLS_FDT_SEED_ABSENT_ZERO;
     }
   return lifecycle;
 }
@@ -525,6 +554,7 @@ goodix_post_tls_lifecycle_free (GoodixPostTlsLifecycle *lifecycle)
   g_clear_error (&lifecycle->error);
   memset (&lifecycle->material, 0, sizeof lifecycle->material);
   memset (lifecycle->current_fdt_table, 0, sizeof lifecycle->current_fdt_table);
+  memset (lifecycle->learned_fdt_table, 0, sizeof lifecycle->learned_fdt_table);
   memset (lifecycle->first_up_table, 0, sizeof lifecycle->first_up_table);
   memset (lifecycle->fresh_down_table, 0, sizeof lifecycle->fresh_down_table);
   memset (lifecycle->fdt_raw, 0, sizeof lifecycle->fdt_raw);
@@ -698,8 +728,15 @@ goodix_post_tls_lifecycle_handle_a0 (GoodixPostTlsLifecycle *lifecycle,
           if (!lifecycle->fdt_delta_classified ||
               !classify_fdt_delta (lifecycle, 1u, 2u))
             goto unexpected;
+          memcpy (lifecycle->learned_fdt_table,
+                  lifecycle->current_fdt_table,
+                  sizeof lifecycle->learned_fdt_table);
+          lifecycle->learned_fdt_valid = TRUE;
           if (lifecycle->audit != NULL)
-            lifecycle->audit->fresh_fdt_count++;
+            {
+              lifecycle->audit->fresh_fdt_count++;
+              lifecycle->audit->learned_fdt_ready = TRUE;
+            }
           submit_or_fail (lifecycle, submit_arm (lifecycle, FALSE, &error),
                           &error);
         }
@@ -1105,6 +1142,22 @@ goodix_post_tls_lifecycle_cancel (GoodixPostTlsLifecycle *lifecycle,
                                            "post-TLS lifecycle cancelled");
 }
 
+void
+goodix_post_tls_lifecycle_timeout (GoodixPostTlsLifecycle *lifecycle)
+{
+  if (lifecycle == NULL || lifecycle->phase == GOODIX_POST_TLS_PHASE_TERMINAL ||
+      lifecycle->phase == GOODIX_POST_TLS_PHASE_STOP ||
+      lifecycle->phase < GOODIX_POST_TLS_PHASE_D4 ||
+      lifecycle->phase > GOODIX_POST_TLS_PHASE_FDT_IRQ100_3 ||
+      lifecycle->learned_fdt_valid)
+    return;
+  if (lifecycle->audit != NULL)
+    lifecycle->audit->fdt_initialization_timeout_count++;
+  lifecycle_fail (lifecycle, g_error_new_literal (
+    G_IO_ERROR, G_IO_ERROR_TIMED_OUT,
+    "post-TLS FDT initialization deadline expired"));
+}
+
 const gchar *
 goodix_post_tls_phase_name (GoodixPostTlsPhase phase)
 {
@@ -1214,6 +1267,21 @@ goodix_post_tls_lifecycle_copy_baseline (
     return FALSE;
   memcpy (samples, lifecycle->baseline_samples,
           sizeof lifecycle->baseline_samples);
+  return TRUE;
+}
+
+gboolean
+goodix_post_tls_lifecycle_copy_learned_fdt (
+  const GoodixPostTlsLifecycle *lifecycle,
+  guint8                         table[GOODIX_POST_TLS_FDT_TABLE_LENGTH])
+{
+  if (table != NULL)
+    memset (table, 0, GOODIX_POST_TLS_FDT_TABLE_LENGTH);
+  if (lifecycle == NULL || table == NULL || !lifecycle->learned_fdt_valid ||
+      lifecycle->fdt_raw_count != GOODIX_POST_TLS_FDT_SAMPLE_LIMIT)
+    return FALSE;
+  memcpy (table, lifecycle->learned_fdt_table,
+          GOODIX_POST_TLS_FDT_TABLE_LENGTH);
   return TRUE;
 }
 

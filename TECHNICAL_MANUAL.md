@@ -484,6 +484,18 @@ A0 D4
 FDT preparation is part of each fresh action's trusted state. A threshold or
 baseline from an uncertain epoch is not silently reused.
 
+The lifecycle represents a missing persisted FDT seed explicitly. In that
+mode, the first `0x36` carries an all-zero 12-byte table; it is not confused
+with a supplied seed. Exactly three clean no-finger readings are allowed and
+there is no automatic retry. Only after both measured deltas pass does the
+lifecycle expose the learned 12-byte FDT table as a candidate for later local
+state persistence. Touch flags, malformed or duplicate frames, timeout, or
+temperature/drift classification failure terminate the attempt and clear that
+candidate. The decoded image baseline remains action-local and is never part
+of the persistence interface. The current production activation still marks
+its legacy imported seed as supplied until state-v2 integration selects the
+explicit missing-seed mode.
+
 ### 6.4 FDT table derivation and arming
 
 FDT state is fresh, action-local, and generation-scoped. Each accepted event

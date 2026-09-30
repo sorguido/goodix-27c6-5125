@@ -418,6 +418,7 @@ production_activation_start_secure_graph (GoodixDeviceContext *ctx)
 
   memcpy (post_material.initial_fdt_table, ctx->runtime_fdt_seed,
           sizeof post_material.initial_fdt_table);
+  post_material.fdt_seed_mode = GOODIX_POST_TLS_FDT_SEED_PROVIDED;
   post_material.af_timestamp = production_timestamp ();
   post_material.first_arm_timestamp = production_timestamp ();
   post_material.second_arm_timestamp = production_timestamp ();

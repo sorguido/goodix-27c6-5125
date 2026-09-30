@@ -189,7 +189,8 @@ first_arm_handoff_callback (GoodixPostTlsLifecycle *lifecycle,
 }
 
 static Fixture *
-fixture_new_for_profile (GoodixPostTlsCaptureProfile capture_profile)
+fixture_new_for_profile_and_seed (GoodixPostTlsCaptureProfile capture_profile,
+                                  GoodixPostTlsFdtSeedMode     seed_mode)
 {
   Fixture *fixture = g_new0 (Fixture, 1);
   g_autoptr(GCancellable) cancellable = g_cancellable_new ();
@@ -197,11 +198,15 @@ fixture_new_for_profile (GoodixPostTlsCaptureProfile capture_profile)
 
   fixture->generation = 23;
   fixture->out = g_queue_new ();
+  fixture->material.fdt_seed_mode = seed_mode;
   for (guint i = 0; i < 6u; i++)
     {
-      fixture->material.initial_fdt_table[i * 2u] = 0x80;
-      fixture->material.initial_fdt_table[i * 2u + 1u] =
-        (guint8) (0x40u + i);
+      if (seed_mode == GOODIX_POST_TLS_FDT_SEED_PROVIDED)
+        {
+          fixture->material.initial_fdt_table[i * 2u] = 0x80;
+          fixture->material.initial_fdt_table[i * 2u + 1u] =
+            (guint8) (0x40u + i);
+        }
       fixture->expected_up[i * 2u] = 0x80;
       fixture->expected_up[i * 2u + 1u] = (guint8) (0xc0u + 0x1du + i);
       fixture->expected_down[i * 2u] = 0x80;
@@ -229,6 +234,13 @@ fixture_new_for_profile (GoodixPostTlsCaptureProfile capture_profile)
   g_assert_nonnull (fixture->lifecycle);
   g_assert_no_error (error);
   return fixture;
+}
+
+static Fixture *
+fixture_new_for_profile (GoodixPostTlsCaptureProfile capture_profile)
+{
+  return fixture_new_for_profile_and_seed (
+    capture_profile, GOODIX_POST_TLS_FDT_SEED_PROVIDED);
 }
 
 static Fixture *
@@ -720,13 +732,175 @@ assert_full_audit (Fixture *fixture)
   g_assert_cmpuint (fixture->audit.device_reset_count, ==, 0u);
   g_assert_cmpuint (fixture->audit.clear_halt_count, ==, 0u);
   g_assert_cmpuint (fixture->audit.persistent_device_write_count, ==, 0u);
+  g_assert_cmpuint (fixture->audit.fdt_sample_limit, ==,
+                    GOODIX_POST_TLS_FDT_SAMPLE_LIMIT);
+  g_assert_cmpuint (fixture->audit.fdt_retry_limit, ==,
+                    GOODIX_POST_TLS_FDT_RETRY_LIMIT);
+  g_assert_cmpuint (fixture->audit.fdt_initialization_timeout_count, ==, 0u);
   g_assert_true (fixture->audit.fresh_down_table);
+  g_assert_false (fixture->audit.zero_seed_initialization);
+  g_assert_true (fixture->audit.learned_fdt_ready);
   g_assert_cmpuint (goodix_fpi_usb_backend_get_max_outstanding (
                      fixture->backend), ==, 1u);
   g_assert_cmpuint (goodix_fpi_usb_backend_get_max_out_outstanding (
                      fixture->backend), ==, 1u);
   g_assert_cmpuint (goodix_fpi_usb_backend_get_real_submit_count (
                      fixture->backend), ==, 0u);
+}
+
+static void
+drive_to_first_fdt_sample (Fixture *fixture)
+{
+  guint8 state[16] = { 0, 2 };
+  g_autoptr(GBytes) ack = NULL;
+  g_autoptr(GBytes) response = NULL;
+
+  g_assert_true (goodix_post_tls_lifecycle_start (fixture->lifecycle, NULL));
+  complete_command (fixture, 0xd4, NULL, 0);
+  ack = build_ack (0xd4);
+  feed_frame (fixture, ack, 0);
+  complete_command (fixture, 0xaf, NULL, 0);
+  response = build_response (0xae, state, sizeof state);
+  feed_frame (fixture, response, 0);
+  complete_command (fixture, 0x36, NULL, 0);
+  g_clear_pointer (&ack, g_bytes_unref);
+  ack = build_ack (0x36);
+  feed_frame (fixture, ack, 0);
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->lifecycle),
+                   ==, GOODIX_POST_TLS_PHASE_FDT_IRQ100_1);
+}
+
+static void
+test_zero_seed_learns_minimal_fdt (void)
+{
+  Fixture *fixture = fixture_new_for_profile_and_seed (
+    GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION,
+    GOODIX_POST_TLS_FDT_SEED_ABSENT_ZERO);
+  guint8 learned[GOODIX_POST_TLS_FDT_TABLE_LENGTH];
+  guint8 expected[GOODIX_POST_TLS_FDT_TABLE_LENGTH];
+
+  memset (learned, 0xa5, sizeof learned);
+  g_assert_false (goodix_post_tls_lifecycle_copy_learned_fdt (
+    fixture->lifecycle, learned));
+  g_assert_cmpmem (learned, sizeof learned,
+                   (guint8[GOODIX_POST_TLS_FDT_TABLE_LENGTH]) { 0 },
+                   sizeof learned);
+
+  fixture->stop_before_finger = TRUE;
+  run_full_trace (fixture, 1u);
+  for (guint channel = 0;
+       channel < GOODIX_POST_TLS_FDT_TABLE_LENGTH / 2u; channel++)
+    {
+      expected[channel * 2u] = 0x80u;
+      expected[channel * 2u + 1u] = (guint8) (0xa0u + channel);
+    }
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->lifecycle),
+                   ==, GOODIX_POST_TLS_PHASE_FIRST_IRQ2);
+  g_assert_true (fixture->audit.zero_seed_initialization);
+  g_assert_true (fixture->audit.learned_fdt_ready);
+  g_assert_cmpuint (fixture->audit.fdt36_submit_count, ==,
+                    GOODIX_POST_TLS_FDT_SAMPLE_LIMIT);
+  g_assert_cmpuint (fixture->audit.fdt_irq100_count, ==,
+                    GOODIX_POST_TLS_FDT_SAMPLE_LIMIT);
+  g_assert_cmpuint (fixture->audit.retry_count, ==,
+                    GOODIX_POST_TLS_FDT_RETRY_LIMIT);
+  g_assert_cmpuint (fixture->audit.fdt_retry_limit, ==,
+                    GOODIX_POST_TLS_FDT_RETRY_LIMIT);
+  g_assert_cmpuint (fixture->audit.persistent_device_write_count, ==, 0u);
+  g_assert_true (goodix_post_tls_lifecycle_copy_learned_fdt (
+    fixture->lifecycle, learned));
+  g_assert_cmpmem (learned, sizeof learned, expected, sizeof expected);
+
+  /* A late initialization deadline cannot poison the active capture. */
+  goodix_post_tls_lifecycle_timeout (fixture->lifecycle);
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->lifecycle),
+                   ==, GOODIX_POST_TLS_PHASE_FIRST_IRQ2);
+  g_assert_cmpuint (fixture->audit.fdt_initialization_timeout_count, ==, 0u);
+  g_assert_true (goodix_post_tls_lifecycle_copy_learned_fdt (
+    fixture->lifecycle, learned));
+
+  goodix_post_tls_lifecycle_cancel (fixture->lifecycle, "test complete");
+  memset (learned, 0xa5, sizeof learned);
+  g_assert_false (goodix_post_tls_lifecycle_copy_learned_fdt (
+    fixture->lifecycle, learned));
+  g_assert_cmpmem (learned, sizeof learned,
+                   (guint8[GOODIX_POST_TLS_FDT_TABLE_LENGTH]) { 0 },
+                   sizeof learned);
+  fixture_free (fixture);
+}
+
+static void
+test_zero_seed_timeout_fails_cleanly (void)
+{
+  Fixture *fixture = fixture_new_for_profile_and_seed (
+    GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION,
+    GOODIX_POST_TLS_FDT_SEED_ABSENT_ZERO);
+  guint8 learned[GOODIX_POST_TLS_FDT_TABLE_LENGTH];
+  const GError *error;
+
+  drive_to_first_fdt_sample (fixture);
+  goodix_post_tls_lifecycle_timeout (fixture->lifecycle);
+  error = goodix_post_tls_lifecycle_get_error (fixture->lifecycle);
+  g_assert_error (error, G_IO_ERROR, G_IO_ERROR_TIMED_OUT);
+  g_assert_cmpuint (fixture->audit.fdt_initialization_timeout_count, ==, 1u);
+  g_assert_cmpuint (fixture->audit.retry_count, ==, 0u);
+  g_assert_false (fixture->audit.learned_fdt_ready);
+  g_assert_false (goodix_post_tls_lifecycle_copy_learned_fdt (
+    fixture->lifecycle, learned));
+  g_assert_cmpuint (fixture->terminal_count, ==, 1u);
+  g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
+  fixture_free (fixture);
+}
+
+static void
+test_zero_seed_disturbed_duplicate_and_malformed_fail (void)
+{
+  for (guint scenario = 0; scenario < 3u; scenario++)
+    {
+      Fixture *fixture = fixture_new_for_profile_and_seed (
+        GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION,
+        GOODIX_POST_TLS_FDT_SEED_ABSENT_ZERO);
+      g_autoptr(GBytes) frame = NULL;
+      guint8 learned[GOODIX_POST_TLS_FDT_TABLE_LENGTH];
+
+      drive_to_first_fdt_sample (fixture);
+      if (scenario == 0u)
+        frame = build_event (0x36, 0x0100, 0x0001, 0x0300);
+      else if (scenario == 1u)
+        frame = build_ack (0x36);
+      else
+        frame = build_event (0x36, 0x0100, 0x0000, 0x0000);
+      feed_frame (fixture, frame, 0);
+      g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->lifecycle),
+                       ==, GOODIX_POST_TLS_PHASE_TERMINAL);
+      g_assert_false (fixture->audit.learned_fdt_ready);
+      g_assert_cmpuint (fixture->audit.retry_count, ==, 0u);
+      g_assert_false (goodix_post_tls_lifecycle_copy_learned_fdt (
+        fixture->lifecycle, learned));
+      g_assert_cmpuint (fixture->terminal_count, ==, 1u);
+      g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
+      fixture_free (fixture);
+    }
+}
+
+static void
+test_zero_seed_mode_rejects_nonzero_table (void)
+{
+  Fixture *fixture = fixture_new ();
+  GoodixPostTlsMaterial material = fixture->material;
+  GoodixPostTlsLifecycle *invalid;
+  g_autoptr(GError) error = NULL;
+
+  material.fdt_seed_mode = GOODIX_POST_TLS_FDT_SEED_ABSENT_ZERO;
+  invalid = goodix_post_tls_lifecycle_new (
+    fixture->backend, fixture->generation, &material, image_callback,
+    finger_down_callback, release_tail_callback, finger_up_callback,
+    terminal_callback, fixture, NULL, &error);
+  g_assert_null (invalid);
+  g_assert_nonnull (error);
+  g_assert_cmpstr (error->message, ==,
+                   "absent FDT seed must have an explicit zero table");
+  fixture_free (fixture);
 }
 
 static void
@@ -883,7 +1057,9 @@ test_image_decoder_crc_terminal (void)
 static void
 test_fdt_delta_outside_threshold_terminal (void)
 {
-  Fixture *fixture = fixture_new ();
+  Fixture *fixture = fixture_new_for_profile_and_seed (
+    GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION,
+    GOODIX_POST_TLS_FDT_SEED_ABSENT_ZERO);
   static const guint8 cmd01[] = { 0x01, 0x00 };
   guint8 af[16] = { 0 };
   guint8 nav[2409] = { 0 };
@@ -944,6 +1120,14 @@ test_fdt_delta_outside_threshold_terminal (void)
   g_assert_cmpuint (fixture->audit.fdt_delta_classification_count, ==, 1u);
   g_assert_cmpuint (fixture->audit.fdt_delta_within_threshold_count, ==, 0u);
   g_assert_cmpuint (fixture->audit.fdt_delta_outside_threshold_count, ==, 1u);
+  g_assert_true (fixture->audit.zero_seed_initialization);
+  g_assert_false (fixture->audit.learned_fdt_ready);
+  {
+    guint8 learned[GOODIX_POST_TLS_FDT_TABLE_LENGTH];
+
+    g_assert_false (goodix_post_tls_lifecycle_copy_learned_fdt (
+      fixture->lifecycle, learned));
+  }
   g_assert_cmpuint (fixture->terminal_count, ==, 1u);
   g_assert_true (g_queue_is_empty (fixture->out));
 
@@ -1523,6 +1707,14 @@ main (int argc, char **argv)
                    test_image_decoder_crc_terminal);
   g_test_add_func ("/d278-12/fdt-delta-outside-threshold-terminal",
                    test_fdt_delta_outside_threshold_terminal);
+  g_test_add_func ("/p3/zero-seed-learns-minimal-fdt",
+                   test_zero_seed_learns_minimal_fdt);
+  g_test_add_func ("/p3/zero-seed-timeout-fails-cleanly",
+                   test_zero_seed_timeout_fails_cleanly);
+  g_test_add_func ("/p3/zero-seed-disturbed-duplicate-malformed-fail",
+                   test_zero_seed_disturbed_duplicate_and_malformed_fail);
+  g_test_add_func ("/p3/zero-seed-mode-rejects-nonzero-table",
+                   test_zero_seed_mode_rejects_nonzero_table);
   g_test_add_func ("/d278-12/rejected-a0-sanitized-telemetry",
                    test_rejected_a0_sanitized_telemetry);
   g_test_add_func ("/post-tls/rejected-controller-state-is-not-irq",

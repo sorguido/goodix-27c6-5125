@@ -50,13 +50,24 @@ typedef enum
   GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION,
 } GoodixPostTlsCaptureProfile;
 
+typedef enum
+{
+  GOODIX_POST_TLS_FDT_SEED_PROVIDED = 0,
+  GOODIX_POST_TLS_FDT_SEED_ABSENT_ZERO,
+} GoodixPostTlsFdtSeedMode;
+
+#define GOODIX_POST_TLS_FDT_TABLE_LENGTH 12u
+#define GOODIX_POST_TLS_FDT_SAMPLE_LIMIT 3u
+#define GOODIX_POST_TLS_FDT_RETRY_LIMIT 0u
+
 typedef struct
 {
-  guint8 initial_fdt_table[12];
+  guint8 initial_fdt_table[GOODIX_POST_TLS_FDT_TABLE_LENGTH];
   guint16 af_timestamp;
   guint16 first_arm_timestamp;
   guint16 second_arm_timestamp;
   GoodixPostTlsCaptureProfile capture_profile;
+  GoodixPostTlsFdtSeedMode fdt_seed_mode;
 } GoodixPostTlsMaterial;
 
 typedef struct
@@ -98,11 +109,16 @@ typedef struct
   guint device_reset_count;
   guint clear_halt_count;
   guint persistent_device_write_count;
+  guint fdt_sample_limit;
+  guint fdt_retry_limit;
+  guint fdt_initialization_timeout_count;
   guint release_tail_complete_count;
   guint single_acquisition_terminal_count;
   guint first_arm_handoff_count;
   guint backend_handoff_count;
   gboolean fresh_down_table;
+  gboolean zero_seed_initialization;
+  gboolean learned_fdt_ready;
   gboolean framework_rearm_gate_seen;
   gboolean terminal;
   gboolean backend_drained;
@@ -166,6 +182,8 @@ void goodix_post_tls_lifecycle_set_framework_await_finger_on (
   gboolean                awaiting);
 void goodix_post_tls_lifecycle_cancel (GoodixPostTlsLifecycle *lifecycle,
                                        const gchar *reason);
+/* Explicit host deadline event.  It never retries or reopens the device. */
+void goodix_post_tls_lifecycle_timeout (GoodixPostTlsLifecycle *lifecycle);
 const gchar *goodix_post_tls_phase_name (GoodixPostTlsPhase phase);
 GoodixPostTlsPhase goodix_post_tls_lifecycle_get_phase (
   const GoodixPostTlsLifecycle *lifecycle);
@@ -178,6 +196,12 @@ gboolean goodix_post_tls_lifecycle_needs_receive (
 gboolean goodix_post_tls_lifecycle_copy_baseline (
   const GoodixPostTlsLifecycle *lifecycle,
   uint16_t                      samples[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT]);
+/* The only seedless-initialization value eligible for state persistence.
+ * It becomes available after exactly three clean, mutually consistent FDT
+ * samples.  Image baseline data is never returned through this interface. */
+gboolean goodix_post_tls_lifecycle_copy_learned_fdt (
+  const GoodixPostTlsLifecycle *lifecycle,
+  guint8                         table[GOODIX_POST_TLS_FDT_TABLE_LENGTH]);
 
 /* Login-only gate. Configure before start; authorize only at first arm ACK.
  * All ordinary capture/enrollment callers retain their existing behavior. */

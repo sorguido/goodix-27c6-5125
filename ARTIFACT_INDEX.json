@@ -363,6 +363,18 @@
       ],
       "private_evidence": "Ignored development/ evidence is consulted only under the approved P2 protected-evidence gate and is never copied into public artifacts."
     },
+    "P3": {
+      "purpose": "Explicit zero-seed FDT lifecycle with bounded no-finger learning.",
+      "load": [
+        "libfprint-driver/goodix_post_tls_lifecycle.c",
+        "libfprint-driver/goodix_post_tls_lifecycle.h",
+        "libfprint-driver/goodix_fdt_irq_policy.c",
+        "libfprint-driver/goodix_fdt_irq_policy.h",
+        "libfprint-driver/tests/test_goodix_post_tls_lifecycle.c",
+        "libfprint-driver/tests/run_goodix_post_tls_test.sh"
+      ],
+      "note": "The current runtime explicitly selects the supplied legacy seed; state-v2/coordinator integration may select the proven absent-zero mode later."
+    },
     "P10": {
       "purpose": "Publication cleanup and classification.",
       "load": [
