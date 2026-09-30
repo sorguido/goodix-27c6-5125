@@ -18,8 +18,8 @@ __pycache__/
 
 # Protected user-supplied material must remain outside this repository.
 /development/
-/AGENTS.md
-/START_PROMPT.md
+#/AGENTS.md
+#/START_PROMPT.md
 
 # Protected user-supplied material: forbidden anywhere inside the repository.
 **/goodix-5125-materials/
