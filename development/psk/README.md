@@ -70,6 +70,10 @@ back-to-back caused the target to stop before ClientKeyExchange.
 
 The generated PSK is never printed and never persisted.
 
+Preflight reads both pairing fields before evaluating the exact baseline, so a
+baseline mismatch still produces complete read-only evidence while remaining
+fail-closed before PSK generation or any `E0` path.
+
 The current pre-write gate is pairing E, established by Windows A recovery:
 
 ```text

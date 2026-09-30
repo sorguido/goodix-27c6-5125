@@ -1324,6 +1324,8 @@ int main(int argc, char **argv)
     int commit = 0;
     int post_write = 0;
     int rc = 1;
+    int bb010002_baseline_ok = 0;
+    int bb020003_baseline_ok = 0;
     enum stage_status transfer_status = STAGE_NOT_ATTEMPTED;
     enum stage_status protocol_status = STAGE_NOT_ATTEMPTED;
     enum stage_status readback_status = STAGE_NOT_ATTEMPTED;
@@ -1392,13 +1394,14 @@ int main(int argc, char **argv)
         goto out;
     }
 
-    if (bb2_len != BB2_LEN ||
-        sha256_buf(bb2, bb2_len, bb2_hash) != 0 ||
-        CRYPTO_memcmp(bb2_hash, BB010002_E_SHA256, 32) != 0) {
+    bb010002_baseline_ok =
+        bb2_len == BB2_LEN &&
+        sha256_buf(bb2, bb2_len, bb2_hash) == 0 &&
+        CRYPTO_memcmp(bb2_hash, BB010002_E_SHA256, 32) == 0;
+    if (!bb010002_baseline_ok)
         printf("PREWRITE_BB010002_E=FAIL\n");
-        goto out;
-    }
-    printf("PREWRITE_BB010002_E=PASS\n");
+    else
+        printf("PREWRITE_BB010002_E=PASS\n");
 
     if (e4_read(g.h, DT_BB020003,
                 current_hash, sizeof(current_hash),
@@ -1407,12 +1410,16 @@ int main(int argc, char **argv)
         goto out;
     }
 
-    if (current_hash_len != 32u ||
-        CRYPTO_memcmp(current_hash, EXPECTED_BB020003_E, 32) != 0) {
+    bb020003_baseline_ok =
+        current_hash_len == 32u &&
+        CRYPTO_memcmp(current_hash, EXPECTED_BB020003_E, 32) == 0;
+    if (!bb020003_baseline_ok)
         printf("PREWRITE_BB020003_E=FAIL\n");
+    else
+        printf("PREWRITE_BB020003_E=PASS\n");
+
+    if (!bb010002_baseline_ok || !bb020003_baseline_ok)
         goto out;
-    }
-    printf("PREWRITE_BB020003_E=PASS\n");
 
     printf("PAIRING_E_BASELINE=PASS\n");
 
