@@ -8,18 +8,18 @@
     "qualified_host": "Fedora 44 KDE x86_64"
   },
   "execution_path": "PRIMARY",
-  "phase": "P5",
-  "phase_status": "IN_PROGRESS",
+  "phase": "P6",
+  "phase_status": "HUMAN_REQUIRED",
   "completed_gates": [
     "SELF_CONTAINED_ARCHITECTURE_APPROVAL",
     "ARTIFACT_INDEX_BASELINE_RECONCILED",
     "PAIRING_CRYPTO_OFFLINE",
     "CONFIG90_AND_BB010002_OFFLINE",
     "FDT_ZERO_SEED_OFFLINE",
-    "STATE_V2_AND_MIGRATION_OFFLINE"
+    "STATE_V2_AND_MIGRATION_OFFLINE",
+    "COORDINATOR_HOST_VM"
   ],
   "pending_gates": [
-    "COORDINATOR_HOST_VM",
     "LIVE_NO_FINGER_APPROVAL",
     "SELF_CONTAINED_LIVE_NO_FINGER",
     "WINDOWS_INTEROP_APPROVAL",
@@ -73,6 +73,9 @@
       "ACTIVATION_ONLY_READ_ONLY_RUNTIME_COORDINATOR_HOST",
       "LEGACY_STATE_V2_COEXISTENCE_HOST",
       "FRESH_INSTALL_WITHOUT_READER_OR_LEGACY_BUNDLE_SYNTHETIC",
+      "FEDORA44_SELINUX_ENFORCING_STATE_V2_ONLY_HOST_LIFECYCLE_VM",
+      "UPDATE_REINSTALL_UNINSTALL_ROLLBACK_AND_RECOVERY_VM",
+      "PASSWORD_SUDO_AND_KDE_SURVIVABILITY_VM",
       "PRODUCTION_PAIRING_WRITER_DISABLED"
     ],
     "inferred": [
@@ -82,9 +85,7 @@
     ],
     "initial_blockers": []
   },
-  "current_blockers": [
-    "P5_FEDORA44_SELINUX_ENFORCING_VM_UNAVAILABLE"
-  ],
+  "current_blockers": [],
   "host_modified": false,
   "relevant_artifacts": [
     "START.md",
@@ -119,14 +120,25 @@
     "deployment/recovery/remove.py",
     "deployment/recovery/test_remove.py",
     "TECHNICAL_MANUAL.md",
+    "docs/VALIDATION.md",
     "docs/LICENSING_AND_PROVENANCE.md"
   ],
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "Complete the remaining ROADMAP P5 evidence on an available Fedora 44 KDE x86_64 VM with SELinux Enforcing: fresh install without reader or legacy bundle, stock fprintd boundary, update, reinstall, uninstall and rollback while password/desktop remain usable. Do not advance to LIVE_NO_FINGER until COORDINATOR_HOST_VM passes.",
-  "last_verified_head": "907c41f6cbddf6dce8754d5593ee2fcb41092132",
-  "state_note": "P0A through P4 are accepted offline. P5 host implementation is committed: discovery/open and uninitialized login are inert; an explicit allowlisted libfprint action is the only resource trigger; the read-only coordinator supports legacy/state-v2 coexistence, ACTIVE and PREPARED-candidate selection from complete live evidence, and fail-closed ambiguity; no production pairing writer is linked. Fresh install without reader or legacy bundle plus state preservation across synthetic update/reinstall/removal are covered, and all host normal/sanitizer regressions pass without USB or real PSK access. COORDINATOR_HOST_VM is not complete because this Fedora 44 host has SELinux Disabled and its libvirt session has no VM or installation image; the required Fedora 44 SELinux Enforcing VM evidence remains pending. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
+  "next_action": "Await explicit LIVE_NO_FINGER_APPROVAL before ROADMAP P6. P6 requires the real APP12509 target and must proceed in the canonical bounded order from read-only identity/config/state evidence through no-finger FDT and, only after those checks pass, the single-write pairing transaction and read-only recovery proof.",
+  "active_human_gate": {
+    "gate": "LIVE_NO_FINGER_APPROVAL",
+    "reason": "ROADMAP P6 requires access to the real Goodix USB target, protected live identity/state evidence and a bounded transaction that may issue at most one pairing write E0. P5 used no reader and grants no authority for those actions.",
+    "excluded": [
+      "REAL_GOODIX_USB_OR_SENSOR_ACCESS",
+      "REAL_PSK_OR_PROTECTED_STATE_ACCESS",
+      "PAIRING_WRITE_E0",
+      "LIVE_NO_FINGER_EXECUTION"
+    ]
+  },
+  "last_verified_head": "5fd8e64c877815789a9b03ade6fe95e217869d91",
+  "state_note": "P0A through P5 are accepted. The production coordinator activates only for an explicit allowlisted libfprint action, remains read-only with respect to pairing and supports fail-closed legacy/state-v2 selection while no pairing writer is linked. COORDINATOR_HOST_VM passed on a clean Fedora 44 KDE x86_64 VM with SELinux Enforcing and the reader absent: state-v2-only fresh install, update, normal uninstall, reinstall, controlled transaction rollback and damaged-install emergency recovery preserved the empty root-only state-v2 location, Fedora-owned fprintd/PAM boundaries, password sudo and KDE usability across the required reboots. No USB passthrough, real PSK access, biometric action or E0 occurred. P6 has not started and remains behind LIVE_NO_FINGER_APPROVAL. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }

@@ -9,6 +9,10 @@ stock fprintd and authentication consumers are used with the project's libfprint
 runtime and minimal Plasma Login selector. Results below are operator-reported
 observations reviewed against the implementation and available telemetry.
 
+A separate host-lifecycle qualification used a clean Fedora 44 KDE x86_64 VM
+with SELinux Enforcing and no reader or USB passthrough. That qualification
+tests installation and recovery behavior, not live reader behavior.
+
 | Function | Evidence and boundary |
 | --- | --- |
 | Enrollment and standard verification | Enrollment completed and a subsequent verification matched the enrolled finger |
@@ -22,7 +26,8 @@ observations reviewed against the implementation and available telemetry.
 | Material/template preservation | File inode, size, owner, mode and modification time unchanged across reported normal removal; metadata evidence does not establish a cryptographic comparison of all bytes |
 | Reinstallation | Installation and subsequent Plasma fingerprint login succeeded; corrected reinstallation with the reader continuously present was also reported successful |
 | Complete public installation | Fresh Fedora 44 KDE VM installation passed; installation on the physical Fedora 44 KDE qualification system passed with SELinux Enforcing, followed by working Plasma Login, ordinary sudo, KScreenLocker, PolicyKit and password fallback |
-| Emergency removal | Successful text-console removal was reported with the reader connected; exact final output and every resulting file/service/label check were not supplied |
+| Read-only coordinator host lifecycle | On the clean reader-absent VM, state-v2-only fresh install, update, normal removal, reinstall, controlled transaction rollback and emergency recovery from a missing runtime receipt passed while stock fprintd, vendor PAM, SELinux Enforcing, password access and KDE usability were preserved |
+| Emergency removal | Successful text-console removal was reported with the reader connected; separately, the clean VM force-removal test passed after normal removal rejected a deliberately incomplete project receipt, with project paths removed and the empty state-v2 root preserved across reboot |
 
 ## Complete installation path
 
@@ -43,6 +48,15 @@ KScreenLocker and PolicyKit, while password fallback remained available. These
 results qualify the combined build/import/install transaction for the tested
 configuration; they do not extend qualification to other readers, firmware,
 distributions or future Fedora changes.
+
+The current read-only coordinator host lifecycle was also exercised on a clean
+SELinux-Enforcing Fedora 44 KDE VM with the reader absent. A fresh installation
+without legacy material created only the empty root-only state-v2 location.
+Update, removal, reinstall, injected transaction rollback and emergency recovery
+preserved that location and left Fedora's fprintd service and vendor PAM as the
+service boundary. Password login, ordinary sudo and the KDE desktop remained
+usable after the required reboots. No USB access, pairing write or biometric
+operation occurred in this host-only qualification.
 
 ## Offline evidence
 
@@ -106,6 +120,9 @@ recognition accuracy, hardware behavior or complete operating-system recovery.
   unrelated future denials.
 - Full factory-state readback, exhaustive Windows compatibility, power-loss recovery
   and every future update combination have not been demonstrated.
+- The state-v2 self-initialization and pairing path has not yet been qualified on
+  the real reader. The reader-absent host lifecycle evidence does not authorize or
+  establish the later live no-finger transaction.
 
 Report exact behavior and errors without protected data. See
 [Security](SECURITY.md), [Installation](INSTALLATION.md) and [Removal](UNINSTALL.md).
