@@ -6,6 +6,10 @@ libfprint-driver/goodix_a0_protocol.c	LGPL-2.1-or-later	LOCAL_GOODIX
 libfprint-driver/goodix_a0_protocol.h	LGPL-2.1-or-later	LOCAL_GOODIX
 libfprint-driver/goodix_action_binding.c	LGPL-2.1-or-later	LOCAL_GOODIX
 libfprint-driver/goodix_action_binding.h	LGPL-2.1-or-later	LOCAL_GOODIX
+libfprint-driver/goodix_bb010002.c	LGPL-2.1-or-later	LOCAL_GOODIX
+libfprint-driver/goodix_bb010002.h	LGPL-2.1-or-later	LOCAL_GOODIX
+libfprint-driver/goodix_config90.c	GPL-2.0-or-later	ROCKY_CONFIG90_227eba219fa9e3fbac5bd59aca79f624f67cd11b
+libfprint-driver/goodix_config90.h	GPL-2.0-or-later	ROCKY_CONFIG90_227eba219fa9e3fbac5bd59aca79f624f67cd11b
 libfprint-driver/goodix_enrollment_command_body.c	LGPL-2.1-or-later	LOCAL_GOODIX
 libfprint-driver/goodix_enrollment_command_body.h	LGPL-2.1-or-later	LOCAL_GOODIX
 libfprint-driver/goodix_enrollment_command_plan.c	LGPL-2.1-or-later	LOCAL_GOODIX

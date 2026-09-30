@@ -270,9 +270,15 @@ The source tree also contains a pure fixed-profile APP12509 derivation for the
 102-byte `BB010003` envelope and its 32-byte `BB020003` SHA-256 validator. Its
 offline contract matches the five non-circular D190 OEM-oracle known answers
 and the qualified complete-envelope vector. It has no USB or persistence
-surface. The current production runtime deliberately continues to use the
+surface. A second pure boundary derives the complete 224-byte ChicagoHS
+type-12 CONFIG90 from a strict 64-byte OTP record and rejects unknown chips,
+CRC failures and ambiguous calibration fields. Its output is byte-identical to
+the qualified target configuration. A separate validator accepts the common
+332-byte DPAPI structure of the available legitimate `BB010002` values while
+treating their protected regions as opaque; it neither decrypts nor synthesizes
+them. The current production runtime deliberately continues to use the
 validated five-file bundle until the later state/coordinator integration gates
-replace that path.
+replace these offline components.
 
 The manifest binds the bundle to `27c6:5125`, the supported application, the
 other four files, and target responses used during initialization. File names,

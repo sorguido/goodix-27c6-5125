@@ -129,6 +129,68 @@
       ]
     },
     {
+      "path": "libfprint-driver/goodix_config90.c",
+      "git_status": "added",
+      "role": "PURE_TYPE12_CONFIG90_DERIVATION",
+      "relevance": [
+        "P2",
+        "P4",
+        "P5",
+        "P10"
+      ]
+    },
+    {
+      "path": "libfprint-driver/goodix_config90.h",
+      "git_status": "added",
+      "role": "PURE_TYPE12_CONFIG90_INTERFACE",
+      "relevance": [
+        "P2",
+        "P4",
+        "P5",
+        "P10"
+      ]
+    },
+    {
+      "path": "libfprint-driver/goodix_bb010002.c",
+      "git_status": "added",
+      "role": "OPAQUE_BB010002_STRUCTURAL_VALIDATOR",
+      "relevance": [
+        "P2",
+        "P4",
+        "P5",
+        "P10"
+      ]
+    },
+    {
+      "path": "libfprint-driver/goodix_bb010002.h",
+      "git_status": "added",
+      "role": "OPAQUE_BB010002_VALIDATOR_INTERFACE",
+      "relevance": [
+        "P2",
+        "P4",
+        "P5",
+        "P10"
+      ]
+    },
+    {
+      "path": "libfprint-driver/tests/run_goodix_config90_bb010002_test.sh",
+      "git_status": "added",
+      "role": "P2_OFFLINE_TEST_RUNNER",
+      "relevance": [
+        "P2",
+        "P10"
+      ]
+    },
+    {
+      "path": "libfprint-driver/tests/test_goodix_config90_bb010002.c",
+      "git_status": "added",
+      "role": "CONFIG90_AND_BB010002_KAT_NEGATIVE_TESTS",
+      "relevance": [
+        "P2",
+        "P10"
+      ]
+    },
+    {
       "path": "libfprint-driver/tests/run_goodix_pairing_crypto_test.sh",
       "git_status": "added",
       "role": "PAIRING_CRYPTO_OFFLINE_TEST_RUNNER",
@@ -287,6 +349,19 @@
         "docs/LICENSING_AND_PROVENANCE.md"
       ],
       "note": "Load only what exists and is needed for the current task; absence of a listed implementation file is a routing hint to verify, not permission to invent it."
+    },
+    "P2": {
+      "purpose": "Pure CONFIG90 derivation and opaque BB010002 structural boundary.",
+      "load": [
+        "libfprint-driver/goodix_config90.c",
+        "libfprint-driver/goodix_config90.h",
+        "libfprint-driver/goodix_bb010002.c",
+        "libfprint-driver/goodix_bb010002.h",
+        "libfprint-driver/tests/run_goodix_config90_bb010002_test.sh",
+        "libfprint-driver/tests/test_goodix_config90_bb010002.c",
+        "docs/LICENSING_AND_PROVENANCE.md"
+      ],
+      "private_evidence": "Ignored development/ evidence is consulted only under the approved P2 protected-evidence gate and is never copied into public artifacts."
     },
     "P10": {
       "purpose": "Publication cleanup and classification.",

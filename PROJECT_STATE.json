@@ -9,7 +9,7 @@
   },
   "execution_path": "PRIMARY",
   "phase": "P2",
-  "phase_status": "HUMAN_REQUIRED",
+  "phase_status": "IN_PROGRESS",
   "completed_gates": [
     "SELF_CONTAINED_ARCHITECTURE_APPROVAL",
     "ARTIFACT_INDEX_BASELINE_RECONCILED",
@@ -96,20 +96,9 @@
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "Await explicit P2 approval for read-only offline access to the local protected CONFIG90/OTP/BB010002 evidence and for an attributed GPL-2.0-or-later adaptation of the Rockytkg type-12 template/patch facts; then implement and verify P2 without USB, privileges or writes to private evidence.",
-  "active_human_gate": {
-    "gate": "P2_PROTECTED_EVIDENCE_AND_GPL_TEMPLATE_APPROVAL",
-    "reason": "Exact CONFIG90 differential proof and generalized BB010002 acceptance require local protected evidence; the only available type-12 template implementation is GPL-2.0-or-later and its adaptation requires an explicit per-file licensing decision.",
-    "excluded": [
-      "USB_OR_SENSOR_ACCESS",
-      "SUDO_OR_ROOT",
-      "PSK_EXTRACTION_OR_DISCLOSURE",
-      "FIRMWARE_OR_OTP_WRITE",
-      "PAIRING_WRITE"
-    ]
-  },
-  "last_verified_head": "b284882618b329ff41ab4c75e368411460948e48",
-  "state_note": "P0A is reconciled and P1 pairing crypto is accepted offline. P2 stopped before opening protected local evidence or making a GPL template adaptation. The P1 module is not used by any runtime path; integration remains deferred to later roadmap phases. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
+  "next_action": "Execute approved ROADMAP P2 offline: inspect the local protected CONFIG90/OTP/BB010002 evidence, implement the attributed GPL-2.0-or-later type-12 CONFIG90 derivation and narrow BB010002 parser, and close exact differential and negative coverage without USB, privileges, PSK access or pairing writes.",
+  "last_verified_head": "81973f1c27b18db2be0acd3bdb0b87ab79e52234",
+  "state_note": "P0A is reconciled and P1 pairing crypto is accepted offline. The user explicitly approved read/write access to development/ and the P2 protected-evidence plus GPL-template gate; all other Human Gates remain unchanged. The P1 module is not used by any runtime path. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }
