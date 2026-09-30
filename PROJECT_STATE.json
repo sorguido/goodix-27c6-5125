@@ -7,7 +7,6 @@
     "app": "GF_ST411SEC_APP_12509",
     "qualified_host": "Fedora 44 KDE x86_64"
   },
-  "branch": "development",
   "execution_path": "PRIMARY",
   "phase": "P1",
   "phase_status": "NOT_STARTED",
@@ -93,6 +92,8 @@
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
   "next_action": "Execute ROADMAP P1 only: implement/refactor pure pairing WB/validator logic offline, preserve the current DLL-backed runtime path, pass all qualified differential and negative KATs, then have AI PM review and update this state cache.",
-  "last_verified_head": "ada2f2c254c4af1104a1e8afadaa043a8bf7af05",
-  "state_note": "Git/evidence/ROADMAP.md are authoritative. AGENTS.md and START_PROMPT.md are now aligned to development + roadmap-driven orchestration. If this cache conflicts with repository state or evidence, repair PROJECT_STATE.json before continuing."
+  "last_verified_head": "2ac313f18c895c3fc0eeb0bd9f2b920429548acb",
+  "state_note": "Git/evidence/ROADMAP.md are authoritative. The operational Git branch is always the current branch explicitly selected by the user in the execution environment; if that branch is ambiguous or unavailable, stop with HUMAN_REQUIRED/BRANCH_SELECTION_REQUIRED. If this cache conflicts with repository state or evidence, repair PROJECT_STATE.json before continuing.",
+  "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
+  "last_verified_branch": "development"
 }
