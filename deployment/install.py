@@ -119,8 +119,19 @@ def material_rule():
     return found
 
 
+def create_state_root():
+    safe_parent(r.STATE)
+    if not material_present(r.STATE):
+        r.STATE.mkdir(mode=0o700)
+    r.trusted(r.STATE, directory=True)
+    require(stat.S_IMODE(r.STATE.lstat().st_mode) == 0o700,
+            'state-v2 root must be root-only mode 0700')
+
+
 def label_materials():
-    paths = (r.MATERIAL, *(r.MATERIAL / n for n in r.MATERIAL_NAMES))
+    paths = [r.STATE]
+    if material_present(r.MATERIAL):
+        paths.extend((r.MATERIAL, *(r.MATERIAL / n for n in r.MATERIAL_NAMES)))
     command('restorecon', '-F', '--', *(str(p) for p in paths))
     for path in paths:
         context = os.getxattr(path, 'security.selinux', follow_symlinks=False).rstrip(b'\0')
@@ -195,7 +206,7 @@ def restore_selinux_module(was_present):
         r.remove_selinux_module()
 
 
-def install_runtime(payload, manifest, rule_preexisting):
+def install_runtime(payload, manifest, rule_preexisting, legacy_present):
     r.RUNTIME.mkdir(mode=0o755)
     hashes = {}
     for name, digest in manifest['files'].items():
@@ -212,9 +223,13 @@ def install_runtime(payload, manifest, rule_preexisting):
             relative = name.removeprefix('runtime/')
             (r.RUNTIME / relative).symlink_to(target)
             links[relative] = target
+    material_selinux = None if rule_preexisting is None else {
+        'rule': r.RULE, 'owned': not rule_preexisting,
+        'preexisting': rule_preexisting, 'phase': 'ready'}
     write_json(r.RUNTIME / 'installation.json', {'schema': 2, 'source_id': manifest['source_id'],
-        'files': hashes, 'links': links, 'material_selinux': {'rule': r.RULE,
-        'owned': not rule_preexisting, 'preexisting': rule_preexisting, 'phase': 'ready'}})
+        'files': hashes, 'links': links, 'material_selinux': material_selinux,
+        'material_mode': 'legacy-and-state-v2' if legacy_present else 'state-v2',
+        'state_root': str(r.STATE)})
     command('restorecon', '-RF', str(r.RUNTIME))
     r.DROPIN.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
     write_file(r.DROPIN, r.DROPIN_BYTES)
@@ -348,6 +363,17 @@ def installed_bundle():
                            'no fallback to Home material: ' + str(error)) from error
 
 
+def installed_software_requires_legacy():
+    if not r.present(r.RUNTIME):
+        return False
+    try:
+        receipt = json.loads(r.read(r.RUNTIME / 'installation.json'))
+    except (OSError, ValueError, RuntimeError) as error:
+        raise RuntimeError('installed runtime receipt is unreadable before material selection') from error
+    # Receipts predating state-v2 were unconditionally legacy-backed.
+    return receipt.get('material_mode', 'legacy') != 'state-v2'
+
+
 def select_materials(material_directory, owner_uid, *, explicit=False):
     """Read-only privileged selection; never copy installed bytes to the user."""
     require(os.geteuid() == 0, 'material selection requires the privileged phase')
@@ -360,14 +386,17 @@ def select_materials(material_directory, owner_uid, *, explicit=False):
             require(requested.files == bundle.files,
                     'REASON=explicit_material_mismatch; installed material differs; it was preserved')
         return ('UPDATE' if software_installed else 'REINSTALL'), bundle, True
-    require(material_present(material_directory),
-            'REASON=no_device_material_available; first installation or total material loss: '
-            'the original five-file device bundle is required in ~/goodix-5125-materials '
-            '(or --materials PATH)')
-    require(not software_installed,
-            'REASON=installed_material_missing; project software remains; '
-            'material loss requires review before importing a bundle')
-    return 'FIRST_INSTALL', source_bundle(material_directory, owner_uid), False
+    if software_installed:
+        require(not installed_software_requires_legacy(),
+                'REASON=installed_material_missing; the installed compatibility runtime '
+                'still requires its legacy bundle')
+        require(not explicit,
+                'REASON=explicit_material_without_installed_legacy; update cannot add a '
+                'different reader identity implicitly')
+        return 'UPDATE', None, False
+    if explicit or material_present(material_directory):
+        return 'FIRST_INSTALL', source_bundle(material_directory, owner_uid), False
+    return 'FIRST_INSTALL', None, False
 
 
 def source_bundle(directory, owner_uid):
@@ -415,14 +444,16 @@ def apply(payload, material_directory, owner_uid, *, explicit=False):
                         require(r.remove(force=False) == 0, 'existing installation could not be removed')
                 install_tools(manifest['source_id'])
                 install_selinux_module()
-                if not reuse:
+                if bundle is not None and not reuse:
                     materials.install_materials(bundle, r.MATERIAL, native_check=native_check)
-                preexisting = material_rule()
-                if not preexisting:
+                create_state_root()
+                legacy_present = material_present(r.MATERIAL)
+                preexisting = material_rule() if legacy_present else None
+                if legacy_present and not preexisting:
                     command('semanage', 'fcontext', '-a', '-f', 'a', '-t', 'fprintd_var_lib_t', '-r', 's0', r.RULE)
                 label_materials()
-                print('GOODIX_MATERIALS=VALID')
-                install_runtime(staged_payload, manifest, preexisting)
+                print('GOODIX_MATERIALS=' + ('LEGACY_VALID' if legacy_present else 'NONE_STATE_V2_READY'))
+                install_runtime(staged_payload, manifest, preexisting, legacy_present)
                 install_login(staged_payload, manifest['source_id'])
                 command('systemctl', 'daemon-reload')
                 r.normal_preflight()
@@ -461,7 +492,8 @@ def main():
                 and not (args.apply is not None and args.material_preflight), 'invalid administrative invocation')
         if args.material_preflight:
             select_materials(material_directory, args.owner_uid, explicit=args.materials is not None)
-            print('GOODIX_MATERIAL_PREFLIGHT=PASS NATIVE_BINDING_CHECK_AT_INSTALL=true')
+            print('GOODIX_MATERIAL_PREFLIGHT=PASS LEGACY_BUNDLE_OPTIONAL=true '
+                  'NATIVE_BINDING_CHECK_AT_INSTALL=true')
         else:
             apply(args.apply.absolute(), material_directory, args.owner_uid, explicit=args.materials is not None)
         return 0
@@ -473,8 +505,12 @@ def main():
         if material_present(r.MATERIAL):
             print('GOODIX_CHECK=PASS INSTALLED_MATERIAL_VALIDATION=DEFERRED_TO_PRIVILEGED_PHASE')
             return 0
-        source_bundle(material_directory, os.getuid())
-        print('GOODIX_CHECK=PASS STATIC_MATERIAL_CHECK=PASS NATIVE_BINDING_CHECK_AT_INSTALL=true')
+        if args.materials is not None or material_present(material_directory):
+            source_bundle(material_directory, os.getuid())
+            print('GOODIX_CHECK=PASS STATIC_LEGACY_MATERIAL_CHECK=PASS '
+                  'NATIVE_BINDING_CHECK_AT_INSTALL=true')
+        else:
+            print('GOODIX_CHECK=PASS LEGACY_BUNDLE_REQUIRED=false STATE_V2_ROOT_AT_APPLY=true')
         return 0
     privileged = ['/usr/bin/sudo', '--', '/usr/bin/python3', '-I', '-B', str(Path(__file__).resolve())]
     selection = ['--materials' if args.materials is not None else '--default-materials',

@@ -19,7 +19,7 @@
 #include "goodix_fpi_usb_backend.h"
 #include "goodix_secure_session.h"
 #include "goodix_post_tls_lifecycle.h"
-#include "goodix_runtime_material.h"
+#include "goodix_runtime_coordinator.h"
 #include "goodix_enrollment_fpi_usb_binding.h"
 #include "goodix_enrollment_diversity.h"
 
@@ -97,9 +97,10 @@ struct _GoodixDeviceContext
   GoodixDeviceContextSecurePhaseObserver phase_observer;
   gpointer                   phase_observer_data;
 
-  GoodixRuntimeMaterial     *runtime_material;
+  GoodixRuntimeCoordinator  *runtime_material;
   GoodixSecureSessionMaterial runtime_secure_view;
   guint8                     runtime_fdt_seed[GOODIX_RUNTIME_FDT_SEED_LENGTH];
+  GoodixRuntimeCoordinatorAudit runtime_coordinator_audit;
   GoodixRuntimeMaterialAudit runtime_material_audit;
   GoodixSecureSessionAudit    runtime_secure_audit;
   GoodixTlsAudit              runtime_tls_audit;
@@ -135,7 +136,7 @@ struct _GoodixDeviceContext
   guint                      production_capture_attempt_count;
   gboolean                   production_capture_terminal;
 #ifdef GOODIX_ENABLE_TEST_SEAMS
-  GoodixRuntimeMaterialReleaseSeam runtime_material_release;
+  GoodixRuntimeCoordinatorReleaseSeam runtime_material_release;
   gpointer                   runtime_material_release_data;
 #endif
   gboolean                   runtime_handoff_views_cleared;
@@ -163,8 +164,8 @@ typedef struct
   gboolean last_production_audit_valid;
   gboolean last_production_audit_logged;
 #ifdef GOODIX_ENABLE_TEST_SEAMS
-  GoodixRuntimeMaterialAcquireSeam acquire_material;
-  GoodixRuntimeMaterialReleaseSeam release_material;
+  GoodixRuntimeCoordinatorAcquireSeam acquire_material;
+  GoodixRuntimeCoordinatorReleaseSeam release_material;
   GoodixUsbInterfaceSeam claim_interface;
   GoodixUsbInterfaceSeam release_interface;
   gpointer production_seam_data;
@@ -227,8 +228,13 @@ static void login_maybe_report_release (GoodixDeviceContext *ctx);
 
 static gboolean
 goodix_fpimage_device_is_production_usb (GoodixFpImageDevice *self);
-static void default_release_runtime_material (GoodixRuntimeMaterial *owner,
+static void default_release_runtime_material (GoodixRuntimeCoordinator *owner,
                                               gpointer user_data);
+static gboolean goodix_fpimage_device_release_claim (
+  GoodixFpImageDevice *self,
+  GError             **error);
+static void goodix_device_context_release_epoch_objects (
+  GoodixDeviceContext *ctx);
 
 static void
 context_protocol_failure (GoodixDeviceContext *ctx,
@@ -795,6 +801,7 @@ goodix_device_context_collect_production_enrollment_audit (
     .terminal_enroll_completion_held =
       ctx->terminal_enroll_completion_held,
     .pre_session_rx_sync = ctx->pre_session_rx_sync_audit,
+    .runtime_coordinator = ctx->runtime_coordinator_audit,
     .runtime_material = ctx->runtime_material_audit,
     .secure = ctx->runtime_secure_audit,
     .tls = ctx->runtime_tls_audit,
@@ -855,7 +862,8 @@ goodix_fpimage_device_log_production_audit (
     "enroll_contacts=%u enroll_retry_scans=%u "
     "secure_retry=%u post_retry=%u reopen=%u explicit_verify_reopen=%u "
     "explicit_identify_reopen=%u "
-    "reset=%u clear_halt=%u persistent=%u "
+    "reset=%u clear_halt=%u persistent=%u coordinator_source=%u "
+    "coordinator_decision=%u pairing_writer=%u pairing_writes=%u "
     "sigfm_baseline_pinned=%u sigfm_baseline_reused=%u "
     "real_submit=%" G_GUINT64_FORMAT " "
     "outstanding=%u drained=%u context_closed=%u",
@@ -889,6 +897,10 @@ goodix_fpimage_device_log_production_audit (
     audit->secure.persistent_write_count +
       audit->post_tls.persistent_device_write_count +
       audit->enrollment_binding.transaction.frame.persistent_family_count,
+    audit->runtime_coordinator.source,
+    audit->runtime_coordinator.decision,
+    audit->runtime_coordinator.writer_enabled,
+    audit->runtime_coordinator.pairing_write_count,
     audit->sigfm_normalization_baseline_pinned,
     audit->sigfm_normalization_baseline_reused,
     audit->usb_real_submit_count,
@@ -948,7 +960,7 @@ goodix_device_context_free (GoodixDeviceContext              *ctx,
 }
 
 static gboolean
-default_acquire_runtime_material (
+default_acquire_legacy_material (
   GoodixRuntimeMaterial       **owner,
   GoodixSecureSessionMaterial  *secure_view,
   guint8                        fdt_seed[GOODIX_RUNTIME_FDT_SEED_LENGTH],
@@ -978,11 +990,53 @@ default_acquire_runtime_material (
 }
 
 static void
-default_release_runtime_material (GoodixRuntimeMaterial *owner,
-                                  gpointer               user_data)
+default_release_legacy_material (GoodixRuntimeMaterial *owner,
+                                 gpointer               user_data)
 {
   (void) user_data;
   goodix_runtime_material_free (owner);
+}
+
+static gboolean
+default_acquire_runtime_material (
+  GoodixRuntimeCoordinator     **owner,
+  GoodixSecureSessionMaterial  *secure_view,
+  guint8                        fdt_seed[GOODIX_RUNTIME_FDT_SEED_LENGTH],
+  GoodixRuntimeCoordinatorAudit *coordinator_audit,
+  GoodixRuntimeMaterialAudit   *audit,
+  gpointer                      user_data,
+  GError                      **error)
+{
+  GoodixRuntimeCoordinatorPaths paths;
+  GoodixRuntimeCoordinatorPolicy policy;
+
+  (void) user_data;
+  goodix_runtime_coordinator_paths_production (&paths);
+  goodix_runtime_coordinator_policy_production (&policy);
+  *owner = goodix_runtime_coordinator_acquire (
+    &paths, &policy, NULL, default_acquire_legacy_material,
+    default_release_legacy_material, NULL, audit, coordinator_audit, error);
+  if (*owner == NULL)
+    return FALSE;
+  if (!goodix_runtime_coordinator_get_secure_view (*owner, secure_view,
+                                                   error) ||
+      !goodix_runtime_coordinator_get_fdt_seed (*owner, fdt_seed, error))
+    {
+      goodix_runtime_coordinator_free (*owner);
+      *owner = NULL;
+      OPENSSL_cleanse (secure_view, sizeof *secure_view);
+      OPENSSL_cleanse (fdt_seed, GOODIX_RUNTIME_FDT_SEED_LENGTH);
+      return FALSE;
+    }
+  return TRUE;
+}
+
+static void
+default_release_runtime_material (GoodixRuntimeCoordinator *owner,
+                                  gpointer                  user_data)
+{
+  (void) user_data;
+  goodix_runtime_coordinator_free (owner);
 }
 
 static gboolean
@@ -1011,6 +1065,92 @@ static gboolean
 goodix_fpimage_device_is_production_usb (GoodixFpImageDevice *self)
 {
   return FP_DEVICE_GET_CLASS (self)->type == FP_DEVICE_TYPE_USB;
+}
+
+static gboolean
+goodix_fpimage_device_acquire_action_resources (GoodixFpImageDevice *self,
+                                                GError             **error)
+{
+  GoodixFpImageDevicePrivate *priv =
+    goodix_fpimage_device_get_instance_private (self);
+  GoodixDeviceContext *ctx = priv->ctx;
+  GCancellable *cancellable;
+#ifdef GOODIX_ENABLE_TEST_SEAMS
+  GoodixRuntimeCoordinatorAcquireSeam acquire_material;
+  GoodixUsbInterfaceSeam claim_interface;
+#endif
+
+  if (ctx == NULL || ctx->runtime_material != NULL ||
+      ctx->usb_interface_claimed)
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_CLOSED,
+                           "Goodix action resources are not clean");
+      return FALSE;
+    }
+  cancellable = fpi_device_get_cancellable (FP_DEVICE (self));
+  if (g_cancellable_set_error_if_cancelled (cancellable, error))
+    return FALSE;
+#ifdef GOODIX_ENABLE_TEST_SEAMS
+  acquire_material = priv->acquire_material != NULL ?
+    priv->acquire_material : default_acquire_runtime_material;
+  ctx->runtime_material_release = priv->release_material != NULL ?
+    priv->release_material : default_release_runtime_material;
+  ctx->runtime_material_release_data = priv->production_seam_data;
+  if (!acquire_material (&ctx->runtime_material,
+                         &ctx->runtime_secure_view,
+                         ctx->runtime_fdt_seed,
+                         &ctx->runtime_coordinator_audit,
+                         &ctx->runtime_material_audit,
+                         priv->production_seam_data, error) ||
+      ctx->runtime_material == NULL)
+#else
+  if (!default_acquire_runtime_material (&ctx->runtime_material,
+                                         &ctx->runtime_secure_view,
+                                         ctx->runtime_fdt_seed,
+                                         &ctx->runtime_coordinator_audit,
+                                         &ctx->runtime_material_audit,
+                                         NULL, error) ||
+      ctx->runtime_material == NULL)
+#endif
+    goto fail;
+  if (g_cancellable_set_error_if_cancelled (cancellable, error))
+    goto fail;
+#ifdef GOODIX_ENABLE_TEST_SEAMS
+  claim_interface = priv->claim_interface != NULL ?
+    priv->claim_interface : default_claim_interface;
+  if (!claim_interface (fpi_device_get_usb_device (FP_DEVICE (self)), 0,
+                        priv->production_seam_data, error))
+    goto fail;
+#else
+  if (!default_claim_interface (
+        fpi_device_get_usb_device (FP_DEVICE (self)), 0, NULL, error))
+    goto fail;
+#endif
+  ctx->usb_interface_claimed = TRUE;
+  ctx->production_transport_epoch_count++;
+  if (g_cancellable_set_error_if_cancelled (cancellable, error))
+    {
+      g_autoptr(GError) release_error = NULL;
+
+      (void) goodix_fpimage_device_release_claim (self, &release_error);
+      goto fail;
+    }
+  return TRUE;
+
+fail:
+  if (ctx->usb_interface_claimed)
+    {
+      g_autoptr(GError) release_error = NULL;
+
+      if (!goodix_fpimage_device_release_claim (self, &release_error) &&
+          error != NULL && *error == NULL)
+        *error = g_steal_pointer (&release_error);
+    }
+  goodix_device_context_release_epoch_objects (ctx);
+  if (error != NULL && *error == NULL)
+    g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                         "Goodix action resource acquisition failed closed");
+  return FALSE;
 }
 
 static gboolean
@@ -1178,6 +1318,8 @@ goodix_device_context_reset_for_capture_reopen (GoodixDeviceContext *ctx,
   ctx->pre_session_rx_sync_out_count_at_pass = 0;
   memset (&ctx->runtime_material_audit, 0,
           sizeof ctx->runtime_material_audit);
+  memset (&ctx->runtime_coordinator_audit, 0,
+          sizeof ctx->runtime_coordinator_audit);
   memset (&ctx->runtime_secure_audit, 0,
           sizeof ctx->runtime_secure_audit);
   memset (&ctx->runtime_tls_audit, 0,
@@ -1200,7 +1342,7 @@ goodix_fpimage_device_reopen_for_capture_action (
     goodix_fpimage_device_get_instance_private (self);
   GoodixDeviceContext *ctx = priv->ctx;
 #ifdef GOODIX_ENABLE_TEST_SEAMS
-  GoodixRuntimeMaterialAcquireSeam acquire_material;
+  GoodixRuntimeCoordinatorAcquireSeam acquire_material;
   GoodixUsbInterfaceSeam claim_interface;
 #endif
 
@@ -1239,6 +1381,7 @@ goodix_fpimage_device_reopen_for_capture_action (
   if (!acquire_material (&ctx->runtime_material,
                          &ctx->runtime_secure_view,
                          ctx->runtime_fdt_seed,
+                         &ctx->runtime_coordinator_audit,
                          &ctx->runtime_material_audit,
                          priv->production_seam_data, error) ||
       ctx->runtime_material == NULL)
@@ -1246,6 +1389,7 @@ goodix_fpimage_device_reopen_for_capture_action (
   if (!default_acquire_runtime_material (&ctx->runtime_material,
                                          &ctx->runtime_secure_view,
                                          ctx->runtime_fdt_seed,
+                                         &ctx->runtime_coordinator_audit,
                                          &ctx->runtime_material_audit,
                                          NULL, error) ||
       ctx->runtime_material == NULL)
@@ -1491,13 +1635,7 @@ static void
 goodix_fpimage_device_img_open (FpImageDevice *dev)
 {
   GoodixFpImageDevice *self = GOODIX_FPIMAGE_DEVICE (dev);
-  GoodixFpImageDevicePrivate *priv =
-    goodix_fpimage_device_get_instance_private (self);
-  GoodixDeviceContext *ctx = priv->ctx;
-#ifdef GOODIX_ENABLE_TEST_SEAMS
-  GoodixRuntimeMaterialAcquireSeam acquire_material;
-  GoodixUsbInterfaceSeam claim_interface;
-#endif
+  GoodixDeviceContext *ctx = goodix_fpimage_device_peek_context (self);
   GCancellable *cancellable;
   g_autoptr(GError) error = NULL;
 
@@ -1525,66 +1663,14 @@ goodix_fpimage_device_img_open (FpImageDevice *dev)
   if (g_cancellable_set_error_if_cancelled (cancellable, &error))
     goto fail;
 
-#ifdef GOODIX_ENABLE_TEST_SEAMS
-  acquire_material = priv->acquire_material != NULL ?
-    priv->acquire_material : default_acquire_runtime_material;
-  ctx->runtime_material_release = priv->release_material != NULL ?
-    priv->release_material : default_release_runtime_material;
-  ctx->runtime_material_release_data = priv->production_seam_data;
-  if (!acquire_material (&ctx->runtime_material,
-                         &ctx->runtime_secure_view,
-                         ctx->runtime_fdt_seed,
-                         &ctx->runtime_material_audit,
-                         priv->production_seam_data, &error) ||
-      ctx->runtime_material == NULL)
-#else
-  if (!default_acquire_runtime_material (&ctx->runtime_material,
-                                         &ctx->runtime_secure_view,
-                                         ctx->runtime_fdt_seed,
-                                         &ctx->runtime_material_audit,
-                                         NULL, &error) ||
-      ctx->runtime_material == NULL)
-#endif
-    {
-      if (error == NULL)
-        error = g_error_new_literal (
-          G_IO_ERROR, G_IO_ERROR_FAILED,
-          "production runtime material acquisition failed closed");
-      goto fail;
-    }
-  if (g_cancellable_set_error_if_cancelled (cancellable, &error))
-    goto fail;
-
-#ifdef GOODIX_ENABLE_TEST_SEAMS
-  claim_interface = priv->claim_interface != NULL ?
-    priv->claim_interface : default_claim_interface;
-  if (!claim_interface (fpi_device_get_usb_device (FP_DEVICE (self)), 0,
-                        priv->production_seam_data, &error))
-    goto fail;
-#else
-  if (!default_claim_interface (
-        fpi_device_get_usb_device (FP_DEVICE (self)), 0, NULL, &error))
-    goto fail;
-#endif
-  ctx->usb_interface_claimed = TRUE;
-  ctx->production_transport_epoch_count = 1u;
-  if (g_cancellable_set_error_if_cancelled (cancellable, &error))
-    goto fail;
-
+  /* Discovery/open is intentionally inert.  Protected state and USB are
+   * acquired only by an allowlisted, explicit libfprint action. */
   goodix_device_context_set_state (ctx,
                                    GOODIX_DEVICE_CONTEXT_STATE_INACTIVE);
   fpi_image_device_open_complete (dev, NULL);
   return;
 
 fail:
-  if (ctx->usb_interface_claimed)
-    {
-      g_autoptr(GError) release_error = NULL;
-
-      if (!goodix_fpimage_device_release_claim (self, &release_error) &&
-          error == NULL)
-        error = g_steal_pointer (&release_error);
-    }
   goodix_fpimage_device_discard_context (self);
   fpi_image_device_open_complete (dev, g_steal_pointer (&error));
 }
@@ -1817,6 +1903,13 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
           g_message ("GOODIX_STOCK_CAPTURE_BEGIN attempt=%u action=%s",
                      ctx->production_capture_attempt_count,
                      action == FPI_DEVICE_ACTION_VERIFY ? "VERIFY" : "IDENTIFY");
+        }
+      if ((ctx->runtime_material == NULL || !ctx->usb_interface_claimed) &&
+          !goodix_fpimage_device_acquire_action_resources (self, &error))
+        {
+          ctx->poisoned = TRUE;
+          fpi_image_device_activate_complete (dev, g_steal_pointer (&error));
+          return;
         }
     }
 
@@ -2202,8 +2295,8 @@ goodix_fpimage_device_get_context (GoodixFpImageDevice *dev)
 void
 goodix_fpimage_device_set_production_open_seams (
   GoodixFpImageDevice               *dev,
-  GoodixRuntimeMaterialAcquireSeam   acquire_material,
-  GoodixRuntimeMaterialReleaseSeam   release_material,
+  GoodixRuntimeCoordinatorAcquireSeam acquire_material,
+  GoodixRuntimeCoordinatorReleaseSeam release_material,
   GoodixUsbInterfaceSeam             claim_interface,
   GoodixUsbInterfaceSeam             release_interface,
   gpointer                           user_data)

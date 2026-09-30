@@ -253,10 +253,13 @@ cannot be proven, the context is poisoned and must be closed rather than reused.
 
 ## 5. Protected device material and secure transport
 
-The driver cannot invent the target's existing PSK or factory-derived runtime
-data. The user must supply exactly five protected files from a lawfully available
-compatible environment. They stay outside the source tree and are imported into
-`/var/lib/goodix-5125-poc/` as root-owned, root-only material.
+The legacy compatibility path cannot invent the target's existing PSK or
+factory-derived runtime data. When that path is used, the user supplies exactly
+five protected files from a lawfully available compatible environment. They stay
+outside the source tree and are imported into `/var/lib/goodix-5125-poc/` as
+root-owned, root-only material. A fresh host installation may instead omit this
+bundle and prepare the separate state-v2 location; installation itself performs
+no reader access or pairing.
 
 | File | Technical role | Security treatment |
 | --- | --- | --- |
@@ -276,9 +279,14 @@ CRC failures and ambiguous calibration fields. Its output is byte-identical to
 the qualified target configuration. A separate validator accepts the common
 332-byte DPAPI structure of the available legitimate `BB010002` values while
 treating their protected regions as opaque; it neither decrypts nor synthesizes
-them. The current production runtime deliberately continues to use the
-validated five-file bundle until the later state/coordinator integration gates
-replace these offline components.
+them. The production runtime now enters a read-only coordinator only after an
+explicit libfprint action. Enumeration, ordinary open, installer, boot and an
+uninitialized login do not load material or claim USB. During migration, the
+coordinator uses the legacy owner when no bounded live preflight is available.
+With complete live evidence it derives CONFIG90, constructs the full target
+binding and may select a matching state-v2 generation. A state-only activation
+without that evidence fails before USB claim. The production pairing writer
+remains absent.
 
 The host-only state-v2 boundary uses two fixed-size generations. Each generation
 contains a 32-byte PSK record and a receipt authenticated by that PSK. The
@@ -293,9 +301,11 @@ interrupted pairing attempt, reconciliation only compares the live validator
 with the candidate and optional prior validator: candidate match retries TLS,
 prior match uses the prior state, and any other result requires recovery. It
 never authorizes a speculative second pairing write. Legacy import is
-side-by-side and records the source digest without changing or removing the
-old bundle. This boundary is qualified offline and is not yet selected by the
-production activation path.
+side-by-side and records the source digest without changing or removing the old
+bundle. The production coordinator can select an ACTIVE match or a PREPARED
+candidate for TLS retry, but exposes no pairing write or host-state promotion
+operation. Prior-generation, external-replacement and ambiguous recovery results
+fail closed for a later explicit recovery boundary.
 
 The manifest binds the bundle to `27c6:5125`, the supported application, the
 other four files, and target responses used during initialization. File names,
@@ -509,9 +519,11 @@ lifecycle expose the learned 12-byte FDT table as a candidate for later local
 state persistence. Touch flags, malformed or duplicate frames, timeout, or
 temperature/drift classification failure terminate the attempt and clear that
 candidate. The decoded image baseline remains action-local and is never part
-of the persistence interface. The current production activation still marks
-its legacy imported seed as supplied until state-v2 integration selects the
-explicit missing-seed mode.
+of the persistence interface. Legacy activation marks its imported seed as
+supplied. State-v2 activation uses the authenticated 12-byte table when present
+and represents an absent table as a zero seed; the later live qualification
+gate must prove the explicit missing-seed lifecycle before enabling
+self-initialization.
 
 ### 6.4 FDT table derivation and arming
 
@@ -918,6 +930,7 @@ Protected reader material and biometric templates are different data classes:
 | Data | Scope | Owner | Location | Removed by project removal? |
 | --- | --- | --- | --- | --- |
 | Reader material | System-wide, target-bound | Project runtime/root | `/var/lib/goodix-5125-poc/` | No |
+| State-v2 pairing state | System-wide, target-bound | Project runtime/root | `/var/lib/fprint/goodix-5125-state-v2/` | No |
 | Biometric template | Per local username/finger | Fedora `fprintd` | `/var/lib/fprint/` | No |
 | Raw image | One in-memory action | Driver process | Not intentionally persisted | Not applicable |
 
@@ -1174,11 +1187,14 @@ Material-source precedence is fixed:
    types without links, exactly five files, manifest, hashes and cross-file bindings.
    Valid installed material takes precedence over the default Home bundle, which
    is not read. Missing files, corruption or metadata drift cause STOP without fallback.
-2. Only when installed material and project software are absent does the installer
-   validate the normal user's `~/goodix-5125-materials/` (or explicit `--materials`).
-3. If neither source exists, it stops with `REASON=no_device_material_available`
-   before package installation or project mutation and requires the original bundle.
-   Remaining software with lost installed material also stops for review.
+2. Only when installed legacy material and project software are absent does the
+   installer validate the normal user's `~/goodix-5125-materials/` (or explicit
+   `--materials`).
+3. If neither material source exists on a first install, the installer creates
+   `/var/lib/fprint/goodix-5125-state-v2/` as root-owned mode `0700` and records a
+   state-v2-only runtime. It does not open USB or initialize pairing. An older
+   installed runtime whose receipt still requires missing legacy material stops
+   for review; a state-v2-only runtime updates without a bundle.
 
 The preliminary privileged check is read-only and repeats at apply time. A
 root-owned copy of the built native checker validates an installed set's E4
@@ -1224,6 +1240,7 @@ normal cleanup.
 | `/usr/local/lib64/goodix-27c6-5125/` | Private libfprint/OpenCV runtime, links, notices, and receipts |
 | `/etc/systemd/system/fprintd.service.d/90-goodix-5125-runtime.conf` | Private runtime environment for stock fprintd |
 | `/var/lib/goodix-5125-poc/` | Preserved root-only protected reader material |
+| `/var/lib/fprint/goodix-5125-state-v2/` | Preserved root-only crash-safe pairing state |
 | `/usr/local/lib64/goodix-plasma-login/` | PAM selector module and metadata |
 | `/etc/pam.d/plasmalogin` | Project-owned opt-in prefix and includes of current Fedora PAM |
 | `/usr/local/bin/goodix-uninstall` | Receipt-validating normal removal |
@@ -1246,6 +1263,7 @@ again when absent, then runs the same installer. The installer reports
 | Installed set | Present and passing software preflight | `UPDATE` |
 | Installed set | Absent, including after normal or emergency removal | `REINSTALL` |
 | Home or explicit bundle; installed set absent | Absent | `FIRST_INSTALL` |
+| No legacy bundle; state-v2 prepared or initially empty | Absent | `FIRST_INSTALL` |
 
 A valid existing installation is removed and replaced transactionally while
 fprintd is quiescent. Existing templates are never part of replacement. The
@@ -1256,8 +1274,9 @@ reader/bundle replacement.
 
 The repository clone may be removed after successful installation; runtime and
 removal commands are independent of it. The Home staging copy is not technically
-required for ordinary updates or reinstalls with valid installed material. A
-separate secure backup remains necessary for recovery from total material loss.
+required for ordinary updates or reinstalls with valid installed material.
+State-v2-only updates and reinstalls preserve their state directory. A separate
+secure backup remains necessary while the legacy compatibility source is used.
 
 ### 16.5 Rollback boundary
 

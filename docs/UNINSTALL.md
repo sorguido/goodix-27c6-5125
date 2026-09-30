@@ -76,6 +76,7 @@ this same command while password and administrative access remain available.
 Both commands preserve:
 
 - `/var/lib/goodix-5125-poc/` and its five protected material files;
+- `/var/lib/fprint/goodix-5125-state-v2/` and its host pairing state;
 - fingerprint templates under `/var/lib/fprint/`;
 - firmware, existing keys, factory state and persistent device configuration;
 - your staging directory and source clone.

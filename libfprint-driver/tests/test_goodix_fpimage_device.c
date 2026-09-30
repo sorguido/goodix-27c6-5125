@@ -21,7 +21,10 @@
 #include "fp-print.h"
 
 #include <glib.h>
+#include <glib/gstdio.h>
 #include <openssl/evp.h>
+#include <string.h>
+#include <unistd.h>
 
 #define TEST_TIMEOUT_MS 5000
 
@@ -1299,6 +1302,296 @@ production_digest (const guint8 *data,
   g_assert_cmpuint (output_length, ==, 32u);
 }
 
+typedef struct
+{
+  guint acquire_count;
+  guint release_count;
+} CoordinatorLegacySeam;
+
+static gboolean
+coordinator_legacy_acquire (
+  GoodixRuntimeMaterial       **owner,
+  GoodixSecureSessionMaterial  *secure_view,
+  guint8                        fdt_seed[GOODIX_RUNTIME_FDT_SEED_LENGTH],
+  GoodixRuntimeMaterialAudit   *audit,
+  gpointer                      user_data,
+  GError                      **error)
+{
+  CoordinatorLegacySeam *seam = user_data;
+
+  (void) error;
+  seam->acquire_count++;
+  memset (secure_view, 0, sizeof *secure_view);
+  memset (fdt_seed, 0, GOODIX_RUNTIME_FDT_SEED_LENGTH);
+  memset (audit, 0, sizeof *audit);
+  *owner = (GoodixRuntimeMaterial *) g_malloc0 (1u);
+  return TRUE;
+}
+
+static void
+coordinator_legacy_release (GoodixRuntimeMaterial *owner,
+                            gpointer               user_data)
+{
+  CoordinatorLegacySeam *seam = user_data;
+
+  seam->release_count++;
+  g_free (owner);
+}
+
+static guint8
+coordinator_crc8 (const guint8 *data,
+                  gsize         length)
+{
+  guint8 crc = 0;
+
+  for (gsize i = 0; i < length; i++)
+    {
+      crc ^= data[i];
+      for (guint bit = 0; bit < 8u; bit++)
+        {
+          guint shifted = (guint) crc << 1;
+
+          crc = (guint8) ((crc & 0x80u) != 0u ?
+                            shifted ^ 0x07u : shifted);
+        }
+    }
+  return (guint8) ~crc;
+}
+
+static void
+coordinator_make_otp (guint8 otp[GOODIX_CONFIG90_OTP_LENGTH])
+{
+  guint8 buffer[27] = { 0 };
+
+  for (guint i = 0; i < GOODIX_CONFIG90_OTP_LENGTH; i++)
+    otp[i] = (guint8) (i * 7u + 3u);
+  otp[27] = 0x22u;
+  otp[42] = 0x42u;
+  otp[43] = 0xbdu;
+  otp[45] = 0x42u;
+  otp[50] = 0x21u;
+  otp[51] = 0x31u;
+  otp[52] = 0x41u;
+  otp[53] = 0x51u;
+  otp[62] = coordinator_crc8 (otp + 50, 4u);
+  memcpy (buffer, otp, 11u);
+  memcpy (buffer + 11, otp + 36, 4u);
+  otp[60] = coordinator_crc8 (buffer, 15u);
+  memcpy (buffer, otp + 11, 9u);
+  buffer[9] = otp[28];
+  memcpy (buffer + 10, otp + 50, 4u);
+  memcpy (buffer + 14, otp + 56, 4u);
+  buffer[18] = otp[62];
+  otp[61] = coordinator_crc8 (buffer, 19u);
+  memcpy (buffer, otp + 20, 8u);
+  memcpy (buffer + 8, otp + 29, 7u);
+  memcpy (buffer + 15, otp + 40, 10u);
+  memcpy (buffer + 25, otp + 54, 2u);
+  otp[63] = coordinator_crc8 (buffer, 27u);
+}
+
+static void
+coordinator_remove_directory (const gchar *directory)
+{
+  GDir *dir = g_dir_open (directory, 0, NULL);
+  const gchar *name;
+
+  if (dir != NULL)
+    {
+      while ((name = g_dir_read_name (dir)) != NULL)
+        {
+          g_autofree gchar *path = g_build_filename (directory, name, NULL);
+
+          g_assert_cmpint (g_unlink (path), ==, 0);
+        }
+      g_dir_close (dir);
+    }
+  g_assert_cmpint (g_rmdir (directory), ==, 0);
+}
+
+static void
+test_p5_coordinator_migration_selection (void)
+{
+  static const guint8 a2[] = { 0x11u, 0x22u, 0x33u };
+  static const guint8 chip[] = { 0x25u, 0x04u, 0x12u, 0x50u };
+  g_autofree gchar *root = g_dir_make_tmp ("goodix-coordinator.XXXXXX", NULL);
+  g_autofree gchar *state_dir = g_build_filename (root, "state", NULL);
+  g_autofree gchar *legacy_dir = g_build_filename (root, "legacy", NULL);
+  GoodixRuntimeCoordinatorPaths paths = { 0 };
+  GoodixRuntimeCoordinatorPolicy policy = { 0 };
+  GoodixRuntimeCoordinatorLiveEvidence live = { 0 };
+  GoodixRuntimeCoordinatorAudit audit;
+  GoodixRuntimeMaterialAudit legacy_audit;
+  CoordinatorLegacySeam seam = { 0 };
+  GoodixRuntimeCoordinator *coordinator;
+  guint8 otp[GOODIX_CONFIG90_OTP_LENGTH];
+  guint8 validator[GOODIX_SELF_STATE_DIGEST_LENGTH];
+  GError *error = NULL;
+
+  g_assert_nonnull (root);
+  g_assert_cmpint (g_mkdir (state_dir, 0700), ==, 0);
+  g_assert_cmpint (g_mkdir (legacy_dir, 0700), ==, 0);
+  paths.state_directory = state_dir;
+  paths.legacy.directory_path = legacy_dir;
+  goodix_self_state_policy_for_owner (&policy.state, getuid (), getgid ());
+  policy.legacy.directory_owner_uid = getuid ();
+  policy.legacy.directory_owner_gid = getgid ();
+  policy.legacy.directory_mode = 0700;
+  coordinator = goodix_runtime_coordinator_acquire (
+    &paths, &policy, NULL, coordinator_legacy_acquire,
+    coordinator_legacy_release, &seam, &legacy_audit, &audit, &error);
+  g_assert_no_error (error);
+  g_assert_nonnull (coordinator);
+  g_assert_cmpint (goodix_runtime_coordinator_get_source (coordinator), ==,
+                   GOODIX_RUNTIME_COORDINATOR_SOURCE_LEGACY);
+  g_assert_true (audit.coexistence_observed);
+  g_assert_false (audit.writer_enabled);
+  g_assert_cmpuint (audit.pairing_write_count, ==, 0u);
+  g_assert_cmpuint (seam.acquire_count, ==, 1u);
+  goodix_runtime_coordinator_free (coordinator);
+  g_assert_cmpuint (seam.release_count, ==, 1u);
+
+  coordinator_make_otp (otp);
+  memset (validator, 0x44, sizeof validator);
+  live = (GoodixRuntimeCoordinatorLiveEvidence) {
+    .vid = 0x27c6u,
+    .pid = 0x5125u,
+    .chip_id = 0x2504u,
+    .app = "APP12509",
+    .a2_response = a2,
+    .a2_response_length = sizeof a2,
+    .chip_response = chip,
+    .chip_response_length = sizeof chip,
+    .otp = otp,
+    .otp_length = sizeof otp,
+    .live_validator = validator,
+    .live_validator_length = sizeof validator,
+  };
+  coordinator = goodix_runtime_coordinator_acquire (
+    &paths, &policy, &live, coordinator_legacy_acquire,
+    coordinator_legacy_release, &seam, &legacy_audit, &audit, &error);
+  g_assert_no_error (error);
+  g_assert_nonnull (coordinator);
+  g_assert_cmpint (audit.state_load_result, ==,
+                   GOODIX_SELF_STATE_LOAD_ABSENT);
+  g_assert_cmpint (audit.decision, ==,
+                   GOODIX_RUNTIME_COORDINATOR_DECISION_READY_LEGACY);
+  g_assert_cmpuint (seam.acquire_count, ==, 2u);
+  goodix_runtime_coordinator_free (coordinator);
+  g_assert_cmpuint (seam.release_count, ==, 2u);
+
+  coordinator_remove_directory (legacy_dir);
+  coordinator = goodix_runtime_coordinator_acquire (
+    &paths, &policy, NULL, coordinator_legacy_acquire,
+    coordinator_legacy_release, &seam, &legacy_audit, &audit, &error);
+  g_assert_null (coordinator);
+  g_assert_nonnull (error);
+  g_clear_error (&error);
+  g_assert_cmpint (audit.decision, ==,
+                   GOODIX_RUNTIME_COORDINATOR_DECISION_NEEDS_LIVE_PREFLIGHT);
+  g_assert_false (audit.writer_enabled);
+  g_assert_cmpuint (audit.pairing_write_count, ==, 0u);
+  g_assert_cmpuint (seam.acquire_count, ==, 2u);
+  coordinator_remove_directory (state_dir);
+  g_assert_cmpint (g_rmdir (root), ==, 0);
+}
+
+static void
+test_p5_coordinator_active_state (void)
+{
+  static const guint8 a2[] = { 0x11u, 0x22u, 0x33u };
+  static const guint8 chip[] = { 0x25u, 0x04u, 0x12u, 0x50u };
+  g_autofree gchar *root = g_dir_make_tmp ("goodix-coordinator.XXXXXX", NULL);
+  g_autofree gchar *state_dir = g_build_filename (root, "state", NULL);
+  g_autofree gchar *legacy_dir = g_build_filename (root, "legacy", NULL);
+  GoodixRuntimeCoordinatorPaths paths = { 0 };
+  GoodixRuntimeCoordinatorPolicy policy = { 0 };
+  GoodixRuntimeCoordinatorLiveEvidence live = { 0 };
+  GoodixRuntimeCoordinatorAudit audit;
+  GoodixRuntimeMaterialAudit legacy_audit;
+  GoodixSelfStateBinding binding = { 0 };
+  GoodixSelfStateRecord record = { 0 };
+  GoodixConfig90Calibration calibration;
+  GoodixSelfState *prepared = NULL;
+  GoodixRuntimeCoordinator *coordinator;
+  GoodixSecureSessionMaterial view;
+  CoordinatorLegacySeam seam = { 0 };
+  guint8 otp[GOODIX_CONFIG90_OTP_LENGTH];
+  guint8 config[GOODIX_CONFIG90_LENGTH];
+  guint8 validator[GOODIX_SELF_STATE_DIGEST_LENGTH];
+  guint8 psk[GOODIX_SELF_STATE_PSK_LENGTH];
+  GError *error = NULL;
+
+  g_assert_nonnull (root);
+  g_assert_cmpint (g_mkdir (state_dir, 0700), ==, 0);
+  coordinator_make_otp (otp);
+  for (guint i = 0; i < sizeof validator; i++)
+    {
+      validator[i] = (guint8) (0x20u + i);
+      psk[i] = (guint8) (0xa0u + i);
+    }
+  g_assert_true (goodix_config90_derive (0x2504u, otp, sizeof otp, config,
+                                         &calibration, NULL));
+  binding.vid = 0x27c6u;
+  binding.pid = 0x5125u;
+  binding.chip_profile = 0x2504u;
+  g_strlcpy (binding.app, "APP12509", sizeof binding.app);
+  production_digest (otp, sizeof otp, binding.otp_sha256);
+  production_digest (config, sizeof config, binding.config90_sha256);
+  record.phase = GOODIX_SELF_STATE_PREPARED;
+  record.generation = 1u;
+  memcpy (record.expected_validator, validator, sizeof validator);
+  record.fdt_present = TRUE;
+  memset (record.fdt_table, 0x5au, sizeof record.fdt_table);
+  goodix_self_state_policy_for_owner (&policy.state, getuid (), getgid ());
+  g_assert_true (goodix_self_state_write_prepared (
+    state_dir, &binding, &record, psk, &policy.state, NULL));
+  g_assert_cmpint (goodix_self_state_load (state_dir, &binding, &policy.state,
+                                           &prepared, NULL), ==,
+                   GOODIX_SELF_STATE_LOAD_VALID);
+  g_assert_true (goodix_self_state_promote_active (state_dir, prepared,
+                                                   &policy.state, NULL));
+  goodix_self_state_free (prepared);
+  paths.state_directory = state_dir;
+  paths.legacy.directory_path = legacy_dir;
+  policy.legacy.directory_owner_uid = getuid ();
+  policy.legacy.directory_owner_gid = getgid ();
+  policy.legacy.directory_mode = 0700;
+  live = (GoodixRuntimeCoordinatorLiveEvidence) {
+    .vid = 0x27c6u,
+    .pid = 0x5125u,
+    .chip_id = 0x2504u,
+    .app = "APP12509",
+    .a2_response = a2,
+    .a2_response_length = sizeof a2,
+    .chip_response = chip,
+    .chip_response_length = sizeof chip,
+    .otp = otp,
+    .otp_length = sizeof otp,
+    .live_validator = validator,
+    .live_validator_length = sizeof validator,
+  };
+  coordinator = goodix_runtime_coordinator_acquire (
+    &paths, &policy, &live, coordinator_legacy_acquire,
+    coordinator_legacy_release, &seam, &legacy_audit, &audit, &error);
+  g_assert_no_error (error);
+  g_assert_nonnull (coordinator);
+  g_assert_cmpint (audit.decision, ==,
+                   GOODIX_RUNTIME_COORDINATOR_DECISION_READY_ACTIVE);
+  g_assert_cmpint (audit.source, ==,
+                   GOODIX_RUNTIME_COORDINATOR_SOURCE_STATE_V2);
+  g_assert_false (audit.writer_enabled);
+  g_assert_cmpuint (audit.pairing_write_count, ==, 0u);
+  g_assert_cmpuint (seam.acquire_count, ==, 0u);
+  g_assert_true (goodix_runtime_coordinator_get_secure_view (
+    coordinator, &view, NULL));
+  g_assert_cmpmem (view.psk, view.psk_length, psk, sizeof psk);
+  g_assert_cmpmem (view.config90, view.config90_length, config, sizeof config);
+  goodix_runtime_coordinator_free (coordinator);
+  coordinator_remove_directory (state_dir);
+  g_assert_cmpint (g_rmdir (root), ==, 0);
+}
+
 static void
 production_set_config_finalizer (
   guint8 config[GOODIX_SECURE_SESSION_CONFIG90_LENGTH])
@@ -1349,9 +1642,10 @@ production_material_init (ProductionOpenSeam *seam)
 
 static gboolean
 production_acquire_seam (
-  GoodixRuntimeMaterial       **owner,
+  GoodixRuntimeCoordinator    **owner,
   GoodixSecureSessionMaterial  *secure_view,
   guint8                        fdt_seed[GOODIX_RUNTIME_FDT_SEED_LENGTH],
+  GoodixRuntimeCoordinatorAudit *coordinator_audit,
   GoodixRuntimeMaterialAudit   *audit,
   gpointer                      user_data,
   GError                      **error)
@@ -1367,6 +1661,10 @@ production_acquire_seam (
   g_assert_cmpuint (goodix_test_gusb_get_open_count (), ==,
                     seam->acquire_count);
   memset (audit, 0, sizeof *audit);
+  memset (coordinator_audit, 0, sizeof *coordinator_audit);
+  coordinator_audit->source = GOODIX_RUNTIME_COORDINATOR_SOURCE_LEGACY;
+  coordinator_audit->decision =
+    GOODIX_RUNTIME_COORDINATOR_DECISION_READY_LEGACY;
   memset (secure_view, 0, sizeof *secure_view);
   memset (fdt_seed, 0x80, GOODIX_RUNTIME_FDT_SEED_LENGTH);
   if (seam->fail_acquire)
@@ -1394,7 +1692,7 @@ production_acquire_seam (
                      secure_view->otp_a6_response_sha256);
   production_digest (seam->config, sizeof seam->config,
                      secure_view->config90_sha256);
-  *owner = (GoodixRuntimeMaterial *) g_malloc0 (1u);
+  *owner = (GoodixRuntimeCoordinator *) g_malloc0 (1u);
   if (seam->cancel_after_acquire)
     g_cancellable_cancel (
       fpi_device_get_cancellable (FP_DEVICE (seam->device)));
@@ -1402,8 +1700,8 @@ production_acquire_seam (
 }
 
 static void
-production_material_release_seam (GoodixRuntimeMaterial *owner,
-                                  gpointer               user_data)
+production_material_release_seam (GoodixRuntimeCoordinator *owner,
+                                  gpointer                  user_data)
 {
   ProductionOpenSeam *seam = user_data;
 
@@ -1538,23 +1836,21 @@ test_d279_08_production_open_close_ownership (void)
   TestFixture *f = production_fixture_new (&seam);
 
   fixture_open (f);
-  g_assert_true (goodix_device_context_has_runtime_material (f->ctx));
-  g_assert_true (goodix_device_context_has_usb_claim (f->ctx));
-  g_assert_cmpstr (seam.events->str, ==, "AC");
+  g_assert_false (goodix_device_context_has_runtime_material (f->ctx));
+  g_assert_false (goodix_device_context_has_usb_claim (f->ctx));
+  g_assert_cmpstr (seam.events->str, ==, "");
   fixture_close (f);
   g_assert_null (goodix_fpimage_device_get_context (f->device));
-  g_assert_cmpstr (seam.events->str, ==, "ACRF");
+  g_assert_cmpstr (seam.events->str, ==, "");
 
-  /* A second open on the same FpDevice creates a distinct owned epoch. */
+  /* Discovery/open remains inert on every logical open. */
   fixture_open (f);
   fixture_close (f);
-  g_assert_cmpstr (seam.events->str, ==, "ACRFACRF");
-  g_assert_cmpuint (seam.acquire_count, ==, 2u);
-  g_assert_cmpuint (seam.claim_count, ==, 2u);
-  g_assert_cmpuint (seam.interface_release_count, ==, 2u);
-  g_assert_cmpuint (seam.material_release_count, ==, 2u);
-  g_assert_cmpuint (goodix_test_gusb_get_open_count (), ==, 2u);
-  g_assert_cmpuint (goodix_test_gusb_get_close_count (), ==, 2u);
+  g_assert_cmpstr (seam.events->str, ==, "");
+  g_assert_cmpuint (seam.acquire_count, ==, 0u);
+  g_assert_cmpuint (seam.claim_count, ==, 0u);
+  g_assert_cmpuint (seam.interface_release_count, ==, 0u);
+  g_assert_cmpuint (seam.material_release_count, ==, 0u);
 
   test_fixture_free (f);
   production_seam_clear (&seam);
@@ -1567,46 +1863,57 @@ test_d279_08_production_open_failures (void)
   ProductionOpenSeam claim_failure = { .fail_claim = TRUE };
   ProductionOpenSeam cancelled = { .cancel_after_acquire = TRUE };
   g_autoptr(GCancellable) cancellable = NULL;
+  g_autoptr(FpPrint) template = NULL;
   TestFixture *f;
 
   f = production_fixture_new (&acquire_failure);
+  fixture_open (f);
+  template = fp_print_new (FP_DEVICE (f->device));
   f->done = FALSE;
-  fp_device_open (FP_DEVICE (f->device), NULL,
-                  (GAsyncReadyCallback) open_cb, f);
+  fp_device_enroll (FP_DEVICE (f->device), g_steal_pointer (&template), NULL,
+                    progress_cb, f, NULL, (GAsyncReadyCallback) enroll_cb, f);
   test_wait (f);
   g_assert_false (f->success);
   g_assert_error (f->error, G_IO_ERROR, G_IO_ERROR_FAILED);
   g_assert_cmpstr (acquire_failure.events->str, ==, "A");
-  g_assert_null (goodix_fpimage_device_get_context (f->device));
+  g_clear_error (&f->error);
+  fixture_close (f);
   test_fixture_free (f);
   production_seam_clear (&acquire_failure);
 
   f = production_fixture_new (&claim_failure);
+  fixture_open (f);
+  template = fp_print_new (FP_DEVICE (f->device));
   f->done = FALSE;
-  fp_device_open (FP_DEVICE (f->device), NULL,
-                  (GAsyncReadyCallback) open_cb, f);
+  fp_device_enroll (FP_DEVICE (f->device), g_steal_pointer (&template), NULL,
+                    progress_cb, f, NULL, (GAsyncReadyCallback) enroll_cb, f);
   test_wait (f);
   g_assert_false (f->success);
   g_assert_error (f->error, G_IO_ERROR, G_IO_ERROR_FAILED);
   g_assert_cmpstr (claim_failure.events->str, ==, "ACF");
   g_assert_cmpuint (claim_failure.material_release_count, ==, 1u);
   g_assert_cmpuint (claim_failure.interface_release_count, ==, 0u);
-  g_assert_null (goodix_fpimage_device_get_context (f->device));
+  g_clear_error (&f->error);
+  fixture_close (f);
   test_fixture_free (f);
   production_seam_clear (&claim_failure);
 
   f = production_fixture_new (&cancelled);
+  fixture_open (f);
   cancellable = g_cancellable_new ();
+  template = fp_print_new (FP_DEVICE (f->device));
   f->done = FALSE;
-  fp_device_open (FP_DEVICE (f->device), cancellable,
-                  (GAsyncReadyCallback) open_cb, f);
+  fp_device_enroll (FP_DEVICE (f->device), g_steal_pointer (&template),
+                    cancellable, progress_cb, f, NULL,
+                    (GAsyncReadyCallback) enroll_cb, f);
   test_wait (f);
   g_assert_false (f->success);
   g_assert_error (f->error, G_IO_ERROR, G_IO_ERROR_CANCELLED);
   g_assert_cmpstr (cancelled.events->str, ==, "AF");
   g_assert_cmpuint (cancelled.claim_count, ==, 0u);
   g_assert_cmpuint (cancelled.material_release_count, ==, 1u);
-  g_assert_null (goodix_fpimage_device_get_context (f->device));
+  g_clear_error (&f->error);
+  fixture_close (f);
   test_fixture_free (f);
   production_seam_clear (&cancelled);
 }
@@ -1616,8 +1923,28 @@ test_d279_08_production_release_failure (void)
 {
   ProductionOpenSeam seam = { .fail_release = TRUE };
   TestFixture *f = production_fixture_new (&seam);
+  g_autoptr(GCancellable) cancellable = g_cancellable_new ();
+  g_autoptr(FpPrint) template = NULL;
+  g_autoptr(GError) cancelled = NULL;
+  guint64 generation;
 
   fixture_open (f);
+  goodix_device_context_set_async_usb_submit_seam (
+    f->ctx, production_graph_submit_seam, &seam);
+  template = fp_print_new (FP_DEVICE (f->device));
+  f->done = FALSE;
+  fp_device_enroll (FP_DEVICE (f->device), g_steal_pointer (&template),
+                    cancellable, progress_cb, f, NULL,
+                    (GAsyncReadyCallback) enroll_cb, f);
+  generation = goodix_device_context_get_generation (f->ctx);
+  g_cancellable_cancel (cancellable);
+  cancelled = g_error_new_literal (G_IO_ERROR, G_IO_ERROR_CANCELLED,
+                                   "synthetic cancelled receive");
+  goodix_device_context_complete_receive (f->ctx, generation, NULL, 0,
+                                           cancelled);
+  test_wait (f);
+  g_assert_false (f->success);
+  g_clear_error (&f->error);
   f->done = FALSE;
   f->completion_count = 0;
   fp_device_close (FP_DEVICE (f->device), NULL,
@@ -1649,27 +1976,15 @@ test_login_prepare_deadline (void)
   ProductionOpenSeam seam = { 0 };
   TestFixture *f = production_fixture_new (&seam);
   gboolean started = FALSE, expired = FALSE;
-  g_autoptr(GError) cancelled = g_error_new_literal (
-    G_IO_ERROR, G_IO_ERROR_CANCELLED, "synthetic cancelled RX");
   fixture_open (f);
-  goodix_device_context_set_async_usb_submit_seam (
-    f->ctx, production_graph_submit_seam, &seam);
   g_signal_connect (f->device, "goodix-login-prepared", G_CALLBACK (login_expired), &expired);
   g_signal_emit_by_name (f->device, "goodix-login-prepare", &started);
-  g_assert_true (started);
-  guint64 generation = goodix_device_context_get_generation (f->ctx);
-  gint64 end = g_get_monotonic_time () + 12000000;
-  while (!expired && g_get_monotonic_time () < end)
-    {
-      g_main_context_iteration (NULL, FALSE);
-      g_usleep (1000);
-    }
-  g_assert_true (expired);
-  g_assert_true (goodix_device_context_get_poisoned (f->ctx));
+  g_assert_false (started);
+  g_assert_false (expired);
+  g_assert_false (goodix_device_context_get_poisoned (f->ctx));
   g_assert_cmpuint (seam.out_submit_count, ==, 0);
-  goodix_device_context_complete_receive (f->ctx, generation, NULL, 0, cancelled);
   fixture_close (f);
-  g_assert_cmpstr (seam.events->str, ==, "ACRF");
+  g_assert_cmpstr (seam.events->str, ==, "");
   test_fixture_free (f);
   production_seam_clear (&seam);
 }
@@ -1679,37 +1994,29 @@ test_login_prepare_close_pending_rx (void)
 {
   ProductionOpenSeam seam = { 0 };
   TestFixture *f = production_fixture_new (&seam);
-  g_autoptr(GError) cancelled = g_error_new_literal (
-    G_IO_ERROR, G_IO_ERROR_CANCELLED, "synthetic cancelled RX");
   gboolean started = FALSE;
   fixture_open (f);
-  goodix_device_context_set_async_usb_submit_seam (
-    f->ctx, production_graph_submit_seam, &seam);
   g_signal_emit_by_name (f->device, "goodix-login-prepare", &started);
-  g_assert_true (started);
-  guint64 generation = goodix_device_context_get_generation (f->ctx);
+  g_assert_false (started);
   g_assert_cmpint (fpi_device_get_current_action (FP_DEVICE (f->device)), ==,
                    FPI_DEVICE_ACTION_NONE);
-  g_assert_cmpuint (seam.acquire_count, ==, 1);
-  g_assert_cmpuint (seam.claim_count, ==, 1);
-  g_assert_cmpuint (seam.in_submit_count, ==, 1);
+  g_assert_cmpuint (seam.acquire_count, ==, 0);
+  g_assert_cmpuint (seam.claim_count, ==, 0);
+  g_assert_cmpuint (seam.in_submit_count, ==, 0);
   g_assert_cmpuint (seam.out_submit_count, ==, 0);
   g_signal_emit_by_name (f->device, "goodix-login-prepare", &started);
   g_assert_false (started);
-  g_assert_cmpuint (seam.in_submit_count, ==, 1);
+  g_assert_cmpuint (seam.in_submit_count, ==, 0);
   f->done = FALSE;
   fp_device_close (FP_DEVICE (f->device), NULL, (GAsyncReadyCallback) close_cb, f);
-  g_assert_false (f->done);
-  g_assert_cmpuint (seam.interface_release_count, ==, 0);
-  goodix_device_context_complete_receive (f->ctx, generation, NULL, 0, cancelled);
   test_wait (f);
   g_assert_true (f->success);
   g_assert_null (goodix_fpimage_device_get_context (f->device));
-  g_assert_cmpstr (seam.events->str, ==, "ACRF");
-  /* Ordinary next open obtains fresh resources; no prepared/poisoned carryover. */
+  g_assert_cmpstr (seam.events->str, ==, "");
+  /* Ordinary next open remains inert as well. */
   fixture_open (f);
   fixture_close (f);
-  g_assert_cmpstr (seam.events->str, ==, "ACRFACRF");
+  g_assert_cmpstr (seam.events->str, ==, "");
   test_fixture_free (f);
   production_seam_clear (&seam);
 }
@@ -2966,6 +3273,11 @@ main (int argc, char **argv)
   g_test_add_data_func ("/login/protocol-error-second", GUINT_TO_POINTER (23), test_login_series);
   g_test_add_func ("/login/prepare-close-drains-rx", test_login_prepare_close_pending_rx);
   g_test_add_func ("/login/preparation-deadline", test_login_prepare_deadline);
+
+  g_test_add_func ("/p5-coordinator/migration-selection",
+                   test_p5_coordinator_migration_selection);
+  g_test_add_func ("/p5-coordinator/active-state",
+                   test_p5_coordinator_active_state);
 
   g_test_add_func ("/goodix-fpimage-device/lifecycle-base-capture",
                    test_lifecycle_base_capture);

@@ -60,11 +60,13 @@ class RecoveryTests(unittest.TestCase):
         for name in self.m.MATERIAL_NAMES:
             self.write(self.m.MATERIAL / name, b'SYNTHETIC PRESERVED ' + name.encode(), 0o600)
         self.m.MATERIAL.chmod(0o700)
+        self.write(self.m.STATE / 'synthetic-reader-state', b'SYNTHETIC STATE', 0o600)
+        self.m.STATE.chmod(0o700)
         self.protected_before = self.preserved_snapshot()
         self.install_fixture()
 
     def bind(self, module):
-        for name in ('CONFIG', 'SUPPORT', 'RUNTIME', 'DROPIN', 'NORMAL', 'FORCE', 'RECOVERY', 'MATERIAL', 'MASK'):
+        for name in ('CONFIG', 'SUPPORT', 'RUNTIME', 'DROPIN', 'NORMAL', 'FORCE', 'RECOVERY', 'MATERIAL', 'STATE', 'MASK'):
             setattr(module, name, self.root / str(getattr(module, name)).lstrip('/'))
 
     def write(self, path, value, mode=0o644):
@@ -152,6 +154,7 @@ class RecoveryTests(unittest.TestCase):
 
     def preserved_snapshot(self):
         paths = [self.vendor, self.foreign_dropin, self.template,
+                 self.m.STATE / 'synthetic-reader-state',
                  *(self.m.MATERIAL / name for name in self.m.MATERIAL_NAMES)]
         return {path: (path.read_bytes(), stat.S_IMODE(path.stat().st_mode),
                        path.stat().st_uid, path.stat().st_gid, path.stat().st_mtime_ns)

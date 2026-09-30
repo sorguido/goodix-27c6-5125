@@ -111,6 +111,15 @@ gcc $strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_runtime_material.c" \
   -o "$build_dir/goodix_runtime_material.o"
 gcc $strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_config90.c" \
+  -o "$build_dir/goodix_config90.o"
+gcc $strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_self_state.c" \
+  -o "$build_dir/goodix_self_state.o"
+gcc $strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_runtime_coordinator.c" \
+  -o "$build_dir/goodix_runtime_coordinator.o"
+gcc $strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_secure_session.c" \
   -o "$build_dir/goodix_secure_session.o"
 gcc $strict_flags $glib_cflags $includes -c \
@@ -186,6 +195,9 @@ gcc -Wl,--gc-sections "$build_dir/metrics.o" -lstdc++ \
   "$build_dir/goodix_target_material.o" \
   "$build_dir/goodix_runtime_inputs.o" \
   "$build_dir/goodix_runtime_material.o" \
+  "$build_dir/goodix_config90.o" \
+  "$build_dir/goodix_self_state.o" \
+  "$build_dir/goodix_runtime_coordinator.o" \
   "$build_dir/goodix_secure_session.o" \
   "$build_dir/goodix_image_decoder.o" \
   "$build_dir/goodix_post_tls_lifecycle.o" \
@@ -266,6 +278,15 @@ gcc $san_strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_runtime_material.c" \
   -o "$build_dir/goodix_runtime_material_san.o"
 gcc $san_strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_config90.c" \
+  -o "$build_dir/goodix_config90_san.o"
+gcc $san_strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_self_state.c" \
+  -o "$build_dir/goodix_self_state_san.o"
+gcc $san_strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_runtime_coordinator.c" \
+  -o "$build_dir/goodix_runtime_coordinator_san.o"
+gcc $san_strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_secure_session.c" \
   -o "$build_dir/goodix_secure_session_san.o"
 gcc $san_strict_flags $glib_cflags $includes -c \
@@ -330,6 +351,9 @@ gcc $san_common -Wl,--gc-sections "$build_dir/metrics_san.o" -lstdc++ \
   "$build_dir/goodix_target_material_san.o" \
   "$build_dir/goodix_runtime_inputs_san.o" \
   "$build_dir/goodix_runtime_material_san.o" \
+  "$build_dir/goodix_config90_san.o" \
+  "$build_dir/goodix_self_state_san.o" \
+  "$build_dir/goodix_runtime_coordinator_san.o" \
   "$build_dir/goodix_secure_session_san.o" \
   "$build_dir/goodix_image_decoder_san.o" \
   "$build_dir/goodix_post_tls_lifecycle_san.o" \

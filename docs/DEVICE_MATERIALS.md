@@ -1,9 +1,10 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Device-specific material contract and acquisition reference
 
-The Goodix `27c6:5125` runtime consumes a five-file protected material bundle.
-For the first installation, when no installed material exists, the public
-installer expects the finished bundle in the standard staging directory:
+The five-file protected material bundle is the legacy compatibility source for
+the Goodix `27c6:5125` runtime during the state-v2 migration window. It is
+optional for a fresh host installation. When used, the public installer expects
+the finished bundle in the standard staging directory:
 
 ```text
 $HOME/goodix-5125-materials/
@@ -16,8 +17,10 @@ $HOME/goodix-5125-materials/
 
 If `/var/lib/goodix-5125-poc/` already contains a valid installed set, ordinary
 updates and reinstalls reuse it automatically; no Home staging copy is required.
-Otherwise, if you already have a valid five-file bundle for your reader, place those files
-there and continue with [Installation](INSTALLATION.md).
+Otherwise, if you already have a valid five-file bundle for your reader, place
+those files there and continue with [Installation](INSTALLATION.md). Without one,
+the installer prepares an empty root-only state-v2 location and does not access
+the reader.
 
 > [!TIP]
 > **Starting from zero? Use the Windows Material Builder.** The supported
@@ -25,8 +28,8 @@ there and continue with [Installation](INSTALLATION.md).
 > qualified Goodix OEM driver, and the original Windows user/DPAPI context for
 > that VM. Use the
 > [Goodix 5125 Windows Material Builder](../tools/windows_material_builder/README.md)
-> inside that VM to capture and prepare the complete five-file bundle required by
-> the Linux installer. Native or bare-metal Windows acquisition is outside the
+> inside that VM to capture and prepare the complete five-file bundle used by
+> the legacy Linux path. Native or bare-metal Windows acquisition is outside the
 > supported workflow.
 >
 > Part II below remains available as the manual acquisition and technical reference
@@ -43,7 +46,7 @@ not a reader-identity value.
 
 ## Supported release scope
 
-The supported Linux release **validates and consumes** an already prepared bundle.
+The legacy Linux path **validates and consumes** an already prepared bundle.
 The [Windows Material Builder](../tools/windows_material_builder/README.md) is the
 supported acquisition path for creating that bundle from the same reader inside
 its qualified Windows VM. That VM uses USB passthrough, the qualified Goodix OEM
@@ -259,9 +262,11 @@ authoritative drift: installation stops without falling back to the Home bundle.
 An ordinary update ignores any Home copy and never replaces the installed reader
 identity. An explicit `--materials` path must match the installed set byte-for-byte.
 
-The Home staging copy is not technically required after a successful installation.
-Keep an independent private backup: total material loss, reformatting or a new
-machine requires the original five-file bundle for that same reader again.
+The Home staging copy is not technically required after a successful legacy
+import. Keep an independent private backup while that compatibility path is in
+use. State-v2 lives separately at
+`/var/lib/fprint/goodix-5125-state-v2/`; install, update, reinstall and removal
+preserve it and never synthesize a legacy bundle from it.
 Another reader needs its own matching bundle. The installer does not regenerate
 missing material or obtain it over USB.
 

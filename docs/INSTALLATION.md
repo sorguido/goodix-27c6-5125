@@ -12,18 +12,19 @@ unsupported. See [validation](VALIDATION.md) for the qualification boundary.
 
 Use a working, supported Fedora installation with SELinux Enforcing, password
 login and ordinary sudo access. Finish authentication dialogs and close fingerprint settings.
-**Leave the reader connected and visible throughout installation and removal.**
-Keep your finger off it during administrative prompts.
+The reader may be absent during installation, update, reinstall and removal.
+When it is present, keep your finger off it during administrative prompts.
 
 You need Git, network access for the public clone and Fedora packages, and disk
-space for a native source build. When no installed material set exists, you also
-need a valid [device-material bundle](DEVICE_MATERIALS.md) for your own reader.
+space for a native source build. A legacy
+[device-material bundle](DEVICE_MATERIALS.md) is optional on a fresh install.
 The installer builds from the source you clone; it requires no previously compiled
 output. It does not obtain materials from the reader.
 
-## Prepare materials for the first installation
+## Optional legacy material for the migration window
 
-Skip this preparation when `/var/lib/goodix-5125-poc/` already holds the valid
+Skip this preparation for a new state-v2-only installation, or when
+`/var/lib/goodix-5125-poc/` already holds the valid
 material preserved by an earlier installation or removal. Updates and reinstalls
 validate and reuse that installed set automatically, even without a Home copy.
 
@@ -104,15 +105,19 @@ untouched and wait about 30 seconds for the
 password prompt. If password authentication is unavailable, stop; do not bypass it.
 
 The installer builds the Goodix library and Plasma Login selector as your normal
-user. It reuses valid installed material, or imports the first-install bundle into
-`/var/lib/goodix-5125-poc/` with root-only permissions and SELinux labels.
+user. It always creates or preserves
+`/var/lib/fprint/goodix-5125-state-v2/` as a root-only state location. It reuses
+valid installed legacy material, imports an optional first-install bundle into
+`/var/lib/goodix-5125-poc/`, or records a state-v2-only installation. It does not
+open the reader or initialize pairing.
 It installs the runtime and login entry, and
 `goodix-uninstall` and `goodix-force-remove` in the normal command search path.
 It quiesces fprintd during replacement and does not start a fingerprint test.
 Fedora's daemon, greeter and vendor authentication files remain package-owned.
 
 Expect **`GOODIX_BUILD=PASS`**, a **`GOODIX_INSTALL_MODE`** of **`FIRST_INSTALL`**,
-**`UPDATE`** or **`REINSTALL`**, and material validation success, followed by
+**`UPDATE`** or **`REINSTALL`**, and either `GOODIX_MATERIALS=LEGACY_VALID` or
+`GOODIX_MATERIALS=NONE_STATE_V2_READY`, followed by
 **`GOODIX_INSTALL=PASS`** with **`READER_PRESENT_ALLOWED=true`**, and finally
 **`GOODIX_INSTALL_BLOCK=PASS`**. Any error or missing final success marker means
 installation did not complete. Neither runtime nor either removal command needs the
@@ -122,9 +127,12 @@ copy is not technically required for ordinary updates or reinstalls as long as
 the preserved installed set remains valid. Keep an independent secure backup of
 the original bundle; do not delete your only backup.
 
-An invalid installed set stops the operation, even if a valid Home bundle exists.
-If both material sources are absent, the installer stops before installing packages
-or changing the project installation and requests the original five-file bundle.
+An invalid installed legacy set stops the operation, even if a valid Home bundle
+exists. If both sources are absent, a fresh install creates only the empty
+state-v2 root. At the current read-only coordinator gate, that state-only runtime
+does not perform self-initialization: an actual fingerprint action fails closed
+before claiming USB until the separately approved live qualification enables the
+initialization path. Password and desktop access remain available.
 
 Advanced users may clone elsewhere: the installer resolves its own location.
 `./install.sh --materials /some/other/path` allows another first-install staging
@@ -134,7 +142,7 @@ The standard procedure above needs no override.
 
 ## Enrollment and basic verification
 
-After successful installation, use KDE's normal fingerprint settings to manage
+After successful installation with an operational material source, use KDE's normal fingerprint settings to manage
 your enrolled fingers. If your finger is already enrolled, keep that enrollment;
 installation preserves existing templates. Otherwise enroll one finger following
 the normal prompts, without opening simultaneous fingerprint applications.
@@ -170,10 +178,9 @@ Never attach your five files, templates, fingerprint images or raw USB captures.
 ## What updates and reinstalls preserve
 
 The same bootstrap block checks dependencies and rebuilds from current source.
-Existing project software is replaced while fprintd is quiescent. A valid installed
-material set and existing
-templates are preserved; changing a reader's protected bundle is not an implicit
-update operation.
+Existing project software is replaced while fprintd is quiescent. State-v2, any
+valid installed legacy material set, and existing templates are preserved;
+changing a reader's protected identity is not an implicit update operation.
 
 After normal or emergency removal, the block reinstalls the software and
 restores its material labels. Existing templates remain available. Incompatible

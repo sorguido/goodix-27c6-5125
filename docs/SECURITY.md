@@ -18,13 +18,21 @@ or synthetic test does not by itself establish every real-system failure path.
 
 ## Protected input and biometric data
 
-Stage your five protected files in `$HOME/goodix-5125-materials/`, outside the
-clone. The installer imports them into a root-only runtime directory without
+If using the legacy migration path, stage your five protected files in
+`$HOME/goodix-5125-materials/`, outside the clone. The installer imports them into a root-only runtime directory without
 printing their contents. Installed device material is validated before use according to
 [the material contract](DEVICE_MATERIALS.md). The transport record contains an
 existing secret; the project neither generates nor distributes it. The OEM DLL
 is parsed for validated data, not loaded as executable code. The C runtime material loader and
-secure-session implementation cleanse their sensitive buffers.
+secure-session implementation cleanse their sensitive buffers. State-v2 stores
+its PSK and authenticated receipt in two crash-safe root-only generations under
+`/var/lib/fprint/goodix-5125-state-v2/`; removal preserves this directory.
+
+The runtime coordinator has no pairing-writer API. Discovery and ordinary open
+do not read protected material or claim USB. Only an explicit libfprint action
+may request runtime resources; state-v2 without the bounded live evidence needed
+to bind identity, OTP, generated CONFIG90 and the live validator fails closed
+before USB claim. The separately gated initialization writer remains disabled.
 
 Fingerprint images are processed in memory. Fedora fprintd stores enrolled
 templates in `/var/lib/fprint/`. Removal preserves templates and device material;

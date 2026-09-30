@@ -9,7 +9,7 @@
 #include "goodix_fpi_usb_backend.h"
 #include "goodix_secure_session.h"
 #include "goodix_post_tls_lifecycle.h"
-#include "goodix_runtime_material.h"
+#include "goodix_runtime_coordinator.h"
 #include "goodix_enrollment_fpi_usb_binding.h"
 
 G_BEGIN_DECLS
@@ -106,6 +106,7 @@ typedef struct
   guint terminal_enroll_completion_abort_count;
   gboolean terminal_enroll_completion_held;
   GoodixPreSessionRxSyncAudit pre_session_rx_sync;
+  GoodixRuntimeCoordinatorAudit runtime_coordinator;
   GoodixRuntimeMaterialAudit runtime_material;
   GoodixSecureSessionAudit secure;
   GoodixTlsAudit tls;
@@ -137,15 +138,16 @@ typedef void (*GoodixDeviceContextSecurePhaseObserver) (
 
 #ifdef GOODIX_ENABLE_TEST_SEAMS
 /* Offline-test seams for the production img_open/img_close boundary. */
-typedef gboolean (*GoodixRuntimeMaterialAcquireSeam) (
-  GoodixRuntimeMaterial       **owner,
+typedef gboolean (*GoodixRuntimeCoordinatorAcquireSeam) (
+  GoodixRuntimeCoordinator    **owner,
   GoodixSecureSessionMaterial  *secure_view,
   guint8                        fdt_seed[GOODIX_RUNTIME_FDT_SEED_LENGTH],
+  GoodixRuntimeCoordinatorAudit *coordinator_audit,
   GoodixRuntimeMaterialAudit   *audit,
   gpointer                      user_data,
   GError                      **error);
-typedef void (*GoodixRuntimeMaterialReleaseSeam) (
-  GoodixRuntimeMaterial *owner,
+typedef void (*GoodixRuntimeCoordinatorReleaseSeam) (
+  GoodixRuntimeCoordinator *owner,
   gpointer               user_data);
 typedef gboolean (*GoodixUsbInterfaceSeam) (
   GUsbDevice *usb_device,
@@ -181,8 +183,8 @@ GType fpi_device_goodix_27c6_5125_get_type (void) G_GNUC_CONST;
 GoodixDeviceContext * goodix_fpimage_device_get_context (GoodixFpImageDevice *dev);
 void goodix_fpimage_device_set_production_open_seams (
   GoodixFpImageDevice               *dev,
-  GoodixRuntimeMaterialAcquireSeam   acquire_material,
-  GoodixRuntimeMaterialReleaseSeam   release_material,
+  GoodixRuntimeCoordinatorAcquireSeam acquire_material,
+  GoodixRuntimeCoordinatorReleaseSeam release_material,
   GoodixUsbInterfaceSeam             claim_interface,
   GoodixUsbInterfaceSeam             release_interface,
   gpointer                           user_data);

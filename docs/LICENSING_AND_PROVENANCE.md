@@ -85,6 +85,11 @@ no USB transport or pairing-write implementation. Its legacy-import boundary
 accepts only already validated caller-owned material and leaves the original
 bundle untouched for rollback.
 
+`libfprint-driver/goodix_runtime_coordinator.[ch]` is project-authored. It
+combines the existing legacy loader, CONFIG90 derivation and state-v2 reader
+behind an activation-only, read-only selection boundary. It contains no USB
+transport, pairing writer or copied third-party implementation.
+
 ## Excluded material
 
 The Windows builder's [audit](../tools/windows_material_builder/AUDIT.md) records

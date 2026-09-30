@@ -48,6 +48,8 @@ libfprint-driver/goodix_pairing_crypto.c	LGPL-2.1-or-later	LOCAL_GOODIX
 libfprint-driver/goodix_pairing_crypto.h	LGPL-2.1-or-later	LOCAL_GOODIX
 libfprint-driver/goodix_runtime_inputs.c	LGPL-2.1-or-later	LOCAL_GOODIX
 libfprint-driver/goodix_runtime_inputs.h	LGPL-2.1-or-later	LOCAL_GOODIX
+libfprint-driver/goodix_runtime_coordinator.c	LGPL-2.1-or-later	LOCAL_GOODIX
+libfprint-driver/goodix_runtime_coordinator.h	LGPL-2.1-or-later	LOCAL_GOODIX
 libfprint-driver/goodix_runtime_material.c	LGPL-2.1-or-later	LOCAL_GOODIX
 libfprint-driver/goodix_runtime_material.h	LGPL-2.1-or-later	LOCAL_GOODIX
 libfprint-driver/goodix_secure_session.c	LGPL-2.1-or-later	LOCAL_GOODIX

@@ -38,6 +38,8 @@ class Selection(fixtures.MaterialFixture):
         for seam in (patch.object(installer, 'materials', fixtures.materials),
                      patch.object(installer.r, 'MATERIAL', self.installed),
                      patch.object(installer, 'software_paths', return_value=(self.software,)),
+                     patch.object(installer, 'installed_software_requires_legacy',
+                                  side_effect=lambda: self.software.exists()),
                      patch.object(installer, 'safe_parent'),
                      patch.object(installer.os, 'geteuid', return_value=0),
                      patch.object(fixtures.materials, 'validate_bundle', side_effect=validate)):
@@ -59,14 +61,10 @@ class Selection(fixtures.MaterialFixture):
         self.software.touch()
         self.assertEqual(self.select()[::2], ('UPDATE', True))
 
-    def test_no_material_requires_original_bundle(self):
+    def test_no_material_allows_fresh_state_v2_install(self):
         shutil.rmtree(self.source)
-        for remaining_software in (False, True):
-            if remaining_software:
-                self.software.touch()
-            with self.subTest(remaining_software=remaining_software), \
-                    self.assertRaisesRegex(RuntimeError, 'REASON=no_device_material_available.*five-file'):
-                self.select()
+        mode, bundle, reuse = self.select()
+        self.assertEqual((mode, bundle, reuse), ('FIRST_INSTALL', None, False))
         self.assertFalse(self.validated)
         self.assertFalse(self.installed.exists())
 
@@ -75,6 +73,13 @@ class Selection(fixtures.MaterialFixture):
         with self.assertRaisesRegex(RuntimeError, 'REASON=installed_material_missing'):
             self.select()
         self.assertFalse(self.validated)
+
+    def test_state_v2_update_does_not_require_legacy_bundle(self):
+        shutil.rmtree(self.source)
+        self.software.touch()
+        with patch.object(installer, 'installed_software_requires_legacy',
+                          return_value=False):
+            self.assertEqual(self.select(), ('UPDATE', None, False))
 
     def test_ordinary_selection_ignores_identical_different_invalid_or_absent_home(self):
         self.populate_installed()

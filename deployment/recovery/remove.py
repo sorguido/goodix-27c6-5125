@@ -22,6 +22,7 @@ NORMAL = Path('/usr/local/bin/goodix-uninstall')
 FORCE = Path('/usr/local/bin/goodix-force-remove')
 RECOVERY = Path('/usr/local/share/goodix-recovery')
 MATERIAL = Path('/var/lib/goodix-5125-poc')
+STATE = Path('/var/lib/fprint/goodix-5125-state-v2')
 MATERIAL_NAMES = ('target-material-manifest.json', 'transport-material.bin',
                   'target-config-90.bin', 'gfusb.dll', 'fdt-cache.bin')
 RULE = r'/var/lib/goodix-5125-poc(/.*)?'
@@ -339,7 +340,7 @@ def remove(force=False):
         print('Leave the reader connected. Report this final output before continuing.', file=sys.stderr)
         return 1
     print('GOODIX_REMOVAL=PASS GOODIX_PROJECT_IN_CRITICAL_AUTH_PATH=false FEDORA_CURRENT_STATE_EXPOSED=true')
-    print('Materials and fingerprint templates preserved. No Fedora files restored.')
+    print('Legacy materials, state-v2 and fingerprint templates preserved. No Fedora files restored.')
     print('Restart the computer normally to close any old authentication sessions.')
     return 0
 

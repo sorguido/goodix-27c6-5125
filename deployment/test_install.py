@@ -38,7 +38,7 @@ class Installer(unittest.TestCase):
         self.ctx = contextlib.ExitStack()
         self.addCleanup(self.ctx.close)
         self.ctx.enter_context(patch.object(m, 'ROOT', self.clone))
-        for key in ('CONFIG', 'SUPPORT', 'RUNTIME', 'DROPIN', 'MASK', 'NORMAL', 'FORCE', 'RECOVERY', 'MATERIAL'):
+        for key in ('CONFIG', 'SUPPORT', 'RUNTIME', 'DROPIN', 'MASK', 'NORMAL', 'FORCE', 'RECOVERY', 'MATERIAL', 'STATE'):
             path = self.host / str(getattr(m.r, key)).lstrip('/')
             path.parent.mkdir(parents=True, exist_ok=True)
             self.ctx.enter_context(patch.object(m.r, key, path))
@@ -113,7 +113,9 @@ class Installer(unittest.TestCase):
 
     def labels(self):
         self.assertFalse(self.active)
-        self.assertTrue(self.rule)
+        self.assertTrue(m.r.STATE.is_dir())
+        if m.r.MATERIAL.exists():
+            self.assertTrue(self.rule)
 
     def command(self, *args):
         args = tuple(str(a) for a in args)
@@ -195,6 +197,37 @@ class Installer(unittest.TestCase):
         self.assertIn('GOODIX_INSTALL_MODE=FIRST_INSTALL', self.stdout.getvalue())
         for value in self.bundle.files.values():
             self.assertNotIn(value.decode(), self.stdout.getvalue() + self.stderr.getvalue())
+
+    def test_fresh_install_without_bundle_or_reader_creates_only_empty_state_root(self):
+        shutil.rmtree(self.source)
+        shutil.rmtree(self.host / 'sys')
+        with patch.object(m.materials, 'validate_bundle',
+                          side_effect=AssertionError('legacy bundle unexpectedly read')), \
+                patch.object(m.materials, 'install_materials',
+                             side_effect=AssertionError('legacy bundle unexpectedly imported')):
+            self.apply()
+        self.assertIn('GOODIX_MATERIALS=NONE_STATE_V2_READY', self.stdout.getvalue())
+        self.assertFalse(m.r.MATERIAL.exists())
+        self.assertTrue(m.r.STATE.is_dir())
+        self.assertEqual(stat.S_IMODE(m.r.STATE.stat().st_mode), 0o700)
+        receipt = json.loads((m.r.RUNTIME / 'installation.json').read_bytes())
+        self.assertEqual(receipt['material_mode'], 'state-v2')
+        self.assertIsNone(receipt['material_selinux'])
+        self.assertFalse(any('/dev/bus/usb' in part or '/sys/bus/usb' in part
+                             for event in self.events for part in event))
+
+    def test_state_v2_only_update_reinstall_and_removal_preserve_state(self):
+        shutil.rmtree(self.source)
+        self.apply()
+        sentinel = m.r.STATE / 'synthetic-reader-state'
+        sentinel.write_bytes(b'SYNTHETIC STATE SENTINEL')
+        sentinel.chmod(0o600)
+        self.apply()
+        self.assertEqual(sentinel.read_bytes(), b'SYNTHETIC STATE SENTINEL')
+        self.assertEqual(m.r.remove(), 0)
+        self.assertEqual(sentinel.read_bytes(), b'SYNTHETIC STATE SENTINEL')
+        self.apply()
+        self.assertEqual(sentinel.read_bytes(), b'SYNTHETIC STATE SENTINEL')
 
     def test_update_without_home_bundle_preserves_inodes(self):
         self.apply()
@@ -433,7 +466,7 @@ class Installer(unittest.TestCase):
                 __import__('importlib').machinery.SourceFileLoader('standalone_installed', str(installed)))
             module = importlib.util.module_from_spec(installed_spec)
             installed_spec.loader.exec_module(module)
-            for key in ('CONFIG', 'SUPPORT', 'RUNTIME', 'DROPIN', 'MASK', 'NORMAL', 'FORCE', 'RECOVERY', 'MATERIAL'):
+            for key in ('CONFIG', 'SUPPORT', 'RUNTIME', 'DROPIN', 'MASK', 'NORMAL', 'FORCE', 'RECOVERY', 'MATERIAL', 'STATE'):
                 setattr(module, key, getattr(m.r, key))
             module.command = self.command
             module.trusted = self.trusted

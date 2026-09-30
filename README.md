@@ -24,12 +24,15 @@ Qualification is limited to the documented target and one reader; see
 `install.sh` automatically selects first installation (`FIRST_INSTALL`), update
 (`UPDATE`) or reinstall (`REINSTALL`), builds the runtime from this source tree,
 and installs the login integration and removal commands. It requests normal
-sudo authentication when needed. The reader stays connected throughout.
+sudo authentication when needed. The reader may be absent throughout these
+host lifecycle operations.
 
-You need a working password login and administrative access. The first installation,
-when no valid installed material exists, also needs your own
-[five-file device-material bundle](docs/DEVICE_MATERIALS.md). If you do not
-already have that bundle, the supported acquisition environment is a qualified
+You need a working password login and administrative access. A fresh installation
+does not require a reader or a legacy material bundle: it creates the empty,
+root-only state-v2 location without opening USB. During the migration window, an
+existing [five-file device-material bundle](docs/DEVICE_MATERIALS.md) remains a
+supported compatibility source. If you need that legacy source, its supported
+acquisition environment is a qualified
 Windows VM with USB passthrough, the qualified Goodix OEM driver, and the original
 Windows user/DPAPI context for that VM. Place the finished files in
 `$HOME/goodix-5125-materials/`, outside the clone. The project does not distribute
@@ -81,15 +84,19 @@ instruction. It cannot repair an independently broken Fedora authentication stac
 
 ## Device material and security
 
-On first installation, the installer copies the protected bundle into
-`/var/lib/goodix-5125-poc/`, sets root-only permissions and applies the required
-SELinux labels. Subsequent runs validate and preserve that installed set; invalid
+The installer always creates or preserves root-only state-v2 under
+`/var/lib/fprint/goodix-5125-state-v2/`. If a legacy bundle is supplied, it is
+copied into `/var/lib/goodix-5125-poc/`, protected and retained as a migration
+source. Subsequent runs validate and preserve an installed legacy set; invalid
 installed material stops the operation without falling back to a Home copy. Keep materials,
 fingerprint images, templates and raw USB captures out of source trees and
 issue reports. [Security and privacy](docs/SECURITY.md) describes the boundary.
 
-The supported path excludes flashing, firmware replacement, PSK provisioning,
-OTP writes and persistent factory changes. Compatibility with future Fedora
+The production coordinator is read-only with respect to pairing at the current
+host/VM gate: ordinary open/discovery performs no material read or USB claim,
+and a state-only activation fails closed pending the separately gated live
+preflight. The supported path excludes flashing, firmware replacement, OTP
+writes and persistent factory changes. Compatibility with future Fedora
 releases, other Windows VM/OEM configurations, and broader hardware remains
 outside the qualified scope.
 
