@@ -63,6 +63,11 @@ After the write it requires:
 - `BB020003 == SHA256(BB010003)`
 - immediate TLS 1.2 PSK handshake using `PSK-AES128-GCM-SHA256`
 
+Each outbound TLS `B0` record is followed by a 10 ms processing interval. This
+matches the qualified reference implementation and the inter-record interval
+observed in the Windows OEM capture; sending the ServerHello flight records
+back-to-back caused the target to stop before ClientKeyExchange.
+
 The generated PSK is never printed and never persisted.
 
 The current pre-write gate is pairing E, established by Windows A recovery:

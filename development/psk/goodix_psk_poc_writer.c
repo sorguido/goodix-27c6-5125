@@ -168,6 +168,18 @@ static int64_t monotonic_ms(void)
     return (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 }
 
+static int sleep_10ms(void)
+{
+    struct timespec delay = {0, 10 * 1000 * 1000};
+
+    while (nanosleep(&delay, &delay) != 0) {
+        if (errno != EINTR)
+            return -1;
+    }
+
+    return 0;
+}
+
 static void put_le32(uint8_t *p, uint32_t v)
 {
     p[0] = (uint8_t)v;
@@ -518,11 +530,8 @@ static int read_firmware(libusb_device_handle *h)
     if (send_nop(h) != 0)
         return -1;
 
-    {
-        struct timespec ts = {0, 10 * 1000 * 1000};
-        if (nanosleep(&ts, NULL) != 0)
-            return -1;
-    }
+    if (sleep_10ms() != 0)
+        return -1;
 
     if (build_and_send_read_control(h, CTRL_A8, req, sizeof(req)) != 0)
         return -1;
@@ -1131,6 +1140,10 @@ static int drain_tls_output(libusb_device_handle *h, SSL *ssl)
 
         OPENSSL_cleanse(record, record_len);
         free(record);
+
+        /* Match the OEM and qualified reference inter-record pacing. */
+        if (sleep_10ms() != 0)
+            return -1;
     }
 
     return 0;
