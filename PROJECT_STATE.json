@@ -9,7 +9,7 @@
   },
   "execution_path": "PRIMARY",
   "phase": "P2",
-  "phase_status": "NOT_STARTED",
+  "phase_status": "HUMAN_REQUIRED",
   "completed_gates": [
     "SELF_CONTAINED_ARCHITECTURE_APPROVAL",
     "ARTIFACT_INDEX_BASELINE_RECONCILED",
@@ -96,9 +96,20 @@
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "Execute ROADMAP P2: inspect all legitimate CONFIG90/OTP and BB010002 evidence available in the repository, implement a pure fail-closed type-12 CONFIG90 derivation and a narrow structural BB010002 parser, and prove exact differential and negative offline coverage without adding a dummy pairing value.",
-  "last_verified_head": "4edfd5cb34c98eea1c704e081a1720fece237889",
-  "state_note": "P0A is reconciled and P1 pairing crypto is accepted offline. The P1 module is not used by any runtime path; integration remains deferred to later roadmap phases. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
+  "next_action": "Await explicit P2 approval for read-only offline access to the local protected CONFIG90/OTP/BB010002 evidence and for an attributed GPL-2.0-or-later adaptation of the Rockytkg type-12 template/patch facts; then implement and verify P2 without USB, privileges or writes to private evidence.",
+  "active_human_gate": {
+    "gate": "P2_PROTECTED_EVIDENCE_AND_GPL_TEMPLATE_APPROVAL",
+    "reason": "Exact CONFIG90 differential proof and generalized BB010002 acceptance require local protected evidence; the only available type-12 template implementation is GPL-2.0-or-later and its adaptation requires an explicit per-file licensing decision.",
+    "excluded": [
+      "USB_OR_SENSOR_ACCESS",
+      "SUDO_OR_ROOT",
+      "PSK_EXTRACTION_OR_DISCLOSURE",
+      "FIRMWARE_OR_OTP_WRITE",
+      "PAIRING_WRITE"
+    ]
+  },
+  "last_verified_head": "b284882618b329ff41ab4c75e368411460948e48",
+  "state_note": "P0A is reconciled and P1 pairing crypto is accepted offline. P2 stopped before opening protected local evidence or making a GPL template adaptation. The P1 module is not used by any runtime path; integration remains deferred to later roadmap phases. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }
