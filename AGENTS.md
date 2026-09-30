@@ -169,27 +169,55 @@ Una suite verde, un commit o un nuovo artefatto non provano da soli avanzamento 
 
 ## 4. Git e integrità del worktree
 
-Branch operativo scrivibile:
+Il branch operativo è **sempre il branch correntemente selezionato dall'Utente
+nell'ambiente di lavoro**.
 
 ```text
-development
+OPERATIONAL_BRANCH = CURRENT_CHECKED_OUT_BRANCH
+AI_MUST_NOT_SWITCH_BRANCH_AUTONOMOUSLY = true
 ```
 
 Prima di modificare file:
 
-- determina Git root, branch, HEAD e `git status --short`;
-- se il branch corrente non è `development`, non cambiare branch autonomamente e termina con `HUMAN_REQUIRED`;
-- tratta un worktree sporco come possibile lavoro valido: ricostruiscine provenienza e intento prima di toccarlo.
+- determina Git root, branch corrente, HEAD e `git status --short`;
+- non assumere il branch dal default remoto, da `PROJECT_STATE.json`, dalla
+  roadmap, dalla sessione precedente o dal nome del task;
+- non eseguire checkout/switch autonomamente per raggiungere un branch ritenuto
+  più appropriato;
+- tratta un worktree sporco come possibile lavoro valido: ricostruiscine
+  provenienza e intento prima di toccarlo.
 
-Su `development` sono consentiti, quando coerenti con il task e la roadmap:
+Se l'ambiente espone in modo univoco il branch corrente, quel branch è il
+boundary Git operativo scelto dall'Utente e sono consentiti, quando coerenti con
+task, roadmap e altri gate:
 
 - modifiche normali;
 - commit normali;
-- push normali a `origin/development`.
+- push normali verso il corrispondente branch remoto.
 
-`main` è read-only per l'agente autonomo e può essere letto/confrontato, in particolare durante P10-P11. Qualunque write/commit/push/merge/rebase/update-ref verso `main` richiede una decisione umana separata.
+Nessun nome di branch, incluso `main` o `development`, è intrinsecamente
+scrivibile o read-only nella governance generale: vale il branch corrente
+selezionato dall'Utente.
 
-Gli altri branch sono read-only salvo autorizzazione esplicita dell'Utente.
+Se il branch corrente **non è determinabile con certezza**, oppure l'ambiente
+presenta segnali discordanti sul branch operativo, fermarsi prima di qualunque
+modifica Git con:
+
+```text
+HUMAN_REQUIRED
+GATE=BRANCH_SELECTION_REQUIRED
+PURPOSE=Determinare il branch operativo scelto dall'Utente
+EXPECTED_RESULT=Nome univoco del branch da usare
+COMMANDS=N/A
+RISK=Scrivere o pubblicare sul branch sbagliato
+ROLLBACK=N/A
+EVIDENCE_TO_RETURN=Nome esatto del branch operativo
+```
+
+Questo vale in particolare per ambienti/chat che non espongono il branch
+correntemente selezionato. La risposta dell'Utente risolve l'ambiguità ma non
+autorizza l'agente a cambiare branch autonomamente: il branch deve risultare
+selezionato nell'ambiente operativo prima di procedere.
 
 Senza autorizzazione esplicita sono vietati:
 
@@ -362,7 +390,7 @@ Principio operativo:
 safety forte
 + evidence-first
 + target reale verificato
-+ development recuperabile
++ branch corrente scelto dall'Utente e recuperabile
 + roadmap canonica e state cache ricostruibile
 + Human Gate espliciti
 + documentazione con ownership chiara
