@@ -288,6 +288,14 @@ binding and may select a matching state-v2 generation. A state-only activation
 without that evidence fails before USB claim. The production pairing writer
 remains absent.
 
+The bounded read-only preflight applies to both a direct enrollment action and
+the identify action that stock fprintd uses as its enrollment duplicate check.
+It validates the target, reads `BB010002` and the current `BB020003` validator,
+and derives CONFIG90 before the strict secure session is allowed to rely on
+legacy pairing state. A structurally valid `BB020003` record whose 32-byte value
+differs from the expected validator is a pairing-state mismatch, not a malformed
+typed response; it fails closed before TLS or runtime configuration writes.
+
 The host-only state-v2 boundary uses two fixed-size generations. Each generation
 contains a 32-byte PSK record and a receipt authenticated by that PSK. The
 receipt binds VID:PID, exact application, chip profile, OTP digest and CONFIG90

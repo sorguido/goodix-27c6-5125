@@ -182,6 +182,8 @@ GoodixFpImageDevice * goodix_fpimage_device_new_for_usb (GUsbDevice *usb_device)
 GType fpi_device_goodix_27c6_5125_get_type (void) G_GNUC_CONST;
 
 #ifdef GOODIX_ENABLE_TEST_SEAMS
+gboolean goodix_fpimage_device_test_action_requires_live_preflight (
+  FpiDeviceAction action);
 GoodixDeviceContext * goodix_fpimage_device_get_context (GoodixFpImageDevice *dev);
 void goodix_fpimage_device_set_production_open_seams (
   GoodixFpImageDevice               *dev,

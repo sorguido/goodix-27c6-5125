@@ -9,7 +9,7 @@
   },
   "execution_path": "PRIMARY",
   "phase": "P6",
-  "phase_status": "AWAITING_LIVE_EVIDENCE",
+  "phase_status": "HUMAN_REQUIRED",
   "completed_gates": [
     "SELF_CONTAINED_ARCHITECTURE_APPROVAL",
     "ARTIFACT_INDEX_BASELINE_RECONCILED",
@@ -80,18 +80,20 @@
       "P6_READ_ONLY_PREFLIGHT_INTEGRATED_OFFLINE",
       "P6_ZERO_SEED_HANDOFF_INTEGRATED_OFFLINE",
       "P6_ONE_SHOT_PAIRING_BOUNDARY_OFFLINE",
-      "P6_LIVE_E4_TYPED_RESPONSE_CONTRACT_MISMATCH"
+      "P6_LIVE_E4_TYPED_RESPONSE_CONTRACT_MISMATCH",
+      "P6_LIVE_E4_VALIDATOR_DIFFERS_FROM_LEGACY_MATERIAL",
+      "P6_E4_STATE_MISMATCH_CLASSIFICATION_OFFLINE",
+      "P6_IDENTIFY_READ_ONLY_PREFLIGHT_ROUTE_OFFLINE"
     ],
     "inferred": [
       "REPEATED_REUSE_OF_SAME_LINUX_PSK_AFTER_WINDOWS_RETURN",
       "L1_W1_L1_W2_L1_STABLE_PING_PONG",
-      "ZERO_SEED_FDT_BOOTSTRAP_ON_REAL_TARGET",
-      "P6_LIVE_E4_VALIDATOR_DIFFERS_FROM_LEGACY_MATERIAL"
+      "ZERO_SEED_FDT_BOOTSTRAP_ON_REAL_TARGET"
     ],
     "initial_blockers": []
   },
   "current_blockers": [
-    "P6_LIVE_E4_CONTRACT_COMPONENT_NOT_YET_DISCRIMINATED"
+    "P6_READ_ONLY_PREFLIGHT_LIVE_CONFIRMATION_PENDING"
   ],
   "host_modified": false,
   "relevant_artifacts": [
@@ -139,9 +141,9 @@
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "Install the component-level E4 diagnostic update and repeat the same bounded no-finger fprintd-enroll exactly once. Return the single GOODIX_PRODUCTION_EPOCH_AUDIT line containing secure_e4_contract. Do not repeat after that result, touch the sensor, journal PREPARED or enable E0.",
-  "last_verified_head": "f7554fac0d1572f3562980942883f7a39a449708",
-  "state_note": "P0A through P5 are accepted. LIVE_NO_FINGER_APPROVAL is active for bounded P6 execution. The latest target attempt installed source ID bffcf2cc9c9330aeb8276c152c9cf2a0994607ad9c26b969e000165986ab457e with LEGACY_VALID and entered fprintd's IDENTIFY-for-enroll precheck, not ENROLL. Evidence now proves a typed E4 contract failure after successful A2/A8: secure_commands=3, secure_acks=3, secure_typed=2, secure_phase=E4, secure_failure_kind=TYPED_SHAPE_MISMATCH, secure_control=228 and secure_body_length=41. TLS and the enrollment-only preflight were not reached; persistent=0, pairing_writer=0, pairing_writes=0, outstanding=0, drained=1 and context_closed=1. A differing live validator is the leading inference, but prefix, validator and digest were not separately observable. The candidate adds only a sanitized E4 component classification; no response bytes, hashes or secrets are logged. PREPARED and E0 remain unreachable. Firmware/IAP/ClearApp/OTP/factory writes, biometric tests and any E0 retry remain excluded. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
+  "next_action": "After a new explicit HUMAN_REQUIRED approval, install the offline-qualified candidate on the physical Fedora 44 KDE target and run one no-finger fprintd-enroll diagnostic. The fprintd IDENTIFY precheck must execute the complete seven-command read-only preflight; on the already observed E4 state mismatch it must stop before secure-session TLS or runtime configuration writes. Return the client result, the specific fprintd error and the single GOODIX_PRODUCTION_EPOCH_AUDIT line. Do not repeat, touch the sensor, journal PREPARED or enable E0.",
+  "last_verified_head": "b1a8adfc8c3adcabfdeeff86e0e364754be5e7ca",
+  "state_note": "P0A through P5 are accepted. The previous LIVE_NO_FINGER approval was consumed by the single target attempt described here; a new explicit gate is required. The installed b1a8adf candidate (SOURCE_ID d4aba6a7ce36fedd0cb404527335e364342e7794a499165073441dca8aa9c516) entered fprintd's IDENTIFY-for-enroll precheck and proved a typed E4 response with control 0xE4, canonical 41-byte BB020003 shape and a 32-byte value different from the qualified legacy validator. This is a pairing-state value mismatch, not a response-shape failure; the live bytes remain undisclosed and no replacement validator is inferred. The offline candidate classifies it as TYPED_VALUE_MISMATCH with a precise redacted error and routes both direct ENROLL and fprintd's IDENTIFY duplicate precheck through the complete read-only preflight before any strict legacy secure session. Normal and ASan/UBSan component and 61-case image-device suites pass offline with REAL_USB_ACCESS=0. The compiled production E0 module has zero runtime callers. PREPARED, TLS, CONFIG write, FDT learning and E0 remain unreachable on this mismatch path. Firmware/IAP/ClearApp/OTP/factory writes, biometric tests and any E0 retry remain excluded. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }

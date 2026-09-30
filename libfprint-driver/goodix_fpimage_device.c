@@ -251,6 +251,16 @@ static gboolean default_acquire_runtime_material_with_live (
   GoodixRuntimeMaterialAudit                 *audit,
   GError                                    **error);
 
+static gboolean
+production_action_requires_live_preflight (FpiDeviceAction action)
+{
+  /* Stock fprintd starts enrollment with an IDENTIFY duplicate check.  That
+   * read-only epoch must establish the P6 live boundary before the strict
+   * legacy secure session can assume that its stored pairing is still live. */
+  return action == FPI_DEVICE_ACTION_ENROLL ||
+         action == FPI_DEVICE_ACTION_IDENTIFY;
+}
+
 static void
 context_protocol_failure (GoodixDeviceContext *ctx,
                           const GError        *error)
@@ -507,17 +517,24 @@ production_live_preflight_accept_legacy (
 {
   if (ctx->runtime_material == NULL ||
       goodix_runtime_coordinator_get_source (ctx->runtime_material) !=
-        GOODIX_RUNTIME_COORDINATOR_SOURCE_LEGACY ||
-      ctx->runtime_secure_view.config90 == NULL ||
+        GOODIX_RUNTIME_COORDINATOR_SOURCE_LEGACY)
+    {
+      g_set_error_literal (
+        error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_PROTO,
+        "read-only live preflight has no qualified legacy owner");
+      return FALSE;
+    }
+  if (ctx->runtime_secure_view.config90 == NULL ||
       ctx->runtime_secure_view.config90_length != sizeof evidence->config90 ||
       CRYPTO_memcmp (ctx->runtime_secure_view.config90, evidence->config90,
-                     sizeof evidence->config90) != 0 ||
-      ctx->runtime_secure_view.e4_validator == NULL ||
-      ctx->runtime_secure_view.e4_validator_length !=
-        sizeof evidence->validator ||
-      CRYPTO_memcmp (ctx->runtime_secure_view.e4_validator,
-                     evidence->validator, sizeof evidence->validator) != 0 ||
-      !production_digest_matches (
+                     sizeof evidence->config90) != 0)
+    {
+      g_set_error_literal (
+        error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_PROTO,
+        "generated CONFIG90 differs from the qualified legacy boundary");
+      return FALSE;
+    }
+  if (!production_digest_matches (
         evidence->a2_response, sizeof evidence->a2_response,
         ctx->runtime_secure_view.a2_response_sha256) ||
       !production_digest_matches (
@@ -529,7 +546,18 @@ production_live_preflight_accept_legacy (
     {
       g_set_error_literal (
         error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_PROTO,
-        "read-only live evidence differs from the qualified legacy boundary");
+        "read-only target evidence differs from the qualified legacy boundary");
+      return FALSE;
+    }
+  if (ctx->runtime_secure_view.e4_validator == NULL ||
+      ctx->runtime_secure_view.e4_validator_length !=
+        sizeof evidence->validator ||
+      CRYPTO_memcmp (ctx->runtime_secure_view.e4_validator,
+                     evidence->validator, sizeof evidence->validator) != 0)
+    {
+      g_set_error_literal (
+        error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_PROTO,
+        "read-only live E4 validator differs from the qualified legacy pairing state");
       return FALSE;
     }
 
@@ -664,8 +692,8 @@ production_activation_start_live_preflight (GoodixDeviceContext *ctx)
 {
   if (ctx == NULL || ctx->terminal_fence || ctx->operator_epoch ||
       ctx->live_preflight != NULL || !ctx->usb_interface_claimed ||
-      fpi_device_get_current_action (FP_DEVICE (ctx->device)) !=
-        FPI_DEVICE_ACTION_ENROLL)
+      !production_action_requires_live_preflight (
+        fpi_device_get_current_action (FP_DEVICE (ctx->device))))
     return;
   ctx->live_preflight = goodix_live_preflight_new (
     &ctx->live_preflight_audit);
@@ -726,8 +754,8 @@ context_pre_session_sync_completed (GoodixFpiUsbBackend *backend,
               ctx->fpi_usb_backend);
           if (!ctx->operator_epoch)
             {
-              if (fpi_device_get_current_action (FP_DEVICE (ctx->device)) ==
-                    FPI_DEVICE_ACTION_ENROLL
+              if (production_action_requires_live_preflight (
+                    fpi_device_get_current_action (FP_DEVICE (ctx->device)))
 #ifdef GOODIX_ENABLE_TEST_SEAMS
                   && !ctx->bypass_live_preflight_for_material_seam
 #endif
@@ -777,6 +805,13 @@ context_pre_session_sync_completed (GoodixFpiUsbBackend *backend,
 }
 
 #ifdef GOODIX_ENABLE_TEST_SEAMS
+gboolean
+goodix_fpimage_device_test_action_requires_live_preflight (
+  FpiDeviceAction action)
+{
+  return production_action_requires_live_preflight (action);
+}
+
 GoodixUsbRouter *
 goodix_device_context_get_usb_router (GoodixDeviceContext *ctx)
 {

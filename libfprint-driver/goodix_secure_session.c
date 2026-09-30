@@ -153,6 +153,7 @@ goodix_protocol_failure_kind_name (GoodixProtocolFailureKind kind)
     "ACK_SHAPE_MISMATCH",
     "TYPED_CONTROL_MISMATCH",
     "TYPED_SHAPE_MISMATCH",
+    "TYPED_VALUE_MISMATCH",
     "UNEXPECTED_OUTER_CLASS",
     "MALFORMED_FRAME",
   };
@@ -934,14 +935,51 @@ check_e4_contract (const guint8 *body,
                    const guint8  expected_validator[32],
                    const guint8  expected_validator_sha256[32]);
 
+static GoodixProtocolFailureKind
+e4_contract_failure_kind (GoodixE4ContractResult result)
+{
+  switch (result)
+    {
+    case GOODIX_E4_CONTRACT_VALIDATOR_MISMATCH:
+    case GOODIX_E4_CONTRACT_DIGEST_MISMATCH:
+      return GOODIX_PROTOCOL_FAILURE_TYPED_VALUE_MISMATCH;
+    default:
+      return GOODIX_PROTOCOL_FAILURE_TYPED_SHAPE_MISMATCH;
+    }
+}
+
+static const gchar *
+e4_contract_failure_message (GoodixE4ContractResult result)
+{
+  switch (result)
+    {
+    case GOODIX_E4_CONTRACT_BODY_LENGTH_MISMATCH:
+      return "E4 typed response length differs from the BB020003 contract";
+    case GOODIX_E4_CONTRACT_PREFIX_MISMATCH:
+      return "E4 typed response is not a BB020003 validator record";
+    case GOODIX_E4_CONTRACT_VALIDATOR_MISMATCH:
+      return "E4 live validator differs from the expected pairing state";
+    case GOODIX_E4_CONTRACT_DIGEST_MISMATCH:
+      return "E4 expected-validator digest contract failed";
+    case GOODIX_E4_CONTRACT_NOT_EVALUATED:
+      return "E4 typed response contract could not be evaluated";
+    case GOODIX_E4_CONTRACT_MATCH:
+    default:
+      return "phase-specific A0 response contract failed";
+    }
+}
+
 static gboolean
 validate_typed (GoodixSecureSession *session,
-                guint8               control,
-                const guint8        *body,
-                gsize                body_length)
+                guint8              control,
+                const guint8       *body,
+                gsize               body_length,
+                GoodixE4ContractResult *e4_result)
 {
   guint8 expected_control = phase_control (session->phase);
 
+  if (e4_result != NULL)
+    *e4_result = GOODIX_E4_CONTRACT_NOT_EVALUATED;
   if (control != expected_control)
     return FALSE;
   switch (session->phase)
@@ -960,6 +998,8 @@ validate_typed (GoodixSecureSession *session,
             body, body_length, session->e4_validator,
             session->material.e4_validator_sha256);
 
+        if (e4_result != NULL)
+          *e4_result = result;
         if (session->audit != NULL)
           session->audit->e4_contract_result = result;
         return result == GOODIX_E4_CONTRACT_MATCH;
@@ -1022,6 +1062,18 @@ goodix_secure_session_test_check_e4_contract (
   return check_e4_contract (body, body_length, expected_validator,
                             expected_validator_sha256);
 }
+
+GoodixProtocolFailureKind
+goodix_secure_session_test_e4_failure_kind (GoodixE4ContractResult result)
+{
+  return e4_contract_failure_kind (result);
+}
+
+const gchar *
+goodix_secure_session_test_e4_failure_message (GoodixE4ContractResult result)
+{
+  return e4_contract_failure_message (result);
+}
 #endif
 
 void
@@ -1033,6 +1085,9 @@ goodix_secure_session_handle_a0 (GoodixSecureSession *session,
   gsize body_length;
   const guint8 *body;
   guint8 expected;
+  GoodixE4ContractResult e4_result = GOODIX_E4_CONTRACT_NOT_EVALUATED;
+  const gchar *contract_failure_message =
+    "phase-specific A0 response contract failed";
 
   if (session == NULL || frame == NULL ||
       session->phase == GOODIX_SECURE_PHASE_TERMINAL)
@@ -1145,10 +1200,19 @@ goodix_secure_session_handle_a0 (GoodixSecureSession *session,
         0xa0, message.control, -1, -1, (gssize) body_length);
       goto invalid_response;
     }
-  if (!validate_typed (session, message.control, body, body_length))
+  if (!validate_typed (session, message.control, body, body_length,
+                       &e4_result))
     {
+      GoodixProtocolFailureKind failure_kind =
+        GOODIX_PROTOCOL_FAILURE_TYPED_SHAPE_MISMATCH;
+
+      if (session->phase == GOODIX_SECURE_PHASE_E4)
+        {
+          failure_kind = e4_contract_failure_kind (e4_result);
+          contract_failure_message = e4_contract_failure_message (e4_result);
+        }
       record_protocol_failure (
-        session, GOODIX_PROTOCOL_FAILURE_TYPED_SHAPE_MISMATCH,
+        session, failure_kind,
         0xa0, message.control, -1, -1, (gssize) body_length);
       goto invalid_response;
     }
@@ -1176,7 +1240,7 @@ goodix_secure_session_handle_a0 (GoodixSecureSession *session,
 invalid_response:
   goodix_a0_message_clear (&message);
   session_fail_literal (session, GOODIX_SECURE_ERROR_PROTOCOL,
-                        "phase-specific A0 response contract failed");
+                        contract_failure_message);
 }
 
 static void

@@ -2263,9 +2263,18 @@ test_p6_e4_contract_diagnostics (void)
   body[0] ^= 1u;
 
   body[9] ^= 1u;
-  g_assert_cmpint (goodix_secure_session_test_check_e4_contract (
-                     body, sizeof body, validator, validator_sha256),
-                   ==, GOODIX_E4_CONTRACT_VALIDATOR_MISMATCH);
+  {
+    GoodixE4ContractResult result =
+      goodix_secure_session_test_check_e4_contract (
+        body, sizeof body, validator, validator_sha256);
+
+    g_assert_cmpint (result, ==, GOODIX_E4_CONTRACT_VALIDATOR_MISMATCH);
+    g_assert_cmpint (goodix_secure_session_test_e4_failure_kind (result), ==,
+                     GOODIX_PROTOCOL_FAILURE_TYPED_VALUE_MISMATCH);
+    g_assert_cmpstr (goodix_secure_session_test_e4_failure_message (result),
+                     ==,
+                     "E4 live validator differs from the expected pairing state");
+  }
   body[9] ^= 1u;
 
   validator_sha256[0] ^= 1u;
@@ -2277,6 +2286,13 @@ test_p6_e4_contract_diagnostics (void)
   g_assert_cmpint (goodix_secure_session_test_check_e4_contract (
                      body, sizeof body - 1u, validator, validator_sha256),
                    ==, GOODIX_E4_CONTRACT_BODY_LENGTH_MISMATCH);
+
+  g_assert_true (goodix_fpimage_device_test_action_requires_live_preflight (
+    FPI_DEVICE_ACTION_IDENTIFY));
+  g_assert_true (goodix_fpimage_device_test_action_requires_live_preflight (
+    FPI_DEVICE_ACTION_ENROLL));
+  g_assert_false (goodix_fpimage_device_test_action_requires_live_preflight (
+    FPI_DEVICE_ACTION_VERIFY));
 }
 
 static void

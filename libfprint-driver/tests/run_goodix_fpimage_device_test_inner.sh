@@ -51,6 +51,18 @@ if [ "$configuration_mentions" -ne 3 ] ||
 fi
 echo D279_28_SINGLE_PRODUCTION_CONFIGURATION_CALLER_SOURCE_AUDIT=PASS
 
+pairing_writer_callers=$(find "$git_root/libfprint-driver" \
+  -path "$git_root/libfprint-driver/tests" -prune -o \
+  \( -name '*.c' -o -name '*.h' \) -type f \
+  ! -name 'goodix_pairing_provision.c' \
+  ! -name 'goodix_pairing_provision.h' -exec \
+  grep -l 'goodix_pairing_provision_begin_e0' {} + | wc -l)
+if [ "$pairing_writer_callers" -ne 0 ]; then
+  echo "pairing E0 writer became reachable from the production runtime" >&2
+  exit 1
+fi
+echo P6_PRODUCTION_E0_WRITER_HAS_NO_RUNTIME_CALLER=PASS
+
 # ---- Generated enum registrations (host-only Python shim) ----
 python3 "$test_dir/support/generate_libfprint_enums.py" \
   --identifier-prefix Fpi --symbol-prefix fpi \

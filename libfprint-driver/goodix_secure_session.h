@@ -42,6 +42,7 @@ typedef enum
   GOODIX_PROTOCOL_FAILURE_ACK_SHAPE_MISMATCH,
   GOODIX_PROTOCOL_FAILURE_TYPED_CONTROL_MISMATCH,
   GOODIX_PROTOCOL_FAILURE_TYPED_SHAPE_MISMATCH,
+  GOODIX_PROTOCOL_FAILURE_TYPED_VALUE_MISMATCH,
   GOODIX_PROTOCOL_FAILURE_UNEXPECTED_OUTER_CLASS,
   GOODIX_PROTOCOL_FAILURE_MALFORMED_FRAME,
 } GoodixProtocolFailureKind;
@@ -199,6 +200,10 @@ GoodixE4ContractResult goodix_secure_session_test_check_e4_contract (
   gsize body_length,
   const guint8 expected_validator[32],
   const guint8 expected_validator_sha256[32]);
+GoodixProtocolFailureKind goodix_secure_session_test_e4_failure_kind (
+  GoodixE4ContractResult result);
+const gchar *goodix_secure_session_test_e4_failure_message (
+  GoodixE4ContractResult result);
 #endif
 
 G_END_DECLS
