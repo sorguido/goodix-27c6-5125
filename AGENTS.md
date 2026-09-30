@@ -8,37 +8,50 @@ Ordine di autorità:
 
 1. istruzione esplicita corrente dell'Utente;
 2. `<git-root>/AGENTS.md`;
-3. repository, codice, test, Git ed evidenze correnti osservabili;
-4. `<git-root>/TECHNICAL_MANUAL.md` per la conoscenza tecnica consolidata corrente;
-5. `<git-root>/development/GOODIX_27C6_5125_DEVELOPMENT_ARCHIVE.md` esclusivamente come evidenza storica on-demand;
-6. altra documentazione pubblica e fonti/reference esterne;
-7. contesto della sessione e inferenza del modello.
+3. `<git-root>/ROADMAP.md` per la state machine, le fasi e gli EXIT_GATE;
+4. repository, codice, test, Git ed evidenze correnti osservabili;
+5. `<git-root>/TECHNICAL_MANUAL.md` per la conoscenza tecnica consolidata corrente;
+6. `<git-root>/PROJECT_STATE.json` esclusivamente come cache operativa non autoritativa;
+7. `<git-root>/development/Goodix 27c6 5125 manuale tecnico.md` esclusivamente come archivio/diario storico on-demand;
+8. altra documentazione pubblica e fonti/reference esterne;
+9. contesto della sessione e inferenza del modello.
 
-`<git-root>/START_PROMPT.md` definisce bootstrap, recovery e orchestrazione PM↔Executor. Non può derogare a questo file.
+`<git-root>/START_PROMPT.md` definisce bootstrap, recovery e orchestrazione PM↔Executor. Non può derogare a questo file o alla sequenza canonica di `ROADMAP.md`.
 
-I due file interni canonici di governance/orchestrazione vivono nella **root** del clone:
+I tre file canonici di governance/orchestrazione vivono nella **root** del clone:
 
 ```text
 <git-root>/AGENTS.md
 <git-root>/START_PROMPT.md
+<git-root>/ROADMAP.md
 ```
+
+La cache operativa vive in:
+
+```text
+<git-root>/PROJECT_STATE.json
+```
+
+`PROJECT_STATE.json` non è autoritativo: se confligge con Git, evidenze o roadmap, Git/evidenze/roadmap prevalgono e la cache deve essere riparata.
 
 La reference tecnica pubblica resta `<git-root>/TECHNICAL_MANUAL.md`. L'archivio storico interno vive invece in:
 
 ```text
-<git-root>/development/GOODIX_27C6_5125_DEVELOPMENT_ARCHIVE.md
+<git-root>/development/Goodix 27c6 5125 manuale tecnico.md
 ```
 
 Non assumere path assoluti della workstation: determina sempre la root con `git rev-parse --show-toplevel`.
 
-### Protezione di `AGENTS.md` e `START_PROMPT.md`
+### Protezione di `AGENTS.md`, `START_PROMPT.md` e `ROADMAP.md`
 
-`AGENTS.md` e `START_PROMPT.md` sono **read-only per qualunque agente per default**.
+`AGENTS.md`, `START_PROMPT.md` e `ROADMAP.md` sono **read-only per qualunque agente per default**.
 
 Un agente può modificarli soltanto quando:
 
 - l'Utente richiede esplicitamente e specificamente la modifica nella conversazione corrente; oppure
 - l'agente propone un `HUMAN_REQUIRED` con `GATE=CANONICAL_FILE_CHANGE_APPROVAL` e l'Utente approva esplicitamente la modifica proposta.
+
+`PROJECT_STATE.json` è invece aggiornabile dall'AI PM: deve rappresentare il punto corrente della roadmap, i gate completati/pending, gli artefatti rilevanti e il prossimo passo. Non può introdurre requisiti o decisioni assenti dalle fonti autoritative.
 
 Un generico “procedi”, un'autorizzazione passata o una convenienza tecnica non costituiscono approvazione.
 
@@ -64,20 +77,37 @@ Fuori scope senza nuova decisione esplicita dell'Utente: altri sensori/firmware,
 Invariante principale:
 
 ```text
-factory_firmware_and_persistent_state_must_remain_untouched
+factory_firmware_otp_and_factory_data_must_remain_untouched
 ```
 
 Senza autorizzazione esplicita e specifica dell'Utente:
 
-- no flash, IAP, ClearApp o provisioning;
-- no sostituzione, overwrite o reprovisioning PSK;
-- no PSK random/null;
-- no scrittura OTP, factory data o configurazione persistente;
+- no flash, firmware replacement, IAP o ClearApp;
+- no scrittura OTP o factory data;
 - no cambio persistente di modalità o VID:PID;
 - no comando wire non compreso con possibile effetto persistente;
 - nessuna regressione intenzionale della compatibilità Windows.
 
-Un'implementazione terza più invasiva non autorizza a replicarne il comportamento sul target locale.
+### Eccezione strettamente delimitata: host pairing
+
+Il progetto self-contained richiede la mutazione del **solo host pairing**, che non deve essere confusa con firmware, OTP o factory data. È ammessa esclusivamente nelle fasi e dietro i Human Gate previsti da `ROADMAP.md`.
+
+Il boundary obbligatorio è:
+
+```text
+MAX_LOGICAL_E0_PER_TRANSACTION=1
+AUTOMATIC_E0_RETRY=false
+PRESERVE_CURRENT_BB010002_BYTE_FOR_BYTE=true
+JOURNAL_LOCAL_PSK_BEFORE_E0=true
+READBACK_HASH_TLS_PROOF_REQUIRED=true
+FAIL_CLOSED_ON_AMBIGUITY=true
+```
+
+La PSK Linux può essere generata localmente con CSPRNG e persistita root-only secondo lo state-v2 approvato. Non usare PSK null/dummy, non sintetizzare `BB010002` e non condividere/esportare la PSK tra Windows e Linux.
+
+Un ordinary same-OS Linux reopen non deve emettere `E0`. Il riutilizzo ripetuto della stessa PSK Linux dopo ritorni da Windows resta `INFERRED` finché P7 non chiude `WINDOWS_LINUX_PING_PONG=PASS`.
+
+Un'implementazione terza più invasiva non autorizza a replicarne altri comportamenti sul target locale.
 
 ### Update survivability
 
@@ -142,20 +172,22 @@ Una suite verde, un commit o un nuovo artefatto non provano da soli avanzamento 
 Branch operativo scrivibile:
 
 ```text
-main
+development
 ```
 
 Prima di modificare file:
 
 - determina Git root, branch, HEAD e `git status --short`;
-- se il branch corrente non è `main`, non cambiare branch autonomamente e termina con `HUMAN_REQUIRED`;
+- se il branch corrente non è `development`, non cambiare branch autonomamente e termina con `HUMAN_REQUIRED`;
 - tratta un worktree sporco come possibile lavoro valido: ricostruiscine provenienza e intento prima di toccarlo.
 
-Su `main` sono consentiti, quando coerenti con il task:
+Su `development` sono consentiti, quando coerenti con il task e la roadmap:
 
 - modifiche normali;
 - commit normali;
-- push normali a `origin/main`.
+- push normali a `origin/development`.
+
+`main` è read-only per l'agente autonomo e può essere letto/confrontato, in particolare durante P10-P11. Qualunque write/commit/push/merge/rebase/update-ref verso `main` richiede una decisione umana separata.
 
 Gli altri branch sono read-only salvo autorizzazione esplicita dell'Utente.
 
@@ -183,7 +215,7 @@ Sono Human Gate:
 - installazione/attivazione runtime che possa raggiungere il sensore;
 - `sudo`, root o privilegi equivalenti eseguiti dall'agente;
 - accesso/manipolazione di PSK, secret, chiavi, protected material o dati biometrici reali non specificamente autorizzati;
-- qualunque possibile modifica persistente del sensore o eccezione alle invarianti factory-preserving;
+- qualunque pairing write o altra possibile modifica persistente del sensore; il pairing path previsto dalla roadmap resta comunque Human Gate;
 - cambiamento materiale di obiettivo, scope, strategia tecnica o profilo di rischio;
 - modifica del licensing boundary;
 - operazioni Git protette definite al §4;
@@ -254,7 +286,7 @@ Prima di ripetere una live fallita, deve cambiare almeno l'ipotesi tecnica o il 
 
 ### Archivio storico di sviluppo
 
-`<git-root>/development/GOODIX_27C6_5125_DEVELOPMENT_ARCHIVE.md` è un **archivio storico congelato**, non una fonte dello stato corrente. Contiene cronologia Dxxx, ipotesi, failure, test, evidenze e corrective dello sviluppo originario.
+`<git-root>/development/Goodix 27c6 5125 manuale tecnico.md` è un **archivio/diario storico di sviluppo**, non una fonte dello stato corrente. Contiene cronologia, ipotesi, failure, test, evidenze e corrective dello sviluppo.
 
 Regole:
 
@@ -316,7 +348,9 @@ Correttivi locali dello stesso boundary non richiedono nuova numerazione Dxxx. U
 
 ## 10. Orchestrazione e configurazione modello
 
-L'orchestrazione PM↔Executor è definita esclusivamente da `START_PROMPT.md`.
+L'orchestrazione PM↔Executor è definita da `START_PROMPT.md` e vincolata alla state machine di `ROADMAP.md`.
+
+AI PM deve leggere/riconciliare `PROJECT_STATE.json` al bootstrap, individuare la fase corrente e il primo requisito non soddisfatto, quindi proseguire soltanto entro quel boundary fino al prossimo gate o stop canonico. Dopo un avanzamento materiale aggiorna la cache operativa prima di fermarsi o passare alla fase successiva.
 
 I task interni devono descrivere soltanto il delta necessario: obiettivo, stato rilevante, scope, lavoro richiesto, verifica e stop condition. Non reidratare questa governance nei prompt intermedi.
 
@@ -328,7 +362,8 @@ Principio operativo:
 safety forte
 + evidence-first
 + target reale verificato
-+ main recuperabile
++ development recuperabile
++ roadmap canonica e state cache ricostruibile
 + Human Gate espliciti
 + documentazione con ownership chiara
 + task delta-only
