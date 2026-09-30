@@ -88,7 +88,9 @@
     ],
     "initial_blockers": []
   },
-  "current_blockers": [],
+  "current_blockers": [
+    "P6_FIRST_LIVE_IDENTIFY_PRECHECK_PROTOCOL_MISMATCH"
+  ],
   "host_modified": false,
   "relevant_artifacts": [
     "START.md",
@@ -135,9 +137,9 @@
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "Run the first user-executed P6 live checkpoint on the exact APP12509 target with the qualified legacy material still available: bounded read-only identity/chip/OTP/BB010002/E4, generated CONFIG90 equality and zero-seed no-finger FDT. Stop immediately after the sanitized GOODIX_ZERO_SEED_FDT_READY evidence. The production E0 call site remains absent and PREPARED journaling, E0, reopen and recovery must not run until this checkpoint passes.",
-  "last_verified_head": "fd556c653d6b4cdff88781559549d458ed0e9704",
-  "state_note": "P0A through P5 are accepted. LIVE_NO_FINGER_APPROVAL was explicitly granted for P6 after the P5 closure commit was pushed to origin/development. The first P6 candidate integrates an enrollment-only, seven-command read-only APP12509 preflight, exact legacy-boundary and generated-CONFIG90 comparisons, and the zero-seed no-finger lifecycle handoff. Its separately tested pairing module constructs exactly one E0 and requires strict ACK/completion, unchanged BB010002, validator match and TLS proof, but no production code references that module yet: writer_enabled and pairing_write_count remain zero. Normal and ASan/UBSan component tests, the full 60-case production integration suite and the Fedora public payload build pass offline. No P6 USB command, protected-material access, pairing write or biometric action has yet occurred. The next checkpoint stops after read-only/config/zero-seed live evidence; PREPARED and E0 remain unreachable until that evidence passes. Firmware/IAP/ClearApp/OTP/factory writes, biometric tests and any E0 retry remain excluded. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
+  "next_action": "Install the sanitized secure-failure telemetry update and repeat the same bounded no-finger fprintd-enroll once. The changed diagnostic method must identify the exact read-only secure phase and response mismatch before any implementation correction. Do not repeat again, touch the sensor, journal PREPARED or enable E0.",
+  "last_verified_head": "51843e6bf0c1738a79a22b78ca0b7de81d7a982a",
+  "state_note": "P0A through P5 are accepted. LIVE_NO_FINGER_APPROVAL is active for bounded P6 execution. The first P6 physical-target attempt installed source ID 69c34d99de03e4a16407d8ac3a5f96e4895b6719baa714cbe3204f072826046e with LEGACY_VALID and entered fprintd's IDENTIFY-for-enroll precheck, not the ENROLL action. It failed closed with phase-specific A0 response mismatch before TLS and before the enrollment-only live preflight: preflight_complete=0, tls=0, persistent=0, pairing_writer=0, pairing_writes=0, drained=1 and context_closed=1. Ten real submits after the quiet boundary are consistent with an E4 typed-response mismatch after successful A2/A8, but that classification remains INFERRED until phase-level telemetry is observed. No biometric contact or pairing write occurred. The candidate now adds sanitized secure phase/failure telemetry only; payload bytes and secrets remain unlogged. PREPARED and E0 remain unreachable. Firmware/IAP/ClearApp/OTP/factory writes, biometric tests and any E0 retry remain excluded. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }

@@ -1092,6 +1092,10 @@ goodix_fpimage_device_log_production_audit (
     "fdt_samples=%u fdt_learned=%u "
     "enroll_stages=%u enroll_rearm32=%u enroll_terminal=%u "
     "enroll_contacts=%u enroll_retry_scans=%u "
+    "secure_commands=%u secure_acks=%u secure_typed=%u "
+    "secure_failure=%u secure_phase=%s secure_failure_kind=%s "
+    "secure_control=%d secure_ack_echo=%d secure_ack_status=%d "
+    "secure_body_length=%" G_GSSIZE_FORMAT " "
     "secure_retry=%u post_retry=%u reopen=%u explicit_verify_reopen=%u "
     "explicit_identify_reopen=%u "
     "reset=%u clear_halt=%u persistent=%u coordinator_source=%u "
@@ -1122,6 +1126,21 @@ goodix_fpimage_device_log_production_audit (
     audit->enrollment_events.lifecycle.plan.pipeline.protocol.terminal_transition_count,
     audit->enrollment_events.lifecycle.plan.pipeline.protocol.observed_primary_stage_count,
     audit->enrollment_events.lifecycle.plan.pipeline.protocol.retry_stage_count,
+    audit->secure.command_count,
+    audit->secure.ack_count,
+    audit->secure.typed_response_count,
+    audit->secure.protocol_failure_recorded,
+    audit->secure.protocol_failure_recorded ?
+      goodix_secure_phase_name (audit->secure.protocol_failure_phase) :
+      "NONE",
+    audit->secure.protocol_failure_recorded ?
+      goodix_protocol_failure_kind_name (
+        audit->secure.protocol_failure_kind) :
+      "NONE",
+    audit->secure.observed_a0_control,
+    audit->secure.observed_ack_echo,
+    audit->secure.observed_ack_status,
+    audit->secure.observed_body_length,
     audit->secure.retry_count,
     audit->post_tls.retry_count,
     reopen_count,
