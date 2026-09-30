@@ -8,10 +8,17 @@ Default execution is **preflight-only** and performs no persistent write.
 
 The response path is split into a pure incremental parser and the USB wrapper.
 The parser requires a valid `B0` acknowledgement for `E0`, then accepts either
-of the two narrowly qualified success controls with the exact body `00 02`:
+of the two narrowly qualified completion controls, `E0` or `E2`. The admitted
+completion bodies are:
 
-- `E0`, observed in `WINDOWS_A_RETURN_AFTER_B.pcapng`;
-- `E2`, documented by the pinned Rockytkg production-command layer.
+- `00 02`, observed in `WINDOWS_A_RETURN_AFTER_B.pcapng`;
+- `00 03`, observed after the Linux `E0` attempt and followed by a proven
+  `BB020003 == SHA256(BB010003)` readback.
+
+`E0` was observed directly in both captures; `E2` remains supported because it
+is documented by the pinned Rockytkg production-command layer. A completion
+response only advances the writer to the independent readback and TLS gates;
+it is not by itself reported as a verified persistent write.
 
 It does not infer persistent success from a completed USB transfer. The writer
 reports these stages independently:
@@ -36,9 +43,10 @@ Run the offline suite without a sensor:
 make test
 ```
 
-The suite covers literal captured `E0`, synthetic `E2`, ACK handling, stream
-fragmentation/reassembly, timeout, unexpected controls, malformed frames,
-duplicate/late results, one terminal transition, and the no-retry guard.
+The suite covers literal captured `E0` responses with both admitted bodies,
+synthetic `E2`, ACK handling, stream fragmentation/reassembly, timeout,
+unexpected controls, malformed frames, duplicate/late results, one terminal
+transition, and the no-retry guard.
 
 The commit path is gated by:
 - exact USB target `27c6:5125`

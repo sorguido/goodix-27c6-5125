@@ -100,6 +100,28 @@ static void test_observed_e0_success(void)
            "captured E0 result accepted in one chunk");
     expect(response.result_control == 0xE0u,
            "captured E0 result recorded");
+    expect(response.result_code == 0x02u,
+           "captured Windows result code recorded");
+}
+
+static void test_observed_linux_e0_advances_to_verification(void)
+{
+    struct goodix_e0_response response;
+    static const uint8_t frames[] = {
+        /* Literal frames from psk-linux-e0-attempt-1.pcap. */
+        0xA0u,0x06u,0x00u,0xA6u,0xB0u,
+        0x03u,0x00u,0xE0u,0x07u,0x10u,
+        0xA0u,0x06u,0x00u,0xA6u,0xE0u,
+        0x03u,0x00u,0x00u,0x03u,0xC4u
+    };
+
+    goodix_e0_response_init(&response);
+    expect(goodix_e0_response_feed(&response, frames, sizeof(frames)) == 1,
+           "captured Linux E0 result advances to verification");
+    expect(response.result_control == 0xE0u &&
+           response.result_code == 0x03u &&
+           response.ack_status == 0x07u,
+           "captured Linux response fields recorded");
 }
 
 static void test_ack_status_07_and_duplicate_ack(void)
@@ -172,8 +194,8 @@ static void test_rejections(void)
     make_result(0xE2u, result);
     expect(goodix_e0_response_feed(&response, ack, ack_len) == 0,
            "valid ACK before bad body");
-    result[8] = 0x03u;
-    result[result_len - 1u]--;
+    result[8] = 0x04u;
+    result[result_len - 1u] -= 2u;
     expect(goodix_e0_response_feed(&response, result, result_len) == -1,
            "wrong result body rejected");
     expect(response.error == GOODIX_E0_ERROR_BAD_RESULT,
@@ -236,6 +258,7 @@ int main(void)
 {
     test_e2_fragmented_success();
     test_observed_e0_success();
+    test_observed_linux_e0_advances_to_verification();
     test_ack_status_07_and_duplicate_ack();
     test_unexpected_control_ignored();
     test_rejections();
@@ -250,6 +273,7 @@ int main(void)
 
     printf("E2_PARSER=PASS\n");
     printf("CAPTURED_E0_COMPATIBILITY=PASS\n");
+    printf("CAPTURED_LINUX_00_03_COMPATIBILITY=PASS\n");
     printf("ACK_HANDLING=PASS\n");
     printf("FRAME_FRAGMENTATION_REASSEMBLY=PASS\n");
     printf("TIMEOUTS=PASS\n");

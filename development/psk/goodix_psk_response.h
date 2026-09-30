@@ -40,6 +40,7 @@ struct goodix_e0_response {
     int ack_seen;
     uint8_t ack_status;
     uint8_t result_control;
+    uint8_t result_code;
 };
 
 struct goodix_e0_write_guard {

@@ -114,11 +114,18 @@ static int handle_a0_frame(struct goodix_e0_response *response,
         return transition(response, GOODIX_E0_REJECTED,
                           GOODIX_E0_ERROR_RESULT_BEFORE_ACK);
 
-    if (body_len != 2u || body[0] != 0x00u || body[1] != 0x02u)
+    /*
+     * 00 02 is the Windows-observed completion. 00 03 was returned by the
+     * target after a Linux E0 whose BB010003 digest was then proven by E4
+     * readback. Neither result bypasses the independent readback/TLS gates.
+     */
+    if (body_len != 2u || body[0] != 0x00u ||
+        (body[1] != 0x02u && body[1] != 0x03u))
         return transition(response, GOODIX_E0_REJECTED,
                           GOODIX_E0_ERROR_BAD_RESULT);
 
     response->result_control = control;
+    response->result_code = body[1];
     return transition(response, GOODIX_E0_ACCEPTED,
                       GOODIX_E0_ERROR_NONE);
 }

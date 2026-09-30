@@ -1477,6 +1477,7 @@ int main(int argc, char **argv)
     protocol_status = STAGE_PASS;
     printf("E0_OEM_RESPONSE=PASS\n");
     printf("E0_RESPONSE_CONTROL=0x%02X\n", e0_response.result_control);
+    printf("E0_RESPONSE_CODE=0x%02X\n", e0_response.result_code);
     printf("E0_ACK_STATUS=0x%02X\n", e0_response.ack_status);
 
     readback_status = STAGE_FAIL;
