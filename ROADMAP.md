@@ -593,7 +593,7 @@ OBSOLETE
   non si riscrive la history autonomamente: si termina con un Human Gate
   specifico per la bonifica della history.
 
-Governance interna (`AGENTS.md`, Start prompt, roadmap/state cache e decision
+Governance interna (`AGENTS.md`, `START.md`, roadmap/state cache e decision
 artifact) deve essere classificata esplicitamente; non deve finire in `main`
 per inerzia né essere cancellata per inerzia.
 
