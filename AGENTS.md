@@ -16,13 +16,13 @@ Ordine di autorità:
 8. altra documentazione pubblica e fonti/reference esterne;
 9. contesto della sessione e inferenza del modello.
 
-`<git-root>/START_PROMPT.md` definisce bootstrap, recovery e orchestrazione PM↔Executor. Non può derogare a questo file o alla sequenza canonica di `ROADMAP.md`.
+`<git-root>/START.md` definisce bootstrap, recovery e orchestrazione PM↔Executor. Non può derogare a questo file o alla sequenza canonica di `ROADMAP.md`.
 
 I tre file canonici di governance/orchestrazione vivono nella **root** del clone:
 
 ```text
 <git-root>/AGENTS.md
-<git-root>/START_PROMPT.md
+<git-root>/START.md
 <git-root>/ROADMAP.md
 ```
 
@@ -42,9 +42,9 @@ La reference tecnica pubblica resta `<git-root>/TECHNICAL_MANUAL.md`. L'archivio
 
 Non assumere path assoluti della workstation: determina sempre la root con `git rev-parse --show-toplevel`.
 
-### Protezione di `AGENTS.md`, `START_PROMPT.md` e `ROADMAP.md`
+### Protezione di `AGENTS.md`, `START.md` e `ROADMAP.md`
 
-`AGENTS.md`, `START_PROMPT.md` e `ROADMAP.md` sono **read-only per qualunque agente per default**.
+`AGENTS.md`, `START.md` e `ROADMAP.md` sono **read-only per qualunque agente per default**.
 
 Un agente può modificarli soltanto quando:
 
@@ -248,7 +248,7 @@ Sono Human Gate:
 - modifica del licensing boundary;
 - operazioni Git protette definite al §4;
 - creazione/pubblicazione di release/tag o distribuzione di materiale privato/non auditato;
-- modifica di `AGENTS.md` o `START_PROMPT.md` non già autorizzata esplicitamente;
+- modifica di `AGENTS.md` o `START.md` non già autorizzata esplicitamente;
 - modifica, riscrittura o append dell'archivio storico congelato, salvo richiesta esplicita e specifica dell'Utente;
 - ambiguità materiale non risolvibile autonomamente quando una scelta errata può compromettere safety, scope, licensing, storia Git o lavoro significativo;
 - blocker reale dovuto a capability, informazione o risorsa indispensabile non disponibile.
@@ -376,7 +376,7 @@ Correttivi locali dello stesso boundary non richiedono nuova numerazione Dxxx. U
 
 ## 10. Orchestrazione e configurazione modello
 
-L'orchestrazione PM↔Executor è definita da `START_PROMPT.md` e vincolata alla state machine di `ROADMAP.md`.
+L'orchestrazione PM↔Executor è definita da `START.md` e vincolata alla state machine di `ROADMAP.md`.
 
 AI PM deve leggere/riconciliare `PROJECT_STATE.json` al bootstrap, individuare la fase corrente e il primo requisito non soddisfatto, quindi proseguire soltanto entro quel boundary fino al prossimo gate o stop canonico. Dopo un avanzamento materiale aggiorna la cache operativa prima di fermarsi o passare alla fase successiva.
 
