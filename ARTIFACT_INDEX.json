@@ -1,0 +1,234 @@
+{
+  "schema_version": 1,
+  "authoritative": false,
+  "purpose": "Non-authoritative context router for AI PM. Git, ROADMAP.md and qualified evidence remain authoritative.",
+  "maintenance_policy": {
+    "source_of_truth": "Git",
+    "initialize_from": "main...development",
+    "comparison_semantics": "Three-dot / merge-base to development: index work introduced on development without treating main-only commits as development work.",
+    "refresh_when": [
+      "A task adds, removes, renames or materially repurposes an artifact.",
+      "A phase EXIT_GATE is accepted and routing for the next phase changes.",
+      "The operational branch differs materially from the last indexed branch.",
+      "ROADMAP P0A reconciliation detects drift."
+    ],
+    "do_not_rewrite_history": true,
+    "no_retroactive_repository_conversion": true
+  },
+  "baseline": {
+    "base_ref": "main",
+    "indexed_ref": "development",
+    "base_head": "4cba03e67be3d357262d5c713ec0f9481c87ba37",
+    "indexed_head": "4683e66d6dcbcc386e017d2519b9aa51872344a8",
+    "merge_base": "2a8ae714c0b847be6d92316191d9a6189a50a76e",
+    "relationship": "diverged",
+    "development_ahead_by": 18,
+    "development_behind_main_by": 2,
+    "note": "The development artifact inventory below is based on the development side of the merge-base diff. Main-only work is tracked separately so it is not mistaken for development-produced material."
+  },
+  "canonical_routing": {
+    "governance": "AGENTS.md",
+    "bootstrap": "START_PROMPT.md",
+    "roadmap": "ROADMAP.md",
+    "state_cache": "PROJECT_STATE.json",
+    "technical_reference": "TECHNICAL_MANUAL.md",
+    "artifact_index": "ARTIFACT_INDEX.json",
+    "historical_development_archive": "development/Goodix 27c6 5125 manuale tecnico.md"
+  },
+  "development_delta_from_main": [
+    {
+      "path": ".gitignore",
+      "git_status": "modified",
+      "role": "REPOSITORY_POLICY",
+      "relevance": [
+        "P0A",
+        "P10"
+      ]
+    },
+    {
+      "path": "AGENTS.md",
+      "git_status": "added",
+      "role": "CANONICAL_GOVERNANCE",
+      "relevance": [
+        "ALL_PHASES"
+      ]
+    },
+    {
+      "path": "PROJECT_STATE.json",
+      "git_status": "added",
+      "role": "OPERATIVE_STATE_CACHE",
+      "relevance": [
+        "ALL_PHASES"
+      ]
+    },
+    {
+      "path": "ROADMAP.md",
+      "git_status": "added",
+      "role": "CANONICAL_STATE_MACHINE",
+      "relevance": [
+        "ALL_PHASES"
+      ]
+    },
+    {
+      "path": "START_PROMPT.md",
+      "git_status": "added",
+      "role": "CANONICAL_BOOTSTRAP",
+      "relevance": [
+        "ALL_PHASES"
+      ]
+    },
+    {
+      "path": "TECHNICAL_MANUAL.md",
+      "git_status": "modified",
+      "role": "PUBLIC_TECHNICAL_REFERENCE",
+      "relevance": [
+        "P11"
+      ],
+      "note": "Current development delta records stable qualified PSK/TLS facts. Do not use as a development diary."
+    },
+    {
+      "path": "development/SELF_CONTAINED_DRIVER_AUDIT.md",
+      "git_status": "added",
+      "role": "ARCHITECTURE_DECISION_ARTIFACT",
+      "relevance": [
+        "P0",
+        "P1",
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ]
+    },
+    {
+      "path": "development/psk/Makefile",
+      "git_status": "added",
+      "role": "QUALIFIED_PSK_POC_BUILD",
+      "relevance": [
+        "P1",
+        "P6",
+        "P10"
+      ]
+    },
+    {
+      "path": "development/psk/README.md",
+      "git_status": "added",
+      "role": "QUALIFIED_PSK_POC_REFERENCE",
+      "relevance": [
+        "P1",
+        "P6",
+        "P7",
+        "P10"
+      ]
+    },
+    {
+      "path": "development/psk/goodix_psk_poc_writer.c",
+      "git_status": "added",
+      "role": "QUALIFIED_PSK_POC_IMPLEMENTATION",
+      "relevance": [
+        "P1",
+        "P4",
+        "P5",
+        "P6",
+        "P10"
+      ],
+      "note": "Experimental/provenance oracle; not automatically production/public code."
+    },
+    {
+      "path": "development/psk/goodix_psk_response.c",
+      "git_status": "added",
+      "role": "QUALIFIED_PAIRING_RESPONSE_IMPLEMENTATION",
+      "relevance": [
+        "P1",
+        "P4",
+        "P5",
+        "P6",
+        "P10"
+      ]
+    },
+    {
+      "path": "development/psk/goodix_psk_response.h",
+      "git_status": "added",
+      "role": "QUALIFIED_PAIRING_RESPONSE_INTERFACE",
+      "relevance": [
+        "P1",
+        "P4",
+        "P5",
+        "P6",
+        "P10"
+      ]
+    },
+    {
+      "path": "development/psk/test_goodix_psk_response.c",
+      "git_status": "added",
+      "role": "QUALIFIED_PAIRING_RESPONSE_TESTS",
+      "relevance": [
+        "P1",
+        "P4",
+        "P5",
+        "P6",
+        "P10"
+      ]
+    }
+  ],
+  "main_only_delta_at_baseline": [
+    {
+      "path": "tools/windows_material_builder/README.md",
+      "role": "MAIN_ONLY_DOCUMENTATION_DELTA",
+      "relevance": [
+        "P10",
+        "P11"
+      ],
+      "note": "Present on current main after the merge base but not on development at index bootstrap. Do not silently overwrite; reconcile deliberately when preparing publication/documentation."
+    }
+  ],
+  "phase_routes": {
+    "P0A": {
+      "purpose": "Reconcile this index against the real Git delta before implementation resumes.",
+      "load": [
+        "ROADMAP.md",
+        "PROJECT_STATE.json",
+        "ARTIFACT_INDEX.json"
+      ],
+      "compare": "main...CURRENT_CHECKED_OUT_BRANCH"
+    },
+    "P1": {
+      "purpose": "Direct pairing crypto / logical DLL removal.",
+      "load": [
+        "development/SELF_CONTAINED_DRIVER_AUDIT.md",
+        "development/psk/README.md",
+        "development/psk/goodix_psk_poc_writer.c",
+        "development/psk/goodix_psk_response.c",
+        "development/psk/goodix_psk_response.h",
+        "development/psk/test_goodix_psk_response.c",
+        "libfprint-driver/goodix_action_binding.c",
+        "libfprint-driver/goodix_action_binding.h",
+        "docs/LICENSING_AND_PROVENANCE.md"
+      ],
+      "note": "Load only what exists and is needed for the current task; absence of a listed implementation file is a routing hint to verify, not permission to invent it."
+    },
+    "P10": {
+      "purpose": "Publication cleanup and classification.",
+      "load": [
+        "ARTIFACT_INDEX.json",
+        ".gitignore",
+        "production/source-files.tsv",
+        "production/build-public.py",
+        "docs/LICENSING_AND_PROVENANCE.md"
+      ],
+      "note": "Reclassify all development-only material and prove the public candidate does not depend on git-ignored development/."
+    },
+    "P11": {
+      "purpose": "Final public documentation reconciliation.",
+      "load": [
+        "ARTIFACT_INDEX.json",
+        "TECHNICAL_MANUAL.md",
+        "README.md",
+        "DOCUMENTATION.md",
+        "docs/"
+      ],
+      "note": "Compare against main and edit only documentation made obsolete or incomplete by the qualified self-contained driver."
+    }
+  },
+  "routing_rule": "Cold-start routing is canonical files -> PROJECT_STATE.json -> ARTIFACT_INDEX.json -> only artifacts relevant to the active phase/task.",
+  "state_note": "This file is a cache/router. If any entry conflicts with Git or qualified evidence, repair this file rather than adapting Git to match it."
+}
