@@ -8,16 +8,16 @@
     "qualified_host": "Fedora 44 KDE x86_64"
   },
   "execution_path": "PRIMARY",
-  "phase": "P3",
+  "phase": "P4",
   "phase_status": "IN_PROGRESS",
   "completed_gates": [
     "SELF_CONTAINED_ARCHITECTURE_APPROVAL",
     "ARTIFACT_INDEX_BASELINE_RECONCILED",
     "PAIRING_CRYPTO_OFFLINE",
-    "CONFIG90_AND_BB010002_OFFLINE"
+    "CONFIG90_AND_BB010002_OFFLINE",
+    "FDT_ZERO_SEED_OFFLINE"
   ],
   "pending_gates": [
-    "FDT_ZERO_SEED_OFFLINE",
     "STATE_V2_AND_MIGRATION_OFFLINE",
     "COORDINATOR_HOST_VM",
     "LIVE_NO_FINGER_APPROVAL",
@@ -65,16 +65,15 @@
       "WINDOWS_RECOVERY_AFTER_LINUX_ORIGINATED_PAIRING",
       "OEM_EQUIVALENT_WHITE_BOX_PSK_DERIVATION",
       "EXACT_TYPE12_CONFIG90_FROM_OTP",
-      "GENERALIZED_STRUCTURAL_BB010002_ACCEPTANCE"
+      "GENERALIZED_STRUCTURAL_BB010002_ACCEPTANCE",
+      "BOUNDED_ZERO_SEED_FDT_MODEL_OFFLINE"
     ],
     "inferred": [
       "REPEATED_REUSE_OF_SAME_LINUX_PSK_AFTER_WINDOWS_RETURN",
       "L1_W1_L1_W2_L1_STABLE_PING_PONG",
-      "ZERO_SEED_FDT_BOOTSTRAP_IN_PRODUCTION_PATH"
+      "ZERO_SEED_FDT_BOOTSTRAP_ON_REAL_TARGET"
     ],
-    "initial_blockers": [
-      "ZERO_SEED_FIRST_RUN_FDT_QUALIFICATION"
-    ]
+    "initial_blockers": []
   },
   "host_modified": false,
   "relevant_artifacts": [
@@ -95,15 +94,18 @@
     "libfprint-driver/tests/test_goodix_config90_bb010002.c",
     "libfprint-driver/goodix_enrollment_fdt_state.c",
     "libfprint-driver/goodix_fdt_irq_policy.c",
+    "libfprint-driver/goodix_post_tls_lifecycle.c",
+    "libfprint-driver/goodix_post_tls_lifecycle.h",
+    "libfprint-driver/tests/test_goodix_post_tls_lifecycle.c",
     "TECHNICAL_MANUAL.md",
     "docs/LICENSING_AND_PROVENANCE.md"
   ],
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "Execute ROADMAP P3 offline: model explicit zero-seed FDT initialization with bounded no-finger sampling, reject contact, timeout, temperature/drift, duplicate and malformed observations, and persist at most the minimal 12-byte FDT table.",
-  "last_verified_head": "5fbbbf14f5085a28e78e72616b83350fb3972231",
-  "state_note": "P0A through P2 are accepted offline. P2 derives the qualified CONFIG90 byte-for-byte and one structural parser accepts all five distinct legitimate BB010002 values without decrypting or synthesizing protected bytes. The P1/P2 modules are not yet used by a runtime path; integration remains deferred to later roadmap phases. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
+  "next_action": "Execute ROADMAP P4 offline: implement per-reader state-v2 PREPARED-to-ACTIVE transitions, durable no-follow atomic storage, read-only crash reconciliation, and byte-preserving legacy import with exhaustive fault-boundary tests.",
+  "last_verified_head": "d1575fc6a8539c08d7251622955385ab0bf327fd",
+  "state_note": "P0A through P3 are accepted offline. P3 explicitly represents absent seed as a zero-table first request, accepts exactly three consistent no-finger samples with zero automatic retry, and exposes only the learned 12-byte FDT table for future persistence. Real-target zero-seed behavior remains for the later live gate. The P1/P2 modules and P3 absent-seed selector are not yet integrated into the production activation path. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }
