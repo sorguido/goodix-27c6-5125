@@ -51,7 +51,7 @@ transition, and the no-retry guard.
 The commit path is gated by:
 - exact USB target `27c6:5125`
 - exact firmware `GF_ST411SEC_APP_12509`
-- exact live pairing-D baseline (`BB010002` and `BB020003`)
+- exact live pairing-E baseline (`BB010002` and `BB020003`)
 - qualified WB self-test
 - exact local OEM-shaped `E0` frame validation
 - explicit `--commit` plus confirmation phrase
@@ -65,11 +65,11 @@ After the write it requires:
 
 The generated PSK is never printed and never persisted.
 
-The current pre-write gate is pairing D:
+The current pre-write gate is pairing E, established by Windows A recovery:
 
 ```text
-BB010002 SHA256 = 7931b70b2b9eb0264546f0da4478ddaa499da8404e336b76a506ae01be5cfc66
-BB020003        = 0dec75577b297e42bf9850367efda42be7c6e29dbd7787ffda71c14343d378b0
+BB010002 SHA256 = a77e1a3d591fee18f874ce7ec3209ea8765f123dbf673c297655c03c96e51c8f
+BB020003        = d5eb3b43b18b3cb40a962c519e204717992851dffaa7f381667ae295fc524885
 ```
 
 Do not run commit mode unless the live preflight has just passed and the operator

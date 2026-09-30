@@ -5,7 +5,7 @@
  * Safety properties:
  *   - exact USB target: 27c6:5125 only
  *   - exact firmware: GF_ST411SEC_APP_12509 only
- *   - exact pre-write pairing-D baseline required:
+ *   - exact pre-write pairing-E baseline required:
  *       BB010002 length 332 + pinned SHA-256
  *       BB020003 exact pinned 32-byte value
  *   - no arbitrary command interface
@@ -80,18 +80,18 @@
 
 static const uint8_t FW_EXPECTED[] = "GF_ST411SEC_APP_12509";
 
-static const uint8_t BB010002_D_SHA256[32] = {
-    0x79,0x31,0xb7,0x0b,0x2b,0x9e,0xb0,0x26,
-    0x45,0x46,0xf0,0xda,0x44,0x78,0xdd,0xaa,
-    0x49,0x9d,0xa8,0x40,0x4e,0x33,0x6b,0x76,
-    0xa5,0x06,0xae,0x01,0xbe,0x5c,0xfc,0x66
+static const uint8_t BB010002_E_SHA256[32] = {
+    0xa7,0x7e,0x1a,0x3d,0x59,0x1f,0xee,0x18,
+    0xf8,0x74,0xce,0x7e,0xc3,0x20,0x9e,0xa8,
+    0x76,0x5f,0x12,0x3d,0xbf,0x67,0x3c,0x29,
+    0x76,0x55,0xc0,0x3c,0x96,0xe5,0x1c,0x8f
 };
 
-static const uint8_t EXPECTED_BB020003_D[32] = {
-    0x0d,0xec,0x75,0x57,0x7b,0x29,0x7e,0x42,
-    0xbf,0x98,0x50,0x36,0x7e,0xfd,0xa4,0x2b,
-    0xe7,0xc6,0xe2,0x9d,0xbd,0x77,0x87,0xff,
-    0xda,0x71,0xc1,0x43,0x43,0xd3,0x78,0xb0
+static const uint8_t EXPECTED_BB020003_E[32] = {
+    0xd5,0xeb,0x3b,0x43,0xb1,0x8b,0x3c,0xb4,
+    0x0a,0x96,0x2c,0x51,0x9e,0x20,0x47,0x17,
+    0x99,0x28,0x51,0xdf,0xfa,0xa7,0xf3,0x81,
+    0x66,0x7a,0xe2,0x95,0xfc,0x52,0x48,0x85
 };
 
 static const uint8_t WB_KDF_KEY[32] = {
@@ -1381,11 +1381,11 @@ int main(int argc, char **argv)
 
     if (bb2_len != BB2_LEN ||
         sha256_buf(bb2, bb2_len, bb2_hash) != 0 ||
-        CRYPTO_memcmp(bb2_hash, BB010002_D_SHA256, 32) != 0) {
-        printf("PREWRITE_BB010002_D=FAIL\n");
+        CRYPTO_memcmp(bb2_hash, BB010002_E_SHA256, 32) != 0) {
+        printf("PREWRITE_BB010002_E=FAIL\n");
         goto out;
     }
-    printf("PREWRITE_BB010002_D=PASS\n");
+    printf("PREWRITE_BB010002_E=PASS\n");
 
     if (e4_read(g.h, DT_BB020003,
                 current_hash, sizeof(current_hash),
@@ -1395,13 +1395,13 @@ int main(int argc, char **argv)
     }
 
     if (current_hash_len != 32u ||
-        CRYPTO_memcmp(current_hash, EXPECTED_BB020003_D, 32) != 0) {
-        printf("PREWRITE_BB020003_D=FAIL\n");
+        CRYPTO_memcmp(current_hash, EXPECTED_BB020003_E, 32) != 0) {
+        printf("PREWRITE_BB020003_E=FAIL\n");
         goto out;
     }
-    printf("PREWRITE_BB020003_D=PASS\n");
+    printf("PREWRITE_BB020003_E=PASS\n");
 
-    printf("PAIRING_D_BASELINE=PASS\n");
+    printf("PAIRING_E_BASELINE=PASS\n");
 
     if (!commit) {
         printf("PREFLIGHT=PASS\n");
