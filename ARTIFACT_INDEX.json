@@ -19,12 +19,12 @@
     "base_ref": "main",
     "indexed_ref": "development",
     "base_head": "2a8ae714c0b847be6d92316191d9a6189a50a76e",
-    "indexed_head": "1f0f5ca9255294e5eac835719cb642c3c8a492a0",
+    "indexed_head": "22b3d0e8ec0f25b6efa791ef4d64d1fea388a75d",
     "merge_base": "2a8ae714c0b847be6d92316191d9a6189a50a76e",
     "relationship": "development_ahead_of_main",
-    "development_ahead_by": 61,
+    "development_ahead_by": 63,
     "development_behind_main_by": 0,
-    "note": "The development artifact inventory below is based on the development side of the merge-base diff at indexed_head. There are no main-only commits at this baseline. The inventory was reconciled against the real Git delta when P6 closed and re-verified when P7 closed; the reconciliation commit itself follows indexed_head."
+    "note": "The development artifact inventory below is based on the development side of the merge-base diff at indexed_head. There are no main-only commits at this baseline. The inventory was reconciled against the real Git delta when P6 closed and re-verified when P7 and P8 closed; the reconciliation commit itself follows indexed_head."
   },
   "canonical_routing": {
     "governance": "AGENTS.md",
@@ -842,7 +842,7 @@
         "docs/VALIDATION.md",
         "TECHNICAL_MANUAL.md"
       ],
-      "note": "Operator-managed phase. The User executes the P8 live qualification manually, one bounded step at a time, and supplies a consolidated PASS/FAIL evidence package. Until it arrives AI PM must not advance into active P8 orchestration, request P8 live tests, implement speculative P8 changes, modify P8 evidence or qualification status, create P8 gates, or infer P8 PASS from historical pre-self-contained enrollment/login/KScreenLocker/sudo/PolicyKit evidence, which is background only. Bounded physical series: at most three attempts, stop at the first MATCH, no fourth or hidden retry; a fingerprint failure must not compromise password, desktop, sudo or PolicyKit. If a P8 live test exposes a concrete implementation defect, the bounded failure evidence returns to AI PM for code analysis."
+      "note": "Closed: SELF_CONTAINED_BIOMETRIC_STACK=PASS on the operator-executed bounded live sequence. Qualified on the self-contained bootstrap: canonical KDE enrollment of two fingers, stock VERIFY match and no-match, a real stock IDENTIFY with two enrolled fingers, fingerprint authentication for Plasma Login, KScreenLocker, sudo and PolicyKit, three-attempt bounded failure series with working password fallback, clean cancel and release paths, and clean baseline/FDT behavior with zero pairing writes. Temperature is qualified only as far as the implementation goes: the driver adds no thermal override, so the stock libfprint FpTemperature lifecycle applies unchanged and no forced-HOT transition was tested. Cold login passes with the documented roughly one-second readiness delay. Evidence detail lives in docs/VALIDATION.md; the operator holds the full sanitized audit blocks. Successor phase P9 is operator-managed and deliberately not routed here: AI PM must not start, preflight, schedule or orchestrate it, and these artifacts are loadable for read-only analysis only."
     },
     "P10": {
       "purpose": "Publication cleanup and classification.",

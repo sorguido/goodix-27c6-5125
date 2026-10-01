@@ -8,8 +8,8 @@
     "qualified_host": "Fedora 44 KDE x86_64"
   },
   "execution_path": "PRIMARY",
-  "phase": "P8",
-  "phase_status": "AWAITING_LIVE_EVIDENCE",
+  "phase": "P9",
+  "phase_status": "NOT_STARTED",
   "completed_gates": [
     "SELF_CONTAINED_ARCHITECTURE_APPROVAL",
     "ARTIFACT_INDEX_BASELINE_RECONCILED",
@@ -23,10 +23,10 @@
     "P6_CONFIG90_AND_TARGET_BOUNDARY_LIVE",
     "SELF_CONTAINED_LIVE_NO_FINGER",
     "WINDOWS_INTEROP_APPROVAL",
-    "WINDOWS_LINUX_PING_PONG"
+    "WINDOWS_LINUX_PING_PONG",
+    "SELF_CONTAINED_BIOMETRIC_STACK"
   ],
   "pending_gates": [
-    "SELF_CONTAINED_BIOMETRIC_STACK",
     "SELF_CONTAINED_RELEASE_CANDIDATE",
     "PUBLICATION_CLEANUP",
     "FINAL_DOCUMENTATION_AND_RELEASE_READINESS"
@@ -111,7 +111,17 @@
       "P7_LIVE_ZERO_WRITE_SAME_OS_REOPEN_AFTER_RESTORE",
       "P7_LIVE_WINDOWS_W2_SECOND_CYCLE_REPEATED_RESTORE_OF_SAME_L1",
       "P7_LIVE_FINAL_ZERO_E0_SAME_OS_REOPEN_ON_TARGET",
-      "WINDOWS_GENERATED_BB010002_STRUCTURAL_ACCEPTANCE_ON_TARGET"
+      "WINDOWS_GENERATED_BB010002_STRUCTURAL_ACCEPTANCE_ON_TARGET",
+      "P8_STOCK_KDE_ENROLLMENT_TWO_FINGERS_ON_SELF_CONTAINED_BOOTSTRAP",
+      "P8_STOCK_VERIFY_MATCH_AND_NO_MATCH_ON_TARGET",
+      "P8_STOCK_IDENTIFY_WITH_TWO_ENROLLED_FINGERS_ON_TARGET",
+      "P8_PLASMA_LOGIN_KSCREENLOCKER_SUDO_POLICYKIT_FINGERPRINT_AUTHENTICATION",
+      "P8_BOUNDED_THREE_ATTEMPT_SERIES_WITH_PASSWORD_FALLBACK_ON_TARGET",
+      "P8_CANCEL_AND_RELEASE_PATHS_CLEAN_ON_TARGET",
+      "P8_BASELINE_FDT_CLEAN_DURING_LIVE_BIOMETRIC_USE",
+      "P8_STOCK_TEMPERATURE_LIFECYCLE_UNMODIFIED_BY_DRIVER",
+      "P8_COLD_LOGIN_PASS_WITH_ONE_SECOND_READINESS_DELAY",
+      "WINDOWS_HELLO_FUNCTIONAL_ROUND_TRIP_SUPPLEMENTAL"
     ],
     "inferred": [],
     "initial_blockers": []
@@ -167,9 +177,9 @@
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "Remain idle at the P8 handoff boundary. WINDOWS_LINUX_PING_PONG=PASS closes P7 and the User executes P8 manually with a bounded operator-side approach, so AI PM must not advance into active P8 orchestration, request P8 live tests, implement speculative P8 changes, modify P8 evidence or P8-specific documentation, create P8 gates, or infer P8 PASS from historical pre-self-contained enrollment/login/sudo/PolicyKit evidence, which is background only. Resume only when the User supplies a consolidated P8 PASS/FAIL evidence package, or bounded P8 failure evidence naming a concrete implementation defect for code analysis. No pairing, E0, secure-session or state-v2 write path changes while waiting.",
-  "last_verified_head": "1f0f5ca",
-  "state_note": "P0A through P7 are accepted; WINDOWS_LINUX_PING_PONG=PASS closes P7 on the operator-reported bounded sequence L1 -> W1 -> L1 -> W2 -> L1 executed manually on the qualification reader with the same Windows 11 VM and USB passthrough, and no Windows enrollment, reset, driver reinstall, firmware operation or manual PSK manipulation. Criterion-by-criterion: Windows recovered autonomously twice (clean OEM enumeration with no warning indicator, plus a pairing replacement that the following Linux run proved had occurred); Linux recognized each replacement read-only before restoring, classifying ACTIVE-plus-validator-mismatch as external replacement and never attributing it automatically to Windows; the same stored L1 was actually reused, since disposition 2 RESTORE_ACTIVE_PSK copies the PSK from the ACTIVE state-v2 record and no disposition 1 NEW_PSK was ever selected; each OS transition cost exactly one qualified write (pairing_writes=1, persistent=1, prepared and E0 reserved once, readback and validator matching, TLS proven, ACTIVE promoted) with the live Windows BB010002 preserved byte-for-byte as the written host object; each same-OS reopen stayed at zero writes and zero E0 through disposition 4 REUSE_ACTIVE_TLS; the repeated W2/L1 cycle created no new Linux key and no loop, only the expected alternating host-side state-v2 generation per qualified write; a second writer is excluded by construction, because the pairing writer has the single activation caller, one logical E0 per transaction, no automatic retry, a durable PREPARED reservation before submit and fail-closed reconciliation, and the live sequence showed no writer during Windows ownership; neither OS was left unrecoverable, since both Windows transitions started from a Linux L1 state and succeeded and Linux restored from each Windows state. Evidence boundary, recorded publicly in docs/VALIDATION.md: no Windows fingerprint enrollment or authentication was performed, so Windows biometric functionality stays outside the qualified scope, and the decisive counters are summarized there while the operator holds the full sanitized audit blocks. Each Linux run also completed the seven-command read-only preflight, so the generalized structural validator accepted two Windows-generated BB010002 objects on the target. ROADMAP.md section 2 promotes repeated L1/Wn reuse and the stable cycle to PROVEN, which only this gate may do. Offline evidence at 1f0f5ca: the closure touched only governance and public documentation, so the public source ledger stays ALL_DIGESTS_MATCH and GOODIX_BUILD=PASS SOURCE_ID=1fb93468bd4f8b0ae717a2e92da4684b00c99fdb8cf3e3e0693fa6f0e1a34aea is unchanged; the code tree is identical to the fully verified 800f445, and at 1f0f5ca the pairing activation suite was re-run 10/10 and the read-only preflight suite passed. REAL_USB_ACCESS=0 and REAL_USB_SUBMIT=0 throughout; no agent reader access, no privileged host mutation and no pairing or E0 change in this task. P6 item 8 remains closed on accepted offline evidence with its residual risk stated. Persisting the learned FDT table through the existing state-v2 fdt_present/fdt_table mechanism remains deferred to P9. Git/evidence/ROADMAP.md remain authoritative.",
+  "next_action": "Remain idle at the passive P9 boundary. SELF_CONTAINED_BIOMETRIC_STACK=PASS closes P8 and NEXT=P9 is recorded as the roadmap successor only. The User executes P9 separately and manually, so AI PM must not start P9, run a P9 preflight, inspect or modify code for P9 implementation work, request P9 live tests, create P9 gates, modify P9 evidence or qualification status, execute fresh-install/migration/update/reinstall/rollback/uninstall or state-v2 preserve-purge qualification as P9 activity, schedule or orchestrate P9, or infer P9 PASS from historical evidence. Resume only on an explicit User P9 instruction or evidence package, or on bounded P8/P9 failure evidence naming a concrete implementation defect for code analysis. No pairing, E0, secure-session or state-v2 write path changes while waiting.",
+  "last_verified_head": "22b3d0e",
+  "state_note": "P0A through P8 are accepted; SELF_CONTAINED_BIOMETRIC_STACK=PASS closes P8 on the operator-reported bounded live sequence executed manually on the qualification reader after the P7 interoperability qualification, with no firmware, reset or reprovisioning path involved. Criterion-by-criterion: the canonical KDE Users/Fingerprint enrollment completed for right-index-finger and then left-index-finger (enroll_stages=8, enroll_contacts=8, enroll_retry_scans=0, enroll_terminal=1) with zero pairing writes; stock fprintd-verify returned verify-match on the first physical contact (capture_attempts=1, capture_terminal=1, first_image=1) and verify-no-match for a deliberately non-enrolled finger without internal retry; with two fingers enrolled, fprintd-verify -f any ran a real FPI_DEVICE_ACTION_IDENTIFY that matched on attempt 1, so VERIFY and IDENTIFY are independently exercised in the stock stack; Plasma Login, KScreenLocker, ordinary sudo and PolicyKit each authenticated by fingerprint without a password, with pam_fprintd recorded as grantor for sudo, polkit-agent-helper-1 and plasmalogin-helper; every bounded failure series stopped at three NO_MATCH attempts with no attempt=4 and password fallback then succeeded, which matches the implementation because a login context is reused only while login_attempts < 3 and only after a completed NO_MATCH release tail, while a MATCH sets the terminal fence; the second login 1->2->3 series was explicitly operator-triggered, so no hidden retry is evidenced; cancel before contact captured no image and still drained and closed cleanly; release paths reported release_tail=1 and single_terminal=1 on completed actions; the baseline/FDT path stayed clean under real biometric use (fdt_samples=3, fdt_learned_once=1, fdt_delta_within=2, fdt_delta_outside=0, fdt36_submits=3, fdt_baseline_b0=1, fdt_baseline_decode=1, secure_failure=0), which is P8 integration evidence and not a new P3 qualification; the temperature criterion is satisfied at the level the implementation supports, since repository inspection shows the driver defines no Goodix-specific thermal override, sets no temp_hot_seconds and adds no custom branch, so the stock libfprint FpTemperature model and its automatic fpi_device_update_temp lifecycle applied unchanged, and no synthetic forced-HOT transition was performed or claimed; every action reported persistent=0, pairing_writes=0, pairing_e0_reserved=0, pairing_active_reused=1, secure_e4_contract=MATCH, outstanding=0, drained=1 and context_closed=1, so ordinary biometric use never wrote pairing state. Cold login passed with the known roughly one-second readiness delay after submitting at the greeter, which is the already documented consequence of preparation starting with the authentication action; it is not zero-latency behavior. Supplemental interoperability evidence, recorded without reopening P7: a real Windows Hello round-trip passed - Windows Hello enrollment and authentication in the VM, Linux fingerprint authentication, then authentication with the previously enrolled Windows Hello finger and again on Linux - with no reset, firmware operation, driver reinstall, manual PSK manipulation or deliberate reprovisioning. ROADMAP.md needed no edit, because it carries no per-phase status field and P8 promotes no section 2 INFERRED entry; completion is recorded here and in docs/VALIDATION.md, and TECHNICAL_MANUAL.md received no operator telemetry since its stable limitation table already states the one-second contact guidance. Offline evidence at 22b3d0e: the closure touched only public documentation and the state cache, so the public source ledger stays ALL_DIGESTS_MATCH and GOODIX_BUILD=PASS SOURCE_ID=1fb93468bd4f8b0ae717a2e92da4684b00c99fdb8cf3e3e0693fa6f0e1a34aea is unchanged; the code tree is identical to the fully verified 800f445. REAL_USB_ACCESS=0 and REAL_USB_SUBMIT=0 throughout; no agent reader access, no privileged host mutation and no pairing or E0 change in this task. P6 item 8 remains closed on accepted offline evidence with its residual risk stated. Persisting the learned FDT table through the existing state-v2 fdt_present/fdt_table mechanism remains deferred to P9, which is operator-managed and not started. Git/evidence/ROADMAP.md remain authoritative.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }
