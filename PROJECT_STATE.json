@@ -98,7 +98,9 @@
       "P6_ONE_SHOT_PAIRING_ACTIVATION_PRODUCTION_GRAPH_OFFLINE",
       "P6_PAIRING_CRASH_WINDOW_AND_RECOVERY_MATRIX_OFFLINE",
       "P6_ORDINARY_ACTIVE_REOPEN_ZERO_E0_OFFLINE",
-      "P6_POST_E0_AMBIGUITY_FAIL_CLOSED_OFFLINE"
+      "P6_POST_E0_AMBIGUITY_FAIL_CLOSED_OFFLINE",
+      "P6_LIVE_SINGLE_E0_PAIRING_ACTIVATION_ON_TARGET",
+      "FDT_FIRST_BASELINE_TOUCH_MASK_CONTEXTUAL_OFFLINE"
     ],
     "inferred": [
       "REPEATED_REUSE_OF_SAME_LINUX_PSK_AFTER_WINDOWS_RETURN",
@@ -108,7 +110,7 @@
     "initial_blockers": []
   },
   "current_blockers": [
-    "P6_LIVE_SINGLE_E0_AWAITS_HUMAN_GATE_APPROVAL"
+    "P6_LIVE_ZERO_E0_ACTIVE_REOPEN_AWAITS_HUMAN_GATE_APPROVAL"
   ],
   "host_modified": false,
   "relevant_artifacts": [
@@ -160,9 +162,9 @@
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "Stop at HUMAN_REQUIRED GATE=P6_SINGLE_E0_LIVE_APPROVAL: authorize the first production one-shot Linux pairing transaction (canonical P6 items 3-6: durable PREPARED reservation, maximum one E0, ACK/completion plus BB010002/BB020003 readback plus TLS proof, then post-TLS zero-seed FDT no-finger) on the physical Fedora 44 KDE host with the offline-qualified candidate commit dcaf965. Do not install or run the candidate before that explicit approval.",
-  "last_verified_head": "dcaf965",
-  "state_note": "P0A through P5 are accepted. The approved canonical P6 order is in ROADMAP.md: read-only target/CONFIG90 items 1-2 are live-proven; item 3 journal PREPARED, item 4 maximum one E0, item 5 ACK/completion plus BB010002 unchanged plus BB020003 match plus TLS, item 6 zero-seed FDT only after TLS, then zero-E0 reopen and read-only crash recovery. The interrupted WIP checkpoint 5d61d24 was recovered, audited and completed offline: goodix_pairing_activation durably reserves PREPARED with e0_attempted and the BB010002 digest before constructing E0, delegates the frame to the qualified provision boundary, requires both exact readbacks before exposing secure material, promotes ACTIVE only after the TLS STOP proof, and never retries E0; ambiguous or prior-validator states fail closed through state-v2 reconciliation. Offline evidence: activation crash-window suite (9 cases), integrated fake-USB production graph proving preflight(7/7 read-only) -> pairing -> single E0 -> readbacks -> TLS 1.2 PSK handshake -> ACTIVE promotion -> zero-seed post-TLS handoff, ordinary ACTIVE reopen with zero E0, fail-closed reopen after an ambiguous reservation (USE_PRIOR_REQUIRED, no second E0), all module suites and the 63-test fpimage suite in normal and ASan/UBSan modes inside a no-device sandbox (epoch audit: persistent=1, pairing_writes=1, real_submit=0, drained=1, context_closed=1), and public build GOODIX_BUILD=PASS SOURCE_ID=7d7e285c79e0551da9b871ecffa13c087c8d01396203872b114ef29ab6547305. Source audit now reports P6_PRODUCTION_E0_WRITER_HAS_ONE_REVIEWED_RUNTIME_CALLER and VERIFY also routes through the read-only preflight, so installing this candidate on the qualification host could enter the pairing path from an ordinary biometric action; installation and any live E0 remain forbidden until the P6_SINGLE_E0_LIVE_APPROVAL gate. REAL_USB_ACCESS=0 and REAL_USB_SUBMIT=0 throughout recovery. Git/evidence/ROADMAP.md remain authoritative.",
+  "next_action": "Stop at HUMAN_REQUIRED GATE=P6_ZERO_E0_ACTIVE_REOPEN_LIVE_APPROVAL: authorize one ordinary ACTIVE reopen of the already paired reader on the physical Fedora 44 KDE host with candidate commit 5df5f64 (canonical P6 item 7). The reopen must emit zero E0 and no other persistent sensor write; it re-runs the read-only preflight, selects the ACTIVE state-v2 record, completes the secure session and TLS proof, and then the zero-seed FDT bootstrap whose first manual sample may legitimately report touch mask 0x003f. Do not install or run the candidate before that explicit approval, and do not repeat the pairing transaction.",
+  "last_verified_head": "5df5f64",
+  "state_note": "P0A through P5 are accepted. The operator reports that the authorized one-shot live pairing transaction completed fully on the qualification reader: canonical P6 items 3-5 (durable PREPARED reservation, exactly one E0, ACK/completion with BB010002 unchanged and BB020003 match, TLS proof) and the ACTIVE promotion. Pairing and E0 remain untouched by the work below and must not be repeated. Item 6, the zero-seed FDT no-finger continuation, stopped at the first manual sample because the lifecycle required IRQ 0x0100 flags=0 while the target reported flags=0x003f. Root cause is a modeling error, not a device or pairing anomaly: the touch mask is relative to the FDT reference in effect, the first 0x36 carries the host seed (all zeros in absent-seed mode), so all six channels necessarily differ. The same 0x003f was already observed live on the legacy supplied-seed runtime, and the OEM corpus shows 0x0000 only for warm bootstraps whose persisted table matches the sensor, while samples two and three are zero in both corpora because their reference is the table just learned. Corrective: the first baseline sample accepts any subset of the six known channel bits; samples two and three keep exact zero; reserved bits, the 0x00/0xFF component filter, both delta gates against the returned threshold, the three-sample bound and the no-retry rule are unchanged; enrollment contact, zero-mask and finger-up rules are unchanged. Offline evidence at 5df5f64: post-TLS lifecycle suite 26/26 normal and ASan/UBSan including first-sample 0x003f/0x002f acceptance, reserved-bit rejection, late-sample disturbance rejection and the target-observed 0x003f/0/0 sequence; all eight C module suites; 63-test fpimage suite normal and sanitized in a no-device sandbox with the P6 pairing graph unchanged; Python deployment/build suites; source ledger ALL_DIGESTS_MATCH; public build GOODIX_BUILD=PASS SOURCE_ID=c3a0a4e3f22050265f3a695a9120297a15657aa8dbe3abc150df2a6efa5a8013. REAL_USB_ACCESS=0 and REAL_USB_SUBMIT=0 throughout. Persisting the learned FDT table through the existing state-v2 fdt_present/fdt_table mechanism is deliberately not implemented: it is not part of the P6 exit gate, and adding a second durable write inside the live pairing window would change the qualified single-write audit signature. Git/evidence/ROADMAP.md remain authoritative.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }
