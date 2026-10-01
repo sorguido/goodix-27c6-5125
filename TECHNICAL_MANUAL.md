@@ -558,9 +558,10 @@ classification failure terminate the attempt and clear that candidate. The
 decoded image baseline remains action-local and is never part
 of the persistence interface. Legacy activation marks its imported seed as
 supplied. State-v2 activation uses the authenticated 12-byte table when present
-and represents an absent table as a zero seed; the later live qualification
-gate must prove the explicit missing-seed lifecycle before enabling
-self-initialization.
+and represents an absent table as a zero seed. The explicit missing-seed
+lifecycle is qualified on the target, so FDT initialization needs no imported
+cache file; each action learns its own table and the learned table is not
+carried across actions.
 
 ### 6.4 FDT table derivation and arming
 

@@ -683,6 +683,88 @@ test_crash_after_accepted_e0_recovers_without_e0 (void)
   remove_state_directory (directory);
 }
 
+/* The qualified host layout after a successful pairing: the journaled PREPARED
+ * generation remains in slot A while the promotion wrote ACTIVE to slot B.
+ * Losing the whole ACTIVE generation must recover read-only from the superseded
+ * PREPARED receipt, without constructing another E0. */
+static void
+test_active_generation_loss_recovers_from_superseded_prepared (void)
+{
+  GoodixLivePreflightEvidence evidence = evidence_fixture ();
+  GoodixPairingActivationPaths paths = { 0 };
+  GoodixPairingActivationPolicy policy = { 0 };
+  GoodixPairingActivationAudit audit;
+  GoodixPairingActivationAudit recovery_audit;
+  GoodixPairingActivationAudit reopen_audit;
+  g_autofree gchar *directory = new_state_directory ();
+  g_autofree gchar *secret_a = NULL;
+  g_autofree gchar *receipt_a = NULL;
+  g_autofree gchar *secret_b = NULL;
+  g_autofree gchar *receipt_b = NULL;
+  g_autoptr(GoodixPairingActivation) activation = NULL;
+  g_autoptr(GoodixPairingActivation) recovery = NULL;
+  g_autoptr(GoodixPairingActivation) reopen = NULL;
+  guint8 psk[32];
+  guint8 envelope[102];
+  guint8 validator[32];
+
+  secret_a = g_build_filename (directory, "secret-a.bin", NULL);
+  receipt_a = g_build_filename (directory, "receipt-a.bin", NULL);
+  secret_b = g_build_filename (directory, "secret-b.bin", NULL);
+  receipt_b = g_build_filename (directory, "receipt-b.bin", NULL);
+  fill_test_psk (psk, 0x80u);
+  g_assert_true (goodix_pairing_crypto_derive (psk, sizeof psk, envelope,
+                                               validator, NULL));
+  init_paths_policy (&paths, &policy, directory);
+  activation = goodix_pairing_activation_new_for_test (
+    &paths, &policy, &evidence, psk, &audit, NULL);
+  g_assert_nonnull (activation);
+  feed_successful_write_and_readback (activation, validator);
+  g_assert_true (goodix_pairing_activation_mark_tls_and_promote (activation,
+                                                                 NULL));
+  g_clear_pointer (&activation, goodix_pairing_activation_free);
+  g_assert_true (g_file_test (secret_a, G_FILE_TEST_EXISTS));
+  g_assert_true (g_file_test (receipt_a, G_FILE_TEST_EXISTS));
+  g_assert_true (g_file_test (secret_b, G_FILE_TEST_EXISTS));
+  g_assert_true (g_file_test (receipt_b, G_FILE_TEST_EXISTS));
+
+  /* Displace the ACTIVE generation; both slot artifacts go together. */
+  g_assert_cmpint (g_remove (secret_b), ==, 0);
+  g_assert_cmpint (g_remove (receipt_b), ==, 0);
+
+  memcpy (evidence.validator, validator, sizeof evidence.validator);
+  recovery = goodix_pairing_activation_new_for_test (
+    &paths, &policy, &evidence, psk, &recovery_audit, NULL);
+  g_assert_nonnull (recovery);
+  g_assert_cmpint (recovery_audit.disposition, ==,
+                   GOODIX_PAIRING_ACTIVATION_DISPOSITION_RECOVER_PREPARED_TLS);
+  g_assert_true (recovery_audit.recovered_without_e0);
+  g_assert_true (recovery_audit.prepared_journaled);
+  g_assert_true (recovery_audit.e0_reserved_before_submit);
+  g_assert_cmpuint (recovery_audit.persistent_write_count, ==, 0u);
+  g_assert_cmpuint (recovery_audit.provision.logical_e0_count, ==, 0u);
+  g_assert_null (goodix_pairing_activation_next_request (recovery, NULL));
+  g_assert_true (goodix_pairing_activation_mark_tls_and_promote (recovery,
+                                                                 NULL));
+  g_assert_true (recovery_audit.tls_proven);
+  g_assert_true (recovery_audit.active_promoted);
+  g_clear_pointer (&recovery, goodix_pairing_activation_free);
+
+  /* The recovered generation is an ordinary ACTIVE record. */
+  reopen = goodix_pairing_activation_new_for_test (
+    &paths, &policy, &evidence, psk, &reopen_audit, NULL);
+  g_assert_nonnull (reopen);
+  g_assert_cmpint (reopen_audit.disposition, ==,
+                   GOODIX_PAIRING_ACTIVATION_DISPOSITION_REUSE_ACTIVE_TLS);
+  g_assert_true (reopen_audit.active_reused_without_e0);
+  g_assert_cmpuint (reopen_audit.persistent_write_count, ==, 0u);
+  g_assert_null (goodix_pairing_activation_next_request (reopen, NULL));
+  g_assert_true (goodix_pairing_activation_mark_tls_and_promote (reopen, NULL));
+  g_assert_false (reopen_audit.active_promoted);
+  g_clear_pointer (&reopen, goodix_pairing_activation_free);
+  remove_state_directory (directory);
+}
+
 /* Window 14: a proven external replacement of an ACTIVE generation reuses the
  * same Linux PSK in a new generation with exactly one new E0. */
 static void
@@ -798,6 +880,8 @@ main (int argc,
                    test_readback_mismatch_fails_closed);
   g_test_add_func ("/goodix/pairing-activation/crash-after-accepted-e0-recovers",
                    test_crash_after_accepted_e0_recovers_without_e0);
+  g_test_add_func ("/goodix/pairing-activation/active-generation-loss-recovers",
+                   test_active_generation_loss_recovers_from_superseded_prepared);
   g_test_add_func ("/goodix/pairing-activation/external-replacement-restores-psk",
                    test_external_replacement_restores_linux_psk);
   g_test_add_func ("/goodix/pairing-activation/production-csprng-construction",
