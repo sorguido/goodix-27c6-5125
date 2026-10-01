@@ -121,9 +121,13 @@ recognition accuracy, hardware behavior or complete operating-system recovery.
 - Full factory-state readback, exhaustive Windows compatibility, power-loss recovery
   and every future update combination have not been demonstrated.
 - The seven-command read-only target and CONFIG90 preflight is qualified on the
-  real reader. The state-v2 pairing mutation, readback/TLS proof, zero-seed FDT
-  continuation and ordinary reopen remain offline-qualified only; they require
-  their separate live no-finger authorization and evidence.
+  real reader. The state-v2 one-shot pairing transaction - a single logical
+  `E0`, the exact `BB010002` and `BB020003` readbacks, the TLS proof and ACTIVE
+  promotion - completed on the real reader in the tested configuration. The
+  zero-seed FDT continuation that follows it is not qualified: its first live
+  attempt stopped at the first manual sample. The ordinary zero-`E0` reopen and
+  the read-only crash recovery remain offline-qualified only and require their
+  separate live no-finger authorization and evidence.
 
 Report exact behavior and errors without protected data. See
 [Security](SECURITY.md), [Installation](INSTALLATION.md) and [Removal](UNINSTALL.md).

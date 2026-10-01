@@ -472,6 +472,56 @@
         "P6",
         "P10"
       ]
+    },
+    {
+      "path": "docs/VALIDATION.md",
+      "git_status": "modified",
+      "role": "PUBLIC_VALIDATION_SCOPE",
+      "relevance": [
+        "P6",
+        "P8",
+        "P11"
+      ]
+    },
+    {
+      "path": "libfprint-driver/goodix_fdt_irq_policy.c",
+      "git_status": "modified",
+      "role": "FDT_IRQ_CONTEXTUAL_FLAGS_POLICY",
+      "relevance": [
+        "P3",
+        "P6",
+        "P8"
+      ]
+    },
+    {
+      "path": "libfprint-driver/goodix_fdt_irq_policy.h",
+      "git_status": "modified",
+      "role": "FDT_IRQ_POLICY_INTERFACE",
+      "relevance": [
+        "P3",
+        "P6",
+        "P8"
+      ]
+    },
+    {
+      "path": "libfprint-driver/goodix_post_tls_lifecycle.c",
+      "git_status": "modified",
+      "role": "POST_TLS_FDT_BOOTSTRAP_LIFECYCLE",
+      "relevance": [
+        "P3",
+        "P6",
+        "P8"
+      ]
+    },
+    {
+      "path": "libfprint-driver/tests/test_goodix_post_tls_lifecycle.c",
+      "git_status": "modified",
+      "role": "POST_TLS_LIFECYCLE_HOST_TESTS",
+      "relevance": [
+        "P3",
+        "P6",
+        "P10"
+      ]
     }
   ],
   "main_only_delta_at_baseline": [],
@@ -527,7 +577,7 @@
         "libfprint-driver/tests/test_goodix_post_tls_lifecycle.c",
         "libfprint-driver/tests/run_goodix_post_tls_test.sh"
       ],
-      "note": "The current runtime explicitly selects the supplied legacy seed; state-v2/coordinator integration may select the proven absent-zero mode later."
+      "note": "State-v2 activation selects the explicit absent-zero seed mode, so the first manual 0x36 carries an all-zero reference. The IRQ 0x0100 touch mask is relative to the reference in effect: the first sample accepts any subset of the six channel bits, while the second and third samples still require exact zero because their reference is the table learned from the preceding sample."
     },
     "P4": {
       "purpose": "Crash-safe per-reader state-v2 and side-by-side legacy migration.",
@@ -560,7 +610,7 @@
         "development/psk/README.md",
         "docs/LICENSING_AND_PROVENANCE.md"
       ],
-      "note": "The pairing writer has exactly one reviewed production caller: the crash-safe activation orchestration in goodix_pairing_activation. The full preflight -> PREPARED reservation -> single E0 -> readback -> TLS -> ACTIVE -> zero-seed FDT chain, the crash/failure windows and the fail-closed reopen behavior are qualified offline with fake USB; no live E0 has occurred and installation of this candidate requires its separate Human Gate."
+      "note": "The pairing writer has exactly one reviewed production caller: the crash-safe activation orchestration in goodix_pairing_activation. The preflight -> PREPARED reservation -> single E0 -> exact readbacks -> TLS proof -> ACTIVE promotion transaction is live-proven on the qualification reader; the zero-seed FDT continuation that follows it stopped at the first manual sample and is not qualified. The first-sample touch-mask boundary is corrected and offline-qualified. The ordinary zero-E0 ACTIVE reopen and read-only crash recovery remain offline-qualified only."
     },
     "P10": {
       "purpose": "Publication cleanup and classification.",

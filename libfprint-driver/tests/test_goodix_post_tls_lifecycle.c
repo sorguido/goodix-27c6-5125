@@ -32,11 +32,7 @@ typedef struct
   guint new_owner_completion_count;
   gboolean handoff_should_fail;
   gboolean stop_before_finger;
-  guint16 baseline_flags;
   const guint16 *baseline_flag_sequence;
-  gboolean response_before_ack;
-  gboolean stop_before_82;
-  guint reverse_events;
   guint64 generation;
   uint16_t expected[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
   guint8 expected_up[12];
@@ -555,7 +551,7 @@ run_full_trace (Fixture *fixture,
       event = build_event (0x36, 0x0100,
                            fixture->baseline_flag_sequence != NULL ?
                              fixture->baseline_flag_sequence[fdt_index] :
-                             fixture->baseline_flags,
+                             (guint16) 0,
                            (guint16) (0x0300u + fdt_index * 0x20u));
       feed_frame (fixture, event, fragmentation);
       if (fdt_index == 0)
@@ -570,16 +566,11 @@ run_full_trace (Fixture *fixture,
       else if (fdt_index == 1)
         {
           complete_command (fixture, 0x82, NULL, 0);
-          if (fixture->stop_before_82)
-            return;
           g_clear_pointer (&ack, g_bytes_unref);
           ack = build_ack (0x82);
           g_clear_pointer (&typed, g_bytes_unref);
           typed = build_response (0x82, typed82, sizeof typed82);
-          if (fixture->response_before_ack)
-            feed_pair (fixture, typed, ack, fragmentation);
-          else
-            feed_pair (fixture, ack, typed, fragmentation);
+          feed_pair (fixture, ack, typed, fragmentation);
           complete_command (fixture, 0x20, cmd01, sizeof cmd01);
           g_clear_pointer (&ack, g_bytes_unref);
           ack = build_ack (0x20);
@@ -607,12 +598,6 @@ run_full_trace (Fixture *fixture,
     {
       g_assert_true (g_queue_is_empty (fixture->out));
       return;
-    }
-  for (guint i = 0; i < fixture->reverse_events; i++)
-    {
-      g_clear_pointer (&event, g_bytes_unref);
-      event = build_event (0x32, 0x0080, 0x0000, 0x0180);
-      feed_frame (fixture, event, fragmentation);
     }
   if (fixture->stop_before_finger)
     return;
@@ -853,7 +838,7 @@ test_zero_seed_timeout_fails_cleanly (void)
 }
 
 static void
-test_zero_seed_disturbed_duplicate_and_malformed_fail (void)
+test_zero_seed_reserved_duplicate_and_malformed_fail (void)
 {
   for (guint scenario = 0; scenario < 3u; scenario++)
     {
@@ -865,7 +850,7 @@ test_zero_seed_disturbed_duplicate_and_malformed_fail (void)
 
       drive_to_first_fdt_sample (fixture);
       if (scenario == 0u)
-        frame = build_event (0x36, 0x0100, 0x0001, 0x0300);
+        frame = build_event (0x36, 0x0100, 0x0040, 0x0300);
       else if (scenario == 1u)
         frame = build_ack (0x36);
       else
@@ -1243,55 +1228,104 @@ test_zero_flags_invalid_baseline_is_not_enrollment_mismatch (void)
   fixture_free (fixture);
 }
 
-/* Characterization, not a fix or a simulation of firmware contact detection.
- * The metadata is target-observed in the 2026-09-15 D297 journal; the raw
+/* The mask sequence and the reserved-bit boundary are target-observed; the raw
  * channel values are synthetic. Do not append an invented IRQ2 to make the
  * missing-event case pass as an authentication. */
 static void
-test_login_baseline_contact_rejected (void)
+test_login_first_baseline_touch_mask_accepted (void)
 {
-  Fixture *fixture = fixture_new_for_profile (
-    GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION);
-  guint8 state[16] = { 0 };
-  g_autoptr(GBytes) ack_d4 = build_ack (0xd4);
-  g_autoptr(GBytes) ack_fdt = build_ack (0x36);
-  g_autoptr(GBytes) event = build_event (0x36, 0x0100, 0x003f, 0x0300);
-  g_autoptr(GBytes) ae = NULL;
+  const guint16 masks[] = { 0x003f, 0x002f };
 
-  state[1] = 0x02;
-  ae = build_response (0xae, state, sizeof state);
+  for (guint i = 0; i < G_N_ELEMENTS (masks); i++)
+    {
+      Fixture *fixture = fixture_new_for_profile (
+        GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION);
+      guint8 state[16] = { 0 };
+      g_autoptr(GBytes) ack_d4 = build_ack (0xd4);
+      g_autoptr(GBytes) ack_fdt = build_ack (0x36);
+      g_autoptr(GBytes) event = build_event (0x36, 0x0100, masks[i], 0x0300);
+      g_autoptr(GBytes) ae = NULL;
+
+      state[1] = 0x02;
+      ae = build_response (0xae, state, sizeof state);
+      g_assert_true (goodix_post_tls_lifecycle_start (fixture->lifecycle, NULL));
+      complete_command (fixture, 0xd4, NULL, 0);
+      feed_frame (fixture, ack_d4, 0);
+      complete_command (fixture, 0xaf, NULL, 0);
+      feed_frame (fixture, ae, 0);
+      complete_command (fixture, 0x36, NULL, 0);
+      feed_frame (fixture, ack_fdt, 0);
+      feed_frame (fixture, event, 0);
+
+      g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->lifecycle),
+                       ==, GOODIX_POST_TLS_PHASE_FDT_NAV_1);
+      g_assert_false (fixture->audit.rejected_a0_observed);
+      g_assert_cmpuint (fixture->audit.fdt_irq100_count, ==, 1u);
+      g_assert_cmpuint (fixture->audit.command_count, ==, 4u);
+      complete_command (fixture, 0x50, NULL, 0);
+      goodix_post_tls_lifecycle_cancel (fixture->lifecycle, "test cancellation");
+      g_assert_cmpuint (fixture->audit.first_image_command_count, ==, 0u);
+      g_assert_cmpuint (fixture->terminal_count, ==, 1u);
+      g_assert_true (g_queue_is_empty (fixture->out));
+      g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
+      g_assert_cmpuint (goodix_fpi_usb_backend_get_real_submit_count (
+                         fixture->backend), ==, 0u);
+      fixture_free (fixture);
+    }
+}
+
+/* The second and third samples are measured against the table learned from the
+ * preceding sample, so a touch bit there is a real disturbance. */
+static void
+test_zero_seed_late_touch_disturbance_fails (void)
+{
+  Fixture *fixture = fixture_new_for_profile_and_seed (
+    GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION,
+    GOODIX_POST_TLS_FDT_SEED_ABSENT_ZERO);
+  guint8 state[16] = { 0, 2 };
+  guint8 nav[2409] = { 0 };
+  guint8 learned[GOODIX_POST_TLS_FDT_TABLE_LENGTH];
+  g_autoptr(GBytes) ack = build_ack (0xd4);
+  g_autoptr(GBytes) typed = build_response (0xae, state, sizeof state);
+  g_autoptr(GBytes) first = build_event (0x36, 0x0100, 0x003f, 0x0300);
+  g_autoptr(GBytes) nav_frame = NULL;
+  g_autoptr(GBytes) late = NULL;
+
+  nav[0] = 0x50;
+  nav[1] = 0x01;
+  nav_frame = build_nav_no_check (nav, sizeof nav);
   g_assert_true (goodix_post_tls_lifecycle_start (fixture->lifecycle, NULL));
   complete_command (fixture, 0xd4, NULL, 0);
-  feed_frame (fixture, ack_d4, 0);
+  feed_frame (fixture, ack, 0);
   complete_command (fixture, 0xaf, NULL, 0);
-  feed_frame (fixture, ae, 0);
+  feed_frame (fixture, typed, 0);
   complete_command (fixture, 0x36, NULL, 0);
-  feed_frame (fixture, ack_fdt, 0);
-  feed_frame (fixture, event, 0);
-
-#ifdef GOODIX_SAME_ACTION_TEST
-  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->lifecycle),
-                   ==, GOODIX_POST_TLS_PHASE_FDT_NAV_1);
-  g_assert_false (fixture->audit.rejected_a0_observed);
-  g_assert_cmpuint (fixture->audit.command_count, ==, 4u);
+  g_clear_pointer (&ack, g_bytes_unref);
+  ack = build_ack (0x36);
+  feed_frame (fixture, ack, 0);
+  feed_frame (fixture, first, 0);
   complete_command (fixture, 0x50, NULL, 0);
-  goodix_post_tls_lifecycle_cancel (fixture->lifecycle, "test cancellation");
-#else
+  g_clear_pointer (&ack, g_bytes_unref);
+  ack = build_ack (0x50);
+  feed_pair (fixture, ack, nav_frame, 0);
+  complete_command (fixture, 0x36, NULL, 0);
+  g_clear_pointer (&ack, g_bytes_unref);
+  ack = build_ack (0x36);
+  feed_frame (fixture, ack, 0);
+  late = build_event (0x36, 0x0100, 0x0001, 0x0320);
+  feed_frame (fixture, late, 0);
+
   g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->lifecycle),
                    ==, GOODIX_POST_TLS_PHASE_TERMINAL);
   g_assert_true (fixture->audit.rejected_a0_observed);
   g_assert_cmpint (fixture->audit.rejected_a0_phase,
-                   ==, GOODIX_POST_TLS_PHASE_FDT_IRQ100_1);
+                   ==, GOODIX_POST_TLS_PHASE_FDT_IRQ100_2);
   g_assert_cmpint (fixture->audit.rejected_a0_control, ==, 0x36);
   g_assert_cmpint (fixture->audit.rejected_a0_irq, ==, 0x0100);
-  g_assert_cmpint (fixture->audit.rejected_a0_flags, ==, 0x003f);
-  g_assert_cmpuint (fixture->audit.command_count, ==, 3u);
-  g_assert_cmpstr (goodix_post_tls_lifecycle_get_error (fixture->lifecycle)->message,
-                   ==, "unexpected post-TLS A0 frame or state: "
-                   "phase=FDT_IRQ100_1 expected=BASELINE_IRQ0100 control=0x36 "
-                   "body_length=16 irq=0x0100 flags=0x003f ack_expected=0x36 "
-                   "ack_seen=1 fdt_samples=0 baseline_ready=0 decision=reject");
-#endif
+  g_assert_cmpint (fixture->audit.rejected_a0_flags, ==, 0x0001);
+  g_assert_false (fixture->audit.learned_fdt_ready);
+  g_assert_false (goodix_post_tls_lifecycle_copy_learned_fdt (
+    fixture->lifecycle, learned));
   g_assert_cmpuint (fixture->audit.first_image_command_count, ==, 0u);
   g_assert_cmpuint (fixture->terminal_count, ==, 1u);
   g_assert_true (g_queue_is_empty (fixture->out));
@@ -1331,18 +1365,15 @@ test_login_readiness_without_irq2_does_not_capture (void)
   fixture_free (fixture);
 }
 
-#ifdef GOODIX_SAME_ACTION_TEST
 static void
-test_same_action_observed_masks_learn_without_finger_off (void)
+test_observed_mask_sequence_learns_without_finger_off (void)
 {
+  static const guint16 flags[] = { 0x003f, 0, 0 };
   Fixture *fixture = fixture_new_for_profile (
     GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION);
-  const guint16 flags[] = { 0x003f, 0, 0 };
   /* Only the mask sequence comes from the live. Raw values and frames are
    * synthetic: this proves host learning, not the firmware comparator. */
   fixture->baseline_flag_sequence = flags;
-  fixture->response_before_ack = TRUE;
-  fixture->reverse_events = 1;
   fixture->stop_before_finger = TRUE;
   run_full_trace (fixture, 1u);
   g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->lifecycle),
@@ -1356,6 +1387,7 @@ test_same_action_observed_masks_learn_without_finger_off (void)
   g_assert_cmpuint (fixture->finger_up_count, ==, 0u);
   g_assert_cmpuint (fixture->image_count, ==, 0u);
   g_assert_cmpuint (fixture->audit.retry_count, ==, 0u);
+  g_assert_cmpuint (fixture->audit.rearm_0x32_count, ==, 0u);
   g_assert_true (g_queue_is_empty (fixture->out));
   goodix_post_tls_lifecycle_cancel (fixture->lifecycle, "test deadline");
   g_assert_cmpuint (fixture->terminal_count, ==, 1u);
@@ -1363,16 +1395,18 @@ test_same_action_observed_masks_learn_without_finger_off (void)
   fixture_free (fixture);
 }
 
+/* Reserved bits fail closed on the first sample too, and independently of the
+ * seed mode: the relaxation covers only the six known channel bits. */
 static void
-test_same_action_baseline_scope (void)
+test_first_baseline_reserved_bits_rejected (void)
 {
-  for (guint i = 0; i < 3u; i++)
+  const guint16 flags[] = { 0x0040, 0x0080, 0x8000 };
+
+  for (guint i = 0; i < G_N_ELEMENTS (flags); i++)
     {
       Fixture *fixture = fixture_new_for_profile (
-        i == 2u ? GOODIX_POST_TLS_CAPTURE_PROFILE_TWO_ACQUISITION :
-                  GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION);
+        GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION);
       guint8 state[16] = { 0, 2 };
-      const guint16 flags[] = { 0x0040, 0x0001, 0x003f };
       g_autoptr(GBytes) ack_d4 = build_ack (0xd4);
       g_autoptr(GBytes) ack36 = build_ack (0x36);
       g_autoptr(GBytes) ae = build_response (0xae, state, sizeof state);
@@ -1388,80 +1422,11 @@ test_same_action_baseline_scope (void)
       g_assert_cmpuint (fixture->terminal_count, ==, 1u);
       g_assert_cmpuint (fixture->audit.command_count, ==, 3u);
       g_assert_true (fixture->audit.rejected_a0_observed);
+      g_assert_cmpint (fixture->audit.rejected_a0_flags, ==, flags[i]);
       g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
       fixture_free (fixture);
     }
 }
-
-static void
-test_same_action_known_prefix_then_irq (void)
-{
-  Fixture *fixture = fixture_new_for_profile (
-    GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION);
-  fixture->baseline_flags = 0x003f;
-  fixture->response_before_ack = TRUE;
-  fixture->reverse_events = 2;
-  run_full_trace (fixture, 1u);
-  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->lifecycle),
-                   ==, GOODIX_POST_TLS_PHASE_STOP);
-  g_assert_cmpuint (fixture->image_count, ==, 1u);
-  g_assert_cmpuint (fixture->audit.command_count, ==, 13u);
-  g_assert_cmpuint (fixture->audit.ack_count, ==, 12u);
-  g_assert_cmpuint (fixture->audit.rearm_0x32_count, ==, 0u);
-  g_assert_cmpuint (fixture->audit.retry_count, ==, 0u);
-  g_assert_cmpuint (fixture->audit.release_tail_complete_count, ==, 1u);
-  g_assert_cmpuint (goodix_fpi_usb_backend_get_real_submit_count (
-                     fixture->backend), ==, 0u);
-  fixture_free (fixture);
-}
-
-static void
-test_same_action_missing_irq_and_reverse_limit (void)
-{
-  Fixture *fixture = fixture_new_for_profile (
-    GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION);
-  g_autoptr(GBytes) reverse = build_event (0x32, 0x0080, 0, 0x0180);
-  fixture->baseline_flags = 0x003f;
-  fixture->response_before_ack = TRUE;
-  fixture->reverse_events = 2;
-  fixture->stop_before_finger = TRUE;
-  run_full_trace (fixture, 1u);
-  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->lifecycle),
-                   ==, GOODIX_POST_TLS_PHASE_FIRST_IRQ2);
-  g_assert_cmpuint (fixture->audit.command_count, ==, 9u);
-  g_assert_cmpuint (fixture->audit.first_image_command_count, ==, 0u);
-  g_assert_cmpuint (fixture->image_count, ==, 0u);
-  g_assert_true (g_queue_is_empty (fixture->out));
-  feed_frame (fixture, reverse, 1u);
-  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->lifecycle),
-                   ==, GOODIX_POST_TLS_PHASE_TERMINAL);
-  g_assert_cmpuint (fixture->terminal_count, ==, 1u);
-  g_assert_cmpuint (fixture->audit.command_count, ==, 9u);
-  g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
-  fixture_free (fixture);
-}
-
-static void
-test_same_action_duplicate_response_fails (void)
-{
-  Fixture *fixture = fixture_new_for_profile (
-    GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION);
-  const guint8 data[] = { 0, 32 };
-  g_autoptr(GBytes) response = build_response (0x82, data, sizeof data);
-  fixture->stop_before_82 = TRUE;
-  run_full_trace (fixture, 1u);
-  feed_frame (fixture, response, 1u);
-  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->lifecycle),
-                   ==, GOODIX_POST_TLS_PHASE_FDT_82);
-  g_assert_true (g_queue_is_empty (fixture->out));
-  g_assert_cmpuint (fixture->audit.command_count, ==, 6u);
-  feed_frame (fixture, response, 1u);
-  g_assert_cmpuint (fixture->terminal_count, ==, 1u);
-  g_assert_cmpuint (fixture->audit.command_count, ==, 6u);
-  g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
-  fixture_free (fixture);
-}
-#endif
 
 static void
 test_first_arm_backend_handoff (void)
@@ -1711,10 +1676,12 @@ main (int argc, char **argv)
                    test_zero_seed_learns_minimal_fdt);
   g_test_add_func ("/p3/zero-seed-timeout-fails-cleanly",
                    test_zero_seed_timeout_fails_cleanly);
-  g_test_add_func ("/p3/zero-seed-disturbed-duplicate-malformed-fail",
-                   test_zero_seed_disturbed_duplicate_and_malformed_fail);
+  g_test_add_func ("/p3/zero-seed-reserved-duplicate-malformed-fail",
+                   test_zero_seed_reserved_duplicate_and_malformed_fail);
   g_test_add_func ("/p3/zero-seed-mode-rejects-nonzero-table",
                    test_zero_seed_mode_rejects_nonzero_table);
+  g_test_add_func ("/p3/zero-seed-late-touch-disturbance-fails",
+                   test_zero_seed_late_touch_disturbance_fails);
   g_test_add_func ("/d278-12/rejected-a0-sanitized-telemetry",
                    test_rejected_a0_sanitized_telemetry);
   g_test_add_func ("/post-tls/rejected-controller-state-is-not-irq",
@@ -1725,17 +1692,13 @@ main (int argc, char **argv)
                    test_first_arm_backend_handoff);
   g_test_add_func ("/d279-21/first-arm-backend-handoff-failure",
                    test_first_arm_backend_handoff_failure);
-  g_test_add_func ("/login-latency/baseline-contact-rejected",
-                   test_login_baseline_contact_rejected);
+  g_test_add_func ("/post-tls/first-baseline-touch-mask-accepted",
+                   test_login_first_baseline_touch_mask_accepted);
+  g_test_add_func ("/post-tls/first-baseline-reserved-bits-rejected",
+                   test_first_baseline_reserved_bits_rejected);
   g_test_add_func ("/login-latency/readiness-without-irq2-does-not-capture",
                    test_login_readiness_without_irq2_does_not_capture);
-#ifdef GOODIX_SAME_ACTION_TEST
-  g_test_add_func ("/same-action/observed-masks-learn-without-finger-off",
-                   test_same_action_observed_masks_learn_without_finger_off);
-  g_test_add_func ("/same-action/baseline-scope", test_same_action_baseline_scope);
-  g_test_add_func ("/same-action/known-prefix-conditional-irq", test_same_action_known_prefix_then_irq);
-  g_test_add_func ("/same-action/missing-irq-reverse-limit", test_same_action_missing_irq_and_reverse_limit);
-  g_test_add_func ("/same-action/duplicate-response-fails", test_same_action_duplicate_response_fails);
-#endif
+  g_test_add_func ("/post-tls/observed-mask-sequence-learns-without-finger-off",
+                   test_observed_mask_sequence_learns_without_finger_off);
   return g_test_run ();
 }

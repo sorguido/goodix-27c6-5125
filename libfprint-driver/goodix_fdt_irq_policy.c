@@ -10,6 +10,8 @@ goodix_fdt_irq_flags_valid (GoodixFdtFlagsContext context,
     case GOODIX_FDT_FLAGS_BASELINE_SAMPLE:
     case GOODIX_FDT_FLAGS_FINGER_UP:
       return flags == 0u;
+    case GOODIX_FDT_FLAGS_BASELINE_FIRST_SAMPLE:
+      return (flags & (guint16) ~GOODIX_FDT_TOUCH_MASK) == 0u;
     case GOODIX_FDT_FLAGS_FINGER_DOWN:
     case GOODIX_FDT_FLAGS_CONTACT_SAMPLE:
       return flags != 0u && (flags & (guint16) ~GOODIX_FDT_TOUCH_MASK) == 0u;
@@ -66,14 +68,14 @@ derive_zero_touch_table (const guint8 raw[GOODIX_FDT_RAW_LENGTH],
   return TRUE;
 }
 
-gboolean
-goodix_fdt_derive_baseline_table (const guint8 raw[GOODIX_FDT_RAW_LENGTH],
-                                  guint16       touch_flags,
-                                  guint8        table[GOODIX_FDT_RAW_LENGTH])
+static gboolean
+derive_baseline_table (const guint8          raw[GOODIX_FDT_RAW_LENGTH],
+                       guint16               touch_flags,
+                       GoodixFdtFlagsContext context,
+                       guint8                table[GOODIX_FDT_RAW_LENGTH])
 {
   if (raw == NULL || table == NULL ||
-      !goodix_fdt_irq_flags_valid (GOODIX_FDT_FLAGS_BASELINE_SAMPLE,
-                                   touch_flags))
+      !goodix_fdt_irq_flags_valid (context, touch_flags))
     return FALSE;
   for (guint i = 0u; i < GOODIX_FDT_CHANNEL_COUNT; i++)
     {
@@ -87,6 +89,25 @@ goodix_fdt_derive_baseline_table (const guint8 raw[GOODIX_FDT_RAW_LENGTH],
       table[i * 2u + 1u] = component;
     }
   return TRUE;
+}
+
+gboolean
+goodix_fdt_derive_baseline_table (const guint8 raw[GOODIX_FDT_RAW_LENGTH],
+                                  guint16       touch_flags,
+                                  guint8        table[GOODIX_FDT_RAW_LENGTH])
+{
+  return derive_baseline_table (raw, touch_flags,
+                                GOODIX_FDT_FLAGS_BASELINE_SAMPLE, table);
+}
+
+gboolean
+goodix_fdt_derive_first_baseline_table (
+  const guint8 raw[GOODIX_FDT_RAW_LENGTH],
+  guint16       touch_flags,
+  guint8        table[GOODIX_FDT_RAW_LENGTH])
+{
+  return derive_baseline_table (raw, touch_flags,
+                                GOODIX_FDT_FLAGS_BASELINE_FIRST_SAMPLE, table);
 }
 
 gboolean

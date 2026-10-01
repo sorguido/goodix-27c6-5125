@@ -13,6 +13,7 @@ G_BEGIN_DECLS
 typedef enum
 {
   GOODIX_FDT_FLAGS_BASELINE_SAMPLE,
+  GOODIX_FDT_FLAGS_BASELINE_FIRST_SAMPLE,
   GOODIX_FDT_FLAGS_FINGER_DOWN,
   GOODIX_FDT_FLAGS_CONTACT_SAMPLE,
   GOODIX_FDT_FLAGS_FINGER_UP,
@@ -21,7 +22,9 @@ typedef enum
 /* The hash-gated APP12509 OEM handler interprets one touch bit per FDT
  * channel.  Contact contexts conservatively require at least one of the six
  * known bits; baseline and finger-up require zero.  Reserved high bits always
- * fail closed. */
+ * fail closed.  The first baseline sample instead accepts any subset of the
+ * six bits: its reference is the host seed, which an absent or stale seed
+ * cannot match, so the mask there carries no finger information. */
 gboolean goodix_fdt_irq_flags_valid (GoodixFdtFlagsContext context,
                                      guint16               flags);
 
@@ -34,6 +37,11 @@ gboolean goodix_fdt_derive_up_table (const guint8 raw[GOODIX_FDT_RAW_LENGTH],
 
 /* Derive the OEM FDT-down/baseline representation. */
 gboolean goodix_fdt_derive_baseline_table (
+  const guint8 raw[GOODIX_FDT_RAW_LENGTH],
+  guint16       touch_flags,
+  guint8        table[GOODIX_FDT_RAW_LENGTH]);
+/* Same derivation, but the touch mask may be any subset of the six bits. */
+gboolean goodix_fdt_derive_first_baseline_table (
   const guint8 raw[GOODIX_FDT_RAW_LENGTH],
   guint16       touch_flags,
   guint8        table[GOODIX_FDT_RAW_LENGTH]);

@@ -552,9 +552,10 @@ mode, the first `0x36` carries an all-zero 12-byte table; it is not confused
 with a supplied seed. Exactly three clean no-finger readings are allowed and
 there is no automatic retry. Only after both measured deltas pass does the
 lifecycle expose the learned 12-byte FDT table as a candidate for later local
-state persistence. Touch flags, malformed or duplicate frames, timeout, or
-temperature/drift classification failure terminate the attempt and clear that
-candidate. The decoded image baseline remains action-local and is never part
+state persistence. A reserved touch bit, a touch bit in the second or third
+reading, malformed or duplicate frames, timeout, or temperature/drift
+classification failure terminate the attempt and clear that candidate. The
+decoded image baseline remains action-local and is never part
 of the persistence interface. Legacy activation marks its imported seed as
 supplied. State-v2 activation uses the authenticated 12-byte table when present
 and represents an absent table as a zero seed; the later live qualification
@@ -570,9 +571,23 @@ closed. Let `R[i]` be raw channel word `i` and `T[i]` its touch bit:
 
 | Boundary | Required event | Derived 12-byte table for channel `i` |
 | --- | --- | --- |
-| Baseline learning/refresh | Control `0x36`, IRQ `0x0100`, flags zero | `table[2i] = 0x80`; `table[2i+1] = (R[i] >> 1) & 0xFF`; components `0x00` and `0xFF` are rejected |
+| First baseline sample | Control `0x36`, IRQ `0x0100`, touch bits restricted to the six known channels | `table[2i] = 0x80`; `table[2i+1] = (R[i] >> 1) & 0xFF`; components `0x00` and `0xFF` are rejected |
+| Baseline refresh (later samples) | Control `0x36`, IRQ `0x0100`, flags zero | `table[2i] = 0x80`; `table[2i+1] = (R[i] >> 1) & 0xFF`; components `0x00` and `0xFF` are rejected |
 | Finger-down up-table | Control `0x32`, IRQ `0x0002`, at least one valid touch bit | `table[2i] = 0x80`; active channel: `table[2i+1] = (R[i] >> 1) + 0x1D`; inactive channel: `0x1B`; overflow is rejected |
 | Release down-table | Control `0x34`, IRQ `0x0200`, flags zero | `table[2i] = 0x80`; `table[2i+1] = R[i] >> 1`; overflow is rejected |
+
+The IRQ `0x0100` touch mask is relative, not an absolute contact detector: it
+reports the channels whose fresh reading differs from the FDT reference in
+effect. The first manual sample of a bootstrap is measured against the
+host-supplied seed, so an absent or stale seed legitimately reports every
+channel and the mask carries no finger information there. Each later sample is
+measured against the table derived from the immediately preceding one, so a
+touch bit in that position is a real disturbance and fails closed. Absence of
+contact during the bootstrap is therefore carried by the bounded sample count,
+the two delta gates against the returned threshold and the component filter,
+never by the first mask. The same control and IRQ also carries a contact sample
+with all six bits set during enrollment, which is why the mask is interpreted
+per protocol context rather than as a single value.
 
 The preparation sequence issues `0x36` and accepts IRQ `0x0100` readings to
 learn/refresh the current table. Three fresh readings participate in the

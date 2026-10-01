@@ -698,15 +698,27 @@ goodix_post_tls_lifecycle_handle_a0 (GoodixPostTlsLifecycle *lifecycle,
     case GOODIX_POST_TLS_PHASE_FDT_IRQ100_1:
     case GOODIX_POST_TLS_PHASE_FDT_IRQ100_2:
     case GOODIX_POST_TLS_PHASE_FDT_IRQ100_3:
-      if (message.control != 0x36 ||
-          !event_fields (&message, &irq, &flags, &raw) ||
-          irq != 0x0100 ||
-          !goodix_fdt_irq_flags_valid (GOODIX_FDT_FLAGS_BASELINE_SAMPLE,
-                                       flags) ||
-          !record_fdt_raw (lifecycle, raw) ||
-          !goodix_fdt_derive_baseline_table (
-            raw, flags, lifecycle->current_fdt_table))
-        goto unexpected;
+      {
+        gboolean first_sample =
+          lifecycle->phase == GOODIX_POST_TLS_PHASE_FDT_IRQ100_1;
+        gboolean accepted =
+          message.control == 0x36 &&
+          event_fields (&message, &irq, &flags, &raw) &&
+          irq == 0x0100 &&
+          goodix_fdt_irq_flags_valid (first_sample ?
+                                        GOODIX_FDT_FLAGS_BASELINE_FIRST_SAMPLE :
+                                        GOODIX_FDT_FLAGS_BASELINE_SAMPLE,
+                                      flags) &&
+          record_fdt_raw (lifecycle, raw) &&
+          (first_sample ?
+             goodix_fdt_derive_first_baseline_table (
+               raw, flags, lifecycle->current_fdt_table) :
+             goodix_fdt_derive_baseline_table (
+               raw, flags, lifecycle->current_fdt_table));
+
+        if (!accepted)
+          goto unexpected;
+      }
       if (lifecycle->audit != NULL)
         lifecycle->audit->fdt_irq100_count++;
       if (lifecycle->phase == GOODIX_POST_TLS_PHASE_FDT_IRQ100_1)
