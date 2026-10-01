@@ -87,7 +87,9 @@
       "P6_LIVE_PREFLIGHT_LARGE_A0_CHECKSUM_ROOT_CAUSE",
       "P6_CANONICAL_A0_MULTIBYTE_LENGTH_CHECKSUM_OFFLINE",
       "P6_FRAGMENTED_SEVEN_COMMAND_PREFLIGHT_OFFLINE",
-      "P6_E0_FRAME_CHECKSUM_PARITY_OFFLINE"
+      "P6_E0_FRAME_CHECKSUM_PARITY_OFFLINE",
+      "P6_LIVE_PREFLIGHT_CHIP82_BOUNDARY_ROOT_CAUSE",
+      "P6_CHIP82_OPAQUE_ENVELOPE_OFFLINE"
     ],
     "inferred": [
       "REPEATED_REUSE_OF_SAME_LINUX_PSK_AFTER_WINDOWS_RETURN",
@@ -97,7 +99,7 @@
     "initial_blockers": []
   },
   "current_blockers": [
-    "P6_STRUCTURAL_CHECKSUM_FIX_LIVE_CONFIRMATION_PENDING"
+    "P6_CHIP82_CONTRACT_FIX_LIVE_CONFIRMATION_PENDING"
   ],
   "host_modified": false,
   "relevant_artifacts": [
@@ -145,9 +147,9 @@
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "After a new explicit HUMAN_REQUIRED approval, install the offline-qualified candidate on the physical Fedora 44 KDE target and run one no-finger fprintd-enroll diagnostic. The fprintd IDENTIFY precheck must execute the complete seven-command non-persistent preflight using the corrected canonical A0 checksum; on the already observed E4 state mismatch it is expected to stop before secure-session TLS or runtime configuration writes. Return the client result, the specific fprintd error and the single GOODIX_PRODUCTION_EPOCH_AUDIT line. Do not repeat, touch the sensor, journal PREPARED or enable E0.",
-  "last_verified_head": "23a41eda52b586c309c2ac2aff4621fb03d6ea39",
-  "state_note": "P0A through P5 are accepted. The previous LIVE_NO_FINGER approval was consumed by one target attempt against 23a41ed (SOURCE_ID 01cd7ce970fea259a412f1fd1ff689902f149f0c35c65bf711dc9c809bfd2fbf): it stopped at preflight command 3 with a host-side A0 inner checksum mismatch, with preflight_complete=0, preflight_commands=3, secure_commands=0, tls=0, no persistent or pairing write, no retry, and clean drain/context closure. The structural root cause is PROVEN: the shared canonical A0 codec added the little-endian inner length as a numeric value, so modulo 256 it omitted the high byte. Legacy secure-session frames remained below 256 bytes and masked the defect; the 341-byte BB010002 typed response is the first ordinary large A0 frame in the P6 graph. The qualified independent PoC checksum and literal known-answer tests require both length bytes. The fix applies once in the shared codec and also corrects the future 460-byte E0 frame, whose production module still has zero runtime callers. The pre-material preflight and material-driven secure-session graphs intentionally remain separate at the material-selection boundary while sharing the same bounded USB router and canonical A0 codec. Independent multibyte checksum KATs, stale-checksum rejection, the complete seven-command graph through exact 64-byte router fragmentation, E0 checksum parity, normal and ASan/UBSan component suites, post-TLS, enrollment and 61-case image-device suites all pass offline with REAL_USB_ACCESS=0 and REAL_USB_SUBMIT=0. The reproducible offline production build passes with SOURCE_ID 68fe7d145195fdcecd70a8a65640332d950ebb9259a8e097d0d5bfe3e3690c31. Firmware/IAP/ClearApp/OTP/factory writes, biometric tests and E0 remain excluded. A new explicit live gate is required. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
+  "next_action": "After a new explicit HUMAN_REQUIRED approval, install the offline-qualified candidate on the physical Fedora 44 KDE target and run one no-finger fprintd-enroll diagnostic. The fprintd IDENTIFY precheck must complete all seven non-persistent commands with the corrected A0 checksum and qualified CHIP_82 discovery contract; the known legacy E4 validator mismatch must then stop the path before secure-session TLS or runtime configuration writes. Return the client result and the single GOODIX_PRODUCTION_EPOCH_AUDIT line. Do not repeat, touch the sensor, journal PREPARED or enable E0.",
+  "last_verified_head": "0170862746d7b83f35c989f565675506483941e8",
+  "state_note": "P0A through P5 are accepted. The approved P6_STRUCTURAL_PREFLIGHT_REVALIDATION was consumed exactly once against 0170862: no finger contact occurred and it stopped fail-closed with preflight_complete=0, preflight_commands=6, tls=0, secure_commands=0, no retry, no persistent or pairing write, and clean drain/context closure. Command count increments when a request is constructed, so 6/7 identifies CHIP_82 as submitted but not accepted; OTP_A6 was never submitted. The root cause is PROVEN offline without reconstructing protected raw bytes. For target chip profile 0x2504, the P6 parser accepted only the four-byte body 00 04 25 00 because it invented zero constraints for opaque bytes 0 and 3. SHA-256 of that sole accepted body is 85d71424865a86046b9e07a3b371a646a2b36f0c36fa5c8dceca4c712c2d5ee6, which differs from the qualified non-secret target pin 82537d2c108887baef128b47ad401fc888d54b184673b1fc23811d79ab6d5703. The legacy path has always treated CHIP_82 as an exact four-byte digest-pinned body and decodes the little-endian chip profile only from bytes 1 and 2; it never required the two opaque coordinates to be zero. P6 now reuses that boundary: exact four-byte length, supported 0x2503/0x2504 profile, preservation of all four bytes, followed by the unchanged whole-body legacy digest comparison before any secure graph. Synthetic nonzero opaque-coordinate cases, unsupported-chip rejection, the complete seven-command graph and exact USB fragmentation pass normal and ASan/UBSan; the integrated image-device suite passes 61/61 in both modes with REAL_USB_SUBMIT=0 and the production E0 writer still has zero runtime callers. The source manifest and 16 production-builder tests pass, and the reproducible offline build has SOURCE_ID 5cbde19fe6c9b1898c5c6a5c5bc46ba798c33f0f5757292912c5095987a777c6. Firmware/IAP/ClearApp/OTP/factory writes, biometric tests and E0 remain excluded. A new explicit live gate is required. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }

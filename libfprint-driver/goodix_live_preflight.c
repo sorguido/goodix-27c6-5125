@@ -254,9 +254,11 @@ accept_typed (GoodixLivePreflight *preflight,
              CRYPTO_memcmp (body, preflight->evidence.a2_response,
                             body_length) == 0;
     case GOODIX_LIVE_PREFLIGHT_CHIP_82:
-      if (body_length != sizeof preflight->evidence.chip_response ||
-          body[0] != 0u || body[3] != 0u)
+      if (body_length != sizeof preflight->evidence.chip_response)
         return FALSE;
+      /* The qualified path decodes only the little-endian chip profile in
+       * bytes 1..2.  Bytes 0 and 3 are target-bound opaque response data:
+       * preserve them for the subsequent whole-body legacy digest check. */
       chip_id = (guint16) body[1] | ((guint16) body[2] << 8);
       if (chip_id != 0x2503u && chip_id != 0x2504u)
         return FALSE;

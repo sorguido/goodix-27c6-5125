@@ -484,6 +484,10 @@ changes the expected outer class directly to B0/TLS.
 
 `CHIP_82` is an implementation phase name for a checked four-byte
 target-bound response, not a claim that the value is an immutable chip ID.
+During discovery, bytes 1 and 2 encode the supported little-endian chip
+profile (`0x2503` or `0x2504`); bytes 0 and 3 remain opaque and are preserved.
+The legacy-material path subsequently checks the digest of all four bytes, so
+discovery must not invent fixed values for the two opaque coordinates.
 `OTP_A6` is a read and check of a 64-byte factory/OTP-related response; it does
 not write OTP. The four DAC phases apply the validated runtime values for
 registers `0x0220`, `0x0236`, `0x0238`, and `0x023A`, and `CONFIG_90` sends the

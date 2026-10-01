@@ -275,7 +275,8 @@ test_complete_read_only_graph (void)
 {
   static const guint8 a2[] = { 0x00, 0x00, 0x00 };
   static const guint8 app[] = "GF_ST411SEC_APP_12509";
-  static const guint8 chip[] = { 0x00, 0x04, 0x25, 0x00 };
+  /* Bytes 0 and 3 are deliberately nonzero opaque coordinates. */
+  static const guint8 chip[] = { 0x5a, 0x04, 0x25, 0xa5 };
   guint8 bb2[GOODIX_BB010002_LENGTH];
   guint8 validator[32];
   guint8 otp[GOODIX_CONFIG90_OTP_LENGTH];
@@ -307,6 +308,8 @@ test_complete_read_only_graph (void)
                    GOODIX_LIVE_PREFLIGHT_STOP);
   g_assert_true (goodix_live_preflight_copy_evidence (preflight, &evidence));
   g_assert_cmpuint (evidence.chip_id, ==, 0x2504u);
+  g_assert_cmpmem (evidence.chip_response, sizeof evidence.chip_response,
+                   chip, sizeof chip);
   g_assert_cmpmem (evidence.bb010002, sizeof evidence.bb010002,
                    bb2, sizeof bb2);
   g_assert_cmpmem (evidence.validator, sizeof evidence.validator,
@@ -330,7 +333,8 @@ test_complete_read_only_graph_fragmented (void)
 {
   static const guint8 a2[] = { 0x00, 0x00, 0x00 };
   static const guint8 app[] = "GF_ST411SEC_APP_12509";
-  static const guint8 chip[] = { 0x00, 0x04, 0x25, 0x00 };
+  /* Preserve the same opaque-coordinate contract through USB fragmentation. */
+  static const guint8 chip[] = { 0xa5, 0x04, 0x25, 0x5a };
   const guint64 generation = 17u;
   guint8 bb2[GOODIX_BB010002_LENGTH];
   guint8 validator[32];
@@ -389,7 +393,7 @@ test_unsupported_chip_fails_closed (void)
 {
   static const guint8 a2[] = { 0x00, 0x00, 0x00 };
   static const guint8 app[] = "GF_ST411SEC_APP_12509";
-  static const guint8 chip[] = { 0x00, 0x05, 0x25, 0x00 };
+  static const guint8 chip[] = { 0xa5, 0x05, 0x25, 0x5a };
   guint8 bb2[GOODIX_BB010002_LENGTH];
   guint8 validator[32] = { 0 };
   guint8 e4_bb2[9 + GOODIX_BB010002_LENGTH] = { 0 };
