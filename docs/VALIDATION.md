@@ -13,6 +13,9 @@ A separate host-lifecycle qualification used a clean Fedora 44 KDE x86_64 VM
 with SELinux Enforcing and no reader or USB passthrough. That qualification
 tests installation and recovery behavior, not live reader behavior.
 
+Interoperability evidence additionally uses the same reader passed through to a
+Windows 11 virtual machine.
+
 | Function | Evidence and boundary |
 | --- | --- |
 | Enrollment and standard verification | Enrollment completed and a subsequent verification matched the enrolled finger |
@@ -32,6 +35,8 @@ tests installation and recovery behavior, not live reader behavior.
 | Zero-`E0` ACTIVE reopen | A later ordinary no-finger identify reused the `ACTIVE` record through the read-only preflight and the pairing-activation reuse disposition, with zero `E0`, zero persistent writes, a matching E4 contract, and complete drain and close |
 | Zero-seed FDT bootstrap | With no imported FDT cache, an ordinary no-finger action completed the three-sample zero-seed bootstrap, including a first manual sample carrying a nonzero touch mask, and reached FDT learning; operator-reported against the declared counters, and the sanitized audit line is not retained in the repository |
 | Interrupted-transaction recovery (offline) | The crash-window matrix and the host-shaped superseded-`PREPARED` recovery test show that reopening after an interrupted post-`E0`/pre-ACTIVE transaction reuses the durable reservation, proves TLS and promotes to `ACTIVE` with zero persistent writes and zero `E0`; no live reproduction exists for this boundary |
+| Windows/Linux ping-pong | A bounded `L1 -> W1 -> L1 -> W2 -> L1` sequence on the qualification reader, with the same Windows 11 VM and USB passthrough, produced: a Linux baseline and two same-OS reopens that reused `ACTIVE` `L1` with zero persistent writes and zero `E0`; two Windows transitions that each replaced the pairing; and two Linux returns that each classified the change read-only as an external replacement and restored the same stored `L1` with exactly one qualified write, byte-for-byte preserved Windows `BB010002`, matching readback and validator, TLS proof and `ACTIVE` promotion. No new Linux key, no loop, no second writer, and no firmware/IAP/ClearApp/OTP path |
+| Windows autonomous recovery boundary | Windows recovery is evidenced by clean OEM enumeration without a warning indicator plus a pairing replacement that Linux then read back as a structurally valid `BB010002` through the read-only preflight. No Windows fingerprint enrollment or authentication was performed, so Windows biometric functionality remains outside the qualified scope |
 
 ## Complete installation path
 

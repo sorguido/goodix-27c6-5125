@@ -81,12 +81,12 @@ indipendente tramite readback/hash/TLS.
 - recovery Windows dopo uno stato persistente originato da Linux;
 - `gx_wb_encrypt()` equivalente byte-per-byte alla rappresentazione OEM
   qualificata;
-- bootstrap FDT da seed iniziale zero nel production path.
+- bootstrap FDT da seed iniziale zero nel production path;
+- riutilizzo della stessa PSK Linux `L1` dopo ripetuti ritorni da Windows;
+- ciclo stabile `L1 -> W1 -> L1 -> W2 -> L1`.
 
 ### INFERRED — non promuovere a PROVEN prima del gate dedicato
 
-- riutilizzo della stessa PSK Linux `L1` dopo ripetuti ritorni da Windows;
-- ciclo stabile `L1 -> W1 -> L1 -> W2 -> L1`;
 - generazione completa di CONFIG90 da template type-12 + OTP;
 - parser strutturale generalizzato di `BB010002` per stati Windows legittimi.
 
