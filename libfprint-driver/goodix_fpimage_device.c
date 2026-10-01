@@ -717,6 +717,24 @@ production_pairing_activation_out_complete (GoodixFpiUsbBackend *backend,
   production_pairing_activation_progress (ctx);
 }
 
+#ifdef GOODIX_ENABLE_TEST_SEAMS
+/* Offline integration seam.  It redirects the production state-v2/legacy
+ * directories to test-owned paths and pins the pairing PSK so the fake-USB
+ * graph can derive the expected validator.  Absent from production builds. */
+static gchar *goodix_test_production_state_directory;
+static gchar *goodix_test_production_legacy_directory;
+static guint goodix_test_production_state_uid;
+static guint goodix_test_production_state_gid;
+static guint8 goodix_test_production_pairing_psk[GOODIX_SELF_STATE_PSK_LENGTH];
+static gboolean goodix_test_production_pairing_psk_set;
+
+static gboolean
+goodix_test_production_state_override_active (void)
+{
+  return goodix_test_production_state_directory != NULL;
+}
+#endif
+
 static gboolean
 production_start_pairing_activation (
   GoodixDeviceContext               *ctx,
@@ -734,6 +752,22 @@ production_start_pairing_activation (
     }
   goodix_pairing_activation_paths_production (&paths);
   goodix_pairing_activation_policy_production (&policy);
+#ifdef GOODIX_ENABLE_TEST_SEAMS
+  if (goodix_test_production_state_override_active ())
+    {
+      paths.state_directory = goodix_test_production_state_directory;
+      goodix_self_state_policy_for_owner (&policy.state,
+                                          goodix_test_production_state_uid,
+                                          goodix_test_production_state_gid);
+      ctx->pairing_activation = goodix_test_production_pairing_psk_set ?
+        goodix_pairing_activation_new_for_test (
+          &paths, &policy, evidence, goodix_test_production_pairing_psk,
+          &ctx->pairing_activation_audit, error) :
+        goodix_pairing_activation_new (
+          &paths, &policy, evidence, &ctx->pairing_activation_audit, error);
+    }
+  else
+#endif
   ctx->pairing_activation = goodix_pairing_activation_new (
     &paths, &policy, evidence, &ctx->pairing_activation_audit, error);
   if (ctx->pairing_activation == NULL)
@@ -1517,6 +1551,16 @@ default_acquire_runtime_material_with_live (
 
   goodix_runtime_coordinator_paths_production (&paths);
   goodix_runtime_coordinator_policy_production (&policy);
+#ifdef GOODIX_ENABLE_TEST_SEAMS
+  if (goodix_test_production_state_override_active ())
+    {
+      paths.state_directory = goodix_test_production_state_directory;
+      paths.legacy.directory_path = goodix_test_production_legacy_directory;
+      goodix_self_state_policy_for_owner (&policy.state,
+                                          goodix_test_production_state_uid,
+                                          goodix_test_production_state_gid);
+    }
+#endif
   *owner = goodix_runtime_coordinator_acquire (
     &paths, &policy, live, default_acquire_legacy_material,
     default_release_legacy_material, NULL, audit, coordinator_audit, error);
@@ -2880,6 +2924,40 @@ goodix_fpimage_device_set_production_open_seams (
   priv->claim_interface = claim_interface;
   priv->release_interface = release_interface;
   priv->production_seam_data = user_data;
+}
+
+void
+goodix_fpimage_device_test_set_production_state_override (
+  const gchar *state_directory,
+  const gchar *legacy_directory,
+  guint uid,
+  guint gid,
+  const guint8 *pairing_psk)
+{
+  g_return_if_fail (state_directory != NULL && legacy_directory != NULL);
+  g_free (goodix_test_production_state_directory);
+  g_free (goodix_test_production_legacy_directory);
+  goodix_test_production_state_directory = g_strdup (state_directory);
+  goodix_test_production_legacy_directory = g_strdup (legacy_directory);
+  goodix_test_production_state_uid = uid;
+  goodix_test_production_state_gid = gid;
+  goodix_test_production_pairing_psk_set = pairing_psk != NULL;
+  if (pairing_psk != NULL)
+    memcpy (goodix_test_production_pairing_psk, pairing_psk,
+            sizeof goodix_test_production_pairing_psk);
+  else
+    memset (goodix_test_production_pairing_psk, 0,
+            sizeof goodix_test_production_pairing_psk);
+}
+
+void
+goodix_fpimage_device_test_clear_production_state_override (void)
+{
+  g_clear_pointer (&goodix_test_production_state_directory, g_free);
+  g_clear_pointer (&goodix_test_production_legacy_directory, g_free);
+  OPENSSL_cleanse (goodix_test_production_pairing_psk,
+                   sizeof goodix_test_production_pairing_psk);
+  goodix_test_production_pairing_psk_set = FALSE;
 }
 
 gboolean

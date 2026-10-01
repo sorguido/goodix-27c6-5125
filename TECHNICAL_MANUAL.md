@@ -289,8 +289,10 @@ without that evidence fails before USB claim. If neither the live validator nor
 the host state can establish an already-active Linux pairing, the production
 activation boundary can reserve and execute one qualified pairing transaction.
 
-The bounded read-only preflight applies to both a direct enrollment action and
-the identify action that stock fprintd uses as its enrollment duplicate check.
+The bounded read-only preflight applies to every biometric capture action:
+enroll, identify (including the identify that stock fprintd uses as its
+enrollment duplicate check) and verify. State-v2 selection is bound to target
+evidence that only the preflight can reconstruct.
 It validates the target, reads `BB010002` and the current `BB020003` validator,
 and derives CONFIG90 before the strict secure session is allowed to rely on
 legacy pairing state. A structurally valid `BB020003` record whose 32-byte value

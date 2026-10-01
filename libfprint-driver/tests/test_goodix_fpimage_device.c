@@ -7,6 +7,7 @@
  */
 #include "../goodix_fpimage_device.h"
 #include "../goodix_a0_protocol.h"
+#include "../goodix_pairing_crypto.h"
 #include "../goodix_enrollment_fpi_usb_binding.h"
 #include "../goodix_enrollment_post_tls_events.h"
 #include "../goodix_fpi_usb_backend.h"
@@ -23,6 +24,7 @@
 #include <glib.h>
 #include <glib/gstdio.h>
 #include <openssl/evp.h>
+#include <openssl/ssl.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -2323,6 +2325,1017 @@ test_p6_e4_contract_diagnostics (void)
     FPI_DEVICE_ACTION_VERIFY));
 }
 
+/* --- P6 production pairing activation integration (offline fake USB) --- */
+
+static const guint8 pairing_graph_provider_guid[16] = {
+  0xd0, 0x8c, 0x9d, 0xdf, 0x01, 0x15, 0xd1, 0x11,
+  0x8c, 0x7a, 0x00, 0xc0, 0x4f, 0xc2, 0x97, 0xeb
+};
+
+typedef struct
+{
+  guint64 generation;
+  GBytes *bytes;
+} PairingGraphSubmission;
+
+typedef struct
+{
+  GoodixFpImageDevice *device;
+  guint64 generation;
+  guint in_submit_count;
+  guint out_submit_count;
+  guint e0_frame_count;
+  guint e4_typed_index;
+  guint claim_count;
+  guint interface_release_count;
+  guint8 bb010002[GOODIX_BB010002_LENGTH];
+  guint8 otp[GOODIX_CONFIG90_OTP_LENGTH];
+  guint8 live_validator[32];
+  guint8 expected_validator[32];
+  guint8 psk[GOODIX_SELF_STATE_PSK_LENGTH];
+  GQueue *out;
+  GByteArray *server_record;
+} PairingGraphSeam;
+
+typedef struct
+{
+  SSL_CTX *context;
+  SSL *ssl;
+  const guint8 *psk;
+  gsize psk_length;
+} PairingGraphTlsClient;
+
+static void
+pairing_graph_put_u32 (guint8 *data,
+                       gsize  *cursor,
+                       guint32 value)
+{
+  data[(*cursor)++] = (guint8) value;
+  data[(*cursor)++] = (guint8) (value >> 8);
+  data[(*cursor)++] = (guint8) (value >> 16);
+  data[(*cursor)++] = (guint8) (value >> 24);
+}
+
+static void
+pairing_graph_put_pattern (guint8 *data,
+                           gsize  *cursor,
+                           gsize   length,
+                           guint8  seed)
+{
+  for (gsize i = 0; i < length; i++)
+    data[(*cursor)++] = (guint8) (seed + (guint8) i);
+}
+
+static void
+pairing_graph_make_bb010002 (guint8 data[GOODIX_BB010002_LENGTH])
+{
+  static const guint8 description[64] = {
+    'T', 0, 'h', 0, 'i', 0, 's', 0, ' ', 0, 'i', 0, 's', 0, ' ', 0,
+    't', 0, 'h', 0, 'e', 0, ' ', 0, 'd', 0, 'e', 0, 's', 0, 'c', 0,
+    'r', 0, 'i', 0, 'p', 0, 't', 0, 'i', 0, 'o', 0, 'n', 0, ' ', 0,
+    's', 0, 't', 0, 'r', 0, 'i', 0, 'n', 0, 'g', 0, '.', 0, 0, 0
+  };
+  gsize cursor = 0;
+
+  memset (data, 0, GOODIX_BB010002_LENGTH);
+  pairing_graph_put_u32 (data, &cursor, 1u);
+  memcpy (data + cursor, pairing_graph_provider_guid,
+          sizeof pairing_graph_provider_guid);
+  cursor += sizeof pairing_graph_provider_guid;
+  pairing_graph_put_u32 (data, &cursor, 1u);
+  pairing_graph_put_pattern (data, &cursor, 16u, 0x31u);
+  pairing_graph_put_u32 (data, &cursor, 4u);
+  pairing_graph_put_u32 (data, &cursor, sizeof description);
+  memcpy (data + cursor, description, sizeof description);
+  cursor += sizeof description;
+  pairing_graph_put_u32 (data, &cursor, 0x6610u);
+  pairing_graph_put_u32 (data, &cursor, 256u);
+  pairing_graph_put_u32 (data, &cursor, 32u);
+  pairing_graph_put_pattern (data, &cursor, 32u, 0x51u);
+  pairing_graph_put_u32 (data, &cursor, 0u);
+  pairing_graph_put_u32 (data, &cursor, 0x800eu);
+  pairing_graph_put_u32 (data, &cursor, 512u);
+  pairing_graph_put_u32 (data, &cursor, 32u);
+  pairing_graph_put_pattern (data, &cursor, 32u, 0x71u);
+  pairing_graph_put_u32 (data, &cursor, 48u);
+  pairing_graph_put_pattern (data, &cursor, 48u, 0x91u);
+  pairing_graph_put_u32 (data, &cursor, 64u);
+  pairing_graph_put_pattern (data, &cursor, 64u, 0xb1u);
+  pairing_graph_put_pattern (data, &cursor, 8u, 0xf1u);
+  g_assert_cmpuint (cursor, ==, GOODIX_BB010002_LENGTH);
+}
+
+static gchar *
+pairing_graph_new_directory (const gchar *name_template)
+{
+  gchar *directory = g_dir_make_tmp (name_template, NULL);
+
+  g_assert_nonnull (directory);
+  g_assert_cmpint (g_chmod (directory, 0700), ==, 0);
+  return directory;
+}
+
+static void
+pairing_graph_remove_directory (const gchar *directory)
+{
+  GDir *dir = g_dir_open (directory, 0, NULL);
+  const gchar *name;
+
+  g_assert_nonnull (dir);
+  while ((name = g_dir_read_name (dir)) != NULL)
+    {
+      g_autofree gchar *path = g_build_filename (directory, name, NULL);
+      g_assert_cmpint (g_unlink (path), ==, 0);
+    }
+  g_dir_close (dir);
+  g_assert_cmpint (g_rmdir (directory), ==, 0);
+}
+
+static void
+pairing_graph_submission_free (PairingGraphSubmission *submission)
+{
+  if (submission == NULL)
+    return;
+  g_bytes_unref (submission->bytes);
+  g_free (submission);
+}
+
+static void
+pairing_graph_submit_seam (GoodixFpiUsbBackend *backend,
+                           GoodixUsbDirection   direction,
+                           guint64              generation,
+                           GBytes              *bytes,
+                           gpointer             user_data)
+{
+  PairingGraphSeam *seam = user_data;
+  PairingGraphSubmission *submission;
+
+  (void) backend;
+  g_assert_cmpuint (generation, >, 0u);
+  if (direction == GOODIX_USB_TRANSFER_IN)
+    {
+      g_assert_null (bytes);
+      seam->in_submit_count++;
+      return;
+    }
+  g_assert_nonnull (bytes);
+  seam->out_submit_count++;
+  {
+    gsize length;
+    const guint8 *data = g_bytes_get_data (bytes, &length);
+    g_assert_cmpuint (length, >=, 5u);
+    if (data[4] == 0xe0u)
+      seam->e0_frame_count++;
+  }
+  submission = g_new0 (PairingGraphSubmission, 1);
+  submission->generation = generation;
+  submission->bytes = g_bytes_ref (bytes);
+  g_queue_push_tail (seam->out, submission);
+}
+
+static PairingGraphSubmission *
+pairing_graph_pop_out (PairingGraphSeam *seam)
+{
+  PairingGraphSubmission *submission = g_queue_pop_head (seam->out);
+
+  g_assert_nonnull (submission);
+  return submission;
+}
+
+static const guint8 *
+pairing_graph_submission_data (PairingGraphSubmission *submission,
+                               gsize                  *length)
+{
+  return g_bytes_get_data (submission->bytes, length);
+}
+
+static void
+pairing_graph_complete_out (TestFixture              *f,
+                            PairingGraphSubmission   *submission,
+                            const GError             *error)
+{
+  goodix_fpi_usb_backend_complete_out (
+    goodix_device_context_get_fpi_usb_backend (f->ctx),
+    submission->generation, error);
+  pairing_graph_submission_free (submission);
+}
+
+static void
+pairing_graph_clear_queue (PairingGraphSeam *seam)
+{
+  while (!g_queue_is_empty (seam->out))
+    pairing_graph_submission_free (g_queue_pop_head (seam->out));
+}
+
+static gboolean
+pairing_graph_claim_seam (GUsbDevice *usb_device,
+                          guint8      interface_number,
+                          gpointer    user_data,
+                          GError    **error)
+{
+  PairingGraphSeam *seam = user_data;
+
+  (void) usb_device;
+  (void) error;
+  g_assert_cmpuint (interface_number, ==, 0u);
+  seam->claim_count++;
+  return TRUE;
+}
+
+static gboolean
+pairing_graph_release_seam (GUsbDevice *usb_device,
+                            guint8      interface_number,
+                            gpointer    user_data,
+                            GError    **error)
+{
+  PairingGraphSeam *seam = user_data;
+
+  (void) usb_device;
+  (void) interface_number;
+  (void) error;
+  seam->interface_release_count++;
+  return TRUE;
+}
+
+static TestFixture *
+pairing_graph_fixture_new (PairingGraphSeam *seam,
+                           const gchar      *state_directory,
+                           const gchar      *legacy_directory,
+                           const guint8     *psk)
+{
+  g_autoptr(GUsbDevice) usb_device = NULL;
+  TestFixture *f;
+
+  goodix_test_gusb_reset_counts ();
+  goodix_test_gusb_set_open_close_success (TRUE);
+  usb_device = (GUsbDevice *) g_object_new (G_USB_TYPE_DEVICE, NULL);
+  f = test_fixture_new_with_device (
+    goodix_fpimage_device_new_for_usb (usb_device));
+  seam->device = f->device;
+  goodix_fpimage_device_set_production_open_seams (
+    f->device, NULL, NULL, pairing_graph_claim_seam,
+    pairing_graph_release_seam, seam);
+  goodix_fpimage_device_test_set_production_state_override (
+    state_directory, legacy_directory, getuid (), getgid (), psk);
+  return f;
+}
+
+static GBytes *
+pairing_graph_frame (guint8        control,
+                     const guint8 *body,
+                     gsize         length)
+{
+  return goodix_a0_build_frame (control, control, body, length, NULL);
+}
+
+static void
+pairing_graph_deliver (TestFixture *f,
+                       GBytes      *frame)
+{
+  gsize length;
+  const guint8 *data = g_bytes_get_data (frame, &length);
+
+  goodix_device_context_complete_receive (
+    f->ctx, goodix_device_context_get_generation (f->ctx), data, length,
+    NULL);
+}
+
+static GBytes *
+pairing_graph_e4_typed (guint32       type,
+                        const guint8 *payload,
+                        gsize         payload_length)
+{
+  g_autofree guint8 *body = g_malloc0 (9u + payload_length);
+  gsize cursor = 1u;
+
+  pairing_graph_put_u32 (body, &cursor, type);
+  pairing_graph_put_u32 (body, &cursor, (guint32) payload_length);
+  memcpy (body + cursor, payload, payload_length);
+  return pairing_graph_frame (0xe4u, body, 9u + payload_length);
+}
+
+static void
+pairing_graph_start_identify (TestFixture      *f,
+                              PairingGraphSeam *seam,
+                              GCancellable     *cancellable)
+{
+  g_autoptr(GPtrArray) gallery = g_ptr_array_new_with_free_func (
+    g_object_unref);
+  g_autoptr(GError) timeout = g_error_new_literal (
+    G_USB_DEVICE_ERROR, G_USB_DEVICE_ERROR_TIMED_OUT,
+    "synthetic quiet boundary");
+  guint in_before = seam->in_submit_count;
+
+  f->done = FALSE;
+  f->completion_count = 0;
+  f->success = FALSE;
+  g_clear_error (&f->error);
+  fp_device_identify (FP_DEVICE (f->device), gallery, cancellable,
+                      NULL, NULL, NULL, (GAsyncReadyCallback) identify_cb, f);
+  seam->generation = goodix_device_context_get_generation (f->ctx);
+  g_assert_cmpuint (seam->generation, >, 0u);
+  g_assert_cmpuint (seam->in_submit_count, ==, in_before + 1u);
+  goodix_device_context_complete_receive (f->ctx, seam->generation, NULL, 0,
+                                          timeout);
+}
+
+static void
+pairing_graph_respond_preflight (TestFixture      *f,
+                                 PairingGraphSeam *seam,
+                                 guint8            expected_control)
+{
+  static const guint8 a2_body[] = { 0x00, 0x00, 0x00 };
+  static const guint8 app_body[] = "GF_ST411SEC_APP_12509";
+  static const guint8 chip_body[] = { 0x5a, 0x04, 0x25, 0xa5 };
+  PairingGraphSubmission *submission = pairing_graph_pop_out (seam);
+  guint8 ack_body[2];
+  g_autoptr(GBytes) ack = NULL;
+  g_autoptr(GBytes) typed = NULL;
+  gsize out_length;
+  const guint8 *out = pairing_graph_submission_data (submission,
+                                                     &out_length);
+
+  g_assert_cmpuint (out_length, >=, 5u);
+  g_assert_cmphex (out[0], ==, 0xa0u);
+  g_assert_cmphex (out[4], ==, expected_control);
+  pairing_graph_complete_out (f, submission, NULL);
+  ack_body[0] = expected_control;
+  ack_body[1] = 0x01u;
+  ack = pairing_graph_frame (0xb0u, ack_body, sizeof ack_body);
+  switch (expected_control)
+    {
+    case 0xa2u:
+      typed = pairing_graph_frame (0xa2u, a2_body, sizeof a2_body);
+      break;
+    case 0xa8u:
+      typed = pairing_graph_frame (0xa8u, app_body, sizeof app_body);
+      break;
+    case 0x82u:
+      typed = pairing_graph_frame (0x82u, chip_body, sizeof chip_body);
+      break;
+    case 0xa6u:
+      typed = pairing_graph_frame (0xa6u, seam->otp, sizeof seam->otp);
+      break;
+    case 0xe4u:
+      typed = seam->e4_typed_index++ == 0u ?
+        pairing_graph_e4_typed (0xbb010002u, seam->bb010002,
+                                sizeof seam->bb010002) :
+        pairing_graph_e4_typed (0xbb020003u, seam->live_validator,
+                                sizeof seam->live_validator);
+      break;
+    default:
+      g_assert_not_reached ();
+    }
+  pairing_graph_deliver (f, ack);
+  pairing_graph_deliver (f, typed);
+}
+
+static void
+pairing_graph_run_preflight (TestFixture      *f,
+                             PairingGraphSeam *seam)
+{
+  static const guint8 controls[] =
+    { 0xa2u, 0xa8u, 0xe4u, 0xe4u, 0xa2u, 0x82u, 0xa6u };
+
+  seam->e4_typed_index = 0u;
+  for (guint i = 0; i < G_N_ELEMENTS (controls); i++)
+    pairing_graph_respond_preflight (f, seam, controls[i]);
+}
+
+static void
+pairing_graph_complete_e0 (TestFixture      *f,
+                           PairingGraphSeam *seam)
+{
+  static const guint8 e0_ack_body[] = { 0xe0u, 0x01u };
+  static const guint8 e0_done_body[] = { 0x00u, 0x03u };
+  PairingGraphSubmission *submission = pairing_graph_pop_out (seam);
+  g_autoptr(GBytes) ack = pairing_graph_frame (0xb0u, e0_ack_body,
+                                               sizeof e0_ack_body);
+  g_autoptr(GBytes) done = pairing_graph_frame (0xe0u, e0_done_body,
+                                                sizeof e0_done_body);
+  gsize out_length;
+  const guint8 *out = pairing_graph_submission_data (submission,
+                                                     &out_length);
+
+  g_assert_cmphex (out[4], ==, 0xe0u);
+  g_assert_cmpuint (out_length, ==, GOODIX_PAIRING_PROVISION_E0_FRAME_LENGTH);
+  g_assert_cmpuint (seam->e0_frame_count, ==, 1u);
+  pairing_graph_complete_out (f, submission, NULL);
+  pairing_graph_deliver (f, ack);
+  pairing_graph_deliver (f, done);
+}
+
+static void
+pairing_graph_respond_readback (TestFixture      *f,
+                                PairingGraphSeam *seam,
+                                guint32           type,
+                                const guint8     *payload,
+                                gsize             payload_length)
+{
+  static const guint8 e4_ack_body[] = { 0xe4u, 0x01u };
+  PairingGraphSubmission *submission = pairing_graph_pop_out (seam);
+  g_autoptr(GBytes) ack = pairing_graph_frame (0xb0u, e4_ack_body,
+                                               sizeof e4_ack_body);
+  g_autoptr(GBytes) typed = pairing_graph_e4_typed (type, payload,
+                                                    payload_length);
+  gsize out_length;
+  const guint8 *out = pairing_graph_submission_data (submission,
+                                                     &out_length);
+
+  g_assert_cmphex (out[4], ==, 0xe4u);
+  pairing_graph_complete_out (f, submission, NULL);
+  pairing_graph_deliver (f, ack);
+  pairing_graph_deliver (f, typed);
+}
+
+static void
+pairing_graph_assert_state_phase (PairingGraphSeam    *seam,
+                                  const gchar         *state_directory,
+                                  GoodixSelfStatePhase phase,
+                                  guint64              generation)
+{
+  GoodixSelfStateBinding binding = { 0 };
+  GoodixSelfStatePolicy policy;
+  GoodixSelfState *state = NULL;
+  GoodixConfig90Calibration calibration = { 0 };
+  guint8 config90[GOODIX_CONFIG90_LENGTH];
+
+  g_assert_true (goodix_config90_derive (0x2504u, seam->otp,
+                                         sizeof seam->otp, config90,
+                                         &calibration, NULL));
+  binding.vid = 0x27c6u;
+  binding.pid = 0x5125u;
+  binding.chip_profile = 0x2504u;
+  g_strlcpy (binding.app, "APP12509", sizeof binding.app);
+  production_digest (seam->otp, sizeof seam->otp, binding.otp_sha256);
+  production_digest (config90, sizeof config90, binding.config90_sha256);
+  goodix_self_state_policy_for_owner (&policy, getuid (), getgid ());
+  g_assert_cmpint (goodix_self_state_load (state_directory, &binding, &policy,
+                                           &state, NULL), ==,
+                   GOODIX_SELF_STATE_LOAD_VALID);
+  g_assert_cmpint (goodix_self_state_get_record (state)->phase, ==, phase);
+  g_assert_cmpuint (goodix_self_state_get_record (state)->generation, ==,
+                    generation);
+  goodix_self_state_free (state);
+}
+
+static guint8
+pairing_graph_secure_control (GoodixSecurePhase phase)
+{
+  switch (phase)
+    {
+    case GOODIX_SECURE_PHASE_A8: return 0xa8;
+    case GOODIX_SECURE_PHASE_E4: return 0xe4;
+    case GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2:
+    case GOODIX_SECURE_PHASE_OEM_COLD_START_A2_1:
+    case GOODIX_SECURE_PHASE_OEM_COLD_START_A2_2: return 0xa2;
+    case GOODIX_SECURE_PHASE_CHIP_82: return 0x82;
+    case GOODIX_SECURE_PHASE_OTP_A6: return 0xa6;
+    case GOODIX_SECURE_PHASE_MODE_70: return 0x70;
+    case GOODIX_SECURE_PHASE_DAC_220:
+    case GOODIX_SECURE_PHASE_DAC_236:
+    case GOODIX_SECURE_PHASE_DAC_238:
+    case GOODIX_SECURE_PHASE_DAC_23A: return 0x80;
+    case GOODIX_SECURE_PHASE_CONFIG_90: return 0x90;
+    case GOODIX_SECURE_PHASE_D1: return 0xd1;
+    default: return 0;
+    }
+}
+
+static GBytes *
+pairing_graph_secure_typed (PairingGraphSeam *seam,
+                            GoodixSecurePhase phase)
+{
+  static const guint8 a2_body[] = { 0x00, 0x00, 0x00 };
+  static const guint8 app_body[] = "GF_ST411SEC_APP_12509";
+  static const guint8 chip_body[] = { 0x5a, 0x04, 0x25, 0xa5 };
+  static const guint8 done90[] = { 1, 0 };
+  guint8 e4[41] = { 0x00, 0x03, 0x00, 0x02, 0xbb, 0x20, 0, 0, 0 };
+
+  switch (phase)
+    {
+    case GOODIX_SECURE_PHASE_A8:
+      return pairing_graph_frame (0xa8, app_body, sizeof app_body);
+    case GOODIX_SECURE_PHASE_E4:
+      memcpy (e4 + 9, seam->expected_validator,
+              sizeof seam->expected_validator);
+      return pairing_graph_frame (0xe4, e4, sizeof e4);
+    case GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2:
+    case GOODIX_SECURE_PHASE_OEM_COLD_START_A2_1:
+    case GOODIX_SECURE_PHASE_OEM_COLD_START_A2_2:
+      return pairing_graph_frame (0xa2, a2_body, sizeof a2_body);
+    case GOODIX_SECURE_PHASE_CHIP_82:
+      return pairing_graph_frame (0x82, chip_body, sizeof chip_body);
+    case GOODIX_SECURE_PHASE_OTP_A6:
+      return pairing_graph_frame (0xa6, seam->otp, sizeof seam->otp);
+    case GOODIX_SECURE_PHASE_CONFIG_90:
+      return pairing_graph_frame (0x90, done90, sizeof done90);
+    default:
+      return NULL;
+    }
+}
+
+static void
+pairing_graph_respond_secure (TestFixture      *f,
+                              PairingGraphSeam *seam)
+{
+  GoodixSecureSession *session =
+    goodix_device_context_get_secure_session (f->ctx);
+  GoodixSecurePhase phase = goodix_secure_session_get_phase (session);
+  PairingGraphSubmission *submission = pairing_graph_pop_out (seam);
+  guint8 control = pairing_graph_secure_control (phase);
+  guint8 ack_body[2];
+  g_autoptr(GBytes) ack = NULL;
+  g_autoptr(GBytes) typed = NULL;
+  gsize length;
+  const guint8 *data = pairing_graph_submission_data (submission, &length);
+
+  g_assert_cmpuint (length, !=, 64u);
+  g_assert_cmphex (data[0], ==, 0xa0u);
+  g_assert_cmphex (data[4], ==, control);
+  pairing_graph_complete_out (f, submission, NULL);
+  if (phase == GOODIX_SECURE_PHASE_D1)
+    return;
+  ack_body[0] = control;
+  ack_body[1] = 0x01u;
+  ack = pairing_graph_frame (0xb0u, ack_body, sizeof ack_body);
+  typed = pairing_graph_secure_typed (seam, phase);
+  pairing_graph_deliver (f, ack);
+  if (typed != NULL)
+    pairing_graph_deliver (f, typed);
+}
+
+static unsigned int
+pairing_graph_client_psk_cb (SSL          *ssl,
+                             const char   *hint,
+                             char         *identity,
+                             unsigned int  identity_max,
+                             unsigned char *psk,
+                             unsigned int  psk_max)
+{
+  PairingGraphTlsClient *client = SSL_get_app_data (ssl);
+
+  (void) hint;
+  g_strlcpy (identity, "Client_identity", identity_max);
+  g_assert_cmpuint (psk_max, >=, client->psk_length);
+  memcpy (psk, client->psk, client->psk_length);
+  return (unsigned int) client->psk_length;
+}
+
+static void
+pairing_graph_client_init (PairingGraphTlsClient *client,
+                           PairingGraphSeam      *seam)
+{
+  BIO *input;
+  BIO *output;
+
+  memset (client, 0, sizeof *client);
+  client->psk = seam->psk;
+  client->psk_length = sizeof seam->psk;
+  client->context = SSL_CTX_new (TLS_client_method ());
+  g_assert_nonnull (client->context);
+  g_assert_cmpint (SSL_CTX_set_min_proto_version (client->context,
+                                                  TLS1_2_VERSION), ==, 1);
+  g_assert_cmpint (SSL_CTX_set_max_proto_version (client->context,
+                                                  TLS1_2_VERSION), ==, 1);
+  g_assert_cmpint (SSL_CTX_set_cipher_list (client->context,
+                                            "PSK-AES128-GCM-SHA256"), ==, 1);
+  SSL_CTX_set_psk_client_callback (client->context,
+                                   pairing_graph_client_psk_cb);
+  client->ssl = SSL_new (client->context);
+  g_assert_nonnull (client->ssl);
+  SSL_set_app_data (client->ssl, client);
+  input = BIO_new (BIO_s_mem ());
+  output = BIO_new (BIO_s_mem ());
+  g_assert_nonnull (input);
+  g_assert_nonnull (output);
+  BIO_set_mem_eof_return (input, -1);
+  SSL_set_bio (client->ssl, input, output);
+  SSL_set_connect_state (client->ssl);
+}
+
+static void
+pairing_graph_client_clear (PairingGraphTlsClient *client)
+{
+  SSL_free (client->ssl);
+  SSL_CTX_free (client->context);
+}
+
+static void
+pairing_graph_feed_client_records (TestFixture         *f,
+                                   PairingGraphTlsClient *client)
+{
+  GoodixSecureSession *session =
+    goodix_device_context_get_secure_session (f->ctx);
+  guint8 buffer[8192];
+  int read_length;
+  g_autoptr(GByteArray) pending = g_byte_array_new ();
+
+  while ((read_length = BIO_read (SSL_get_wbio (client->ssl), buffer,
+                                  sizeof buffer)) > 0)
+    g_byte_array_append (pending, buffer, (guint) read_length);
+  while (pending->len >= 5)
+    {
+      gsize record_length = 5u + ((gsize) pending->data[3] << 8) +
+                            pending->data[4];
+      guint8 header[4];
+      g_autoptr(GByteArray) b0 = NULL;
+
+      if (pending->len < record_length)
+        break;
+      if (goodix_secure_session_get_phase (session) ==
+            GOODIX_SECURE_PHASE_TERMINAL)
+        {
+          g_byte_array_set_size (pending, 0);
+          break;
+        }
+      header[0] = 0xb0;
+      header[1] = (guint8) record_length;
+      header[2] = (guint8) (record_length >> 8);
+      header[3] = (guint8) (header[0] + header[1] + header[2]);
+      b0 = g_byte_array_sized_new ((guint) record_length + 4u);
+      g_byte_array_append (b0, header, sizeof header);
+      g_byte_array_append (b0, pending->data, (guint) record_length);
+      goodix_device_context_complete_receive (
+        f->ctx, goodix_device_context_get_generation (f->ctx),
+        b0->data, b0->len, NULL);
+      g_byte_array_remove_range (pending, 0, (guint) record_length);
+    }
+  g_assert_cmpuint (pending->len, ==, 0u);
+}
+
+static void
+pairing_graph_drain_server_records (TestFixture           *f,
+                                    PairingGraphSeam      *seam,
+                                    PairingGraphTlsClient *client)
+{
+  GoodixSecureSession *session =
+    goodix_device_context_get_secure_session (f->ctx);
+
+  if (g_queue_is_empty (seam->out) &&
+      goodix_secure_session_get_phase (session) !=
+        GOODIX_SECURE_PHASE_STOP &&
+      goodix_secure_session_get_phase (session) !=
+        GOODIX_SECURE_PHASE_TERMINAL)
+    {
+      /* Bounds only the host-side wait for the session's record pacing. */
+      gint64 host_deadline = g_get_monotonic_time () + 1000000;
+
+      while (g_queue_is_empty (seam->out) &&
+             g_get_monotonic_time () < host_deadline)
+        g_main_context_iteration (NULL, FALSE);
+    }
+  while (!g_queue_is_empty (seam->out))
+    {
+      PairingGraphSubmission *submission = pairing_graph_pop_out (seam);
+      gsize length;
+      const guint8 *data = pairing_graph_submission_data (submission,
+                                                          &length);
+
+      if (goodix_secure_session_get_phase (session) ==
+            GOODIX_SECURE_PHASE_STOP &&
+          length != 0 && data[0] == 0xa0)
+        {
+          g_queue_push_head (seam->out, submission);
+          break;
+        }
+      g_assert_cmpuint (length, ==, 64u);
+      g_byte_array_append (seam->server_record, data, (guint) length);
+      if (seam->server_record->len >= 4)
+        {
+          guint16 payload_length = (guint16) (
+            (guint16) seam->server_record->data[1] |
+            (guint16) ((guint16) seam->server_record->data[2] << 8));
+          gsize logical_length = (gsize) payload_length + 4u;
+
+          if (seam->server_record->len >= logical_length)
+            {
+              g_assert_cmphex (seam->server_record->data[0], ==, 0xb0);
+              g_assert_cmphex (seam->server_record->data[3], ==,
+                               (guint8) (0xb0u +
+                                         seam->server_record->data[1] +
+                                         seam->server_record->data[2]));
+              g_assert_cmpint (
+                BIO_write (SSL_get_rbio (client->ssl),
+                           seam->server_record->data + 4, payload_length),
+                ==, (int) payload_length);
+              g_byte_array_set_size (seam->server_record, 0);
+            }
+        }
+      pairing_graph_complete_out (f, submission, NULL);
+    }
+  g_assert_cmpuint (seam->server_record->len, ==, 0u);
+}
+
+static gboolean
+pairing_graph_pump_tls (TestFixture           *f,
+                        PairingGraphSeam      *seam,
+                        PairingGraphTlsClient *client)
+{
+  GoodixSecureSession *session =
+    goodix_device_context_get_secure_session (f->ctx);
+
+  for (guint iteration = 0; iteration < 64u; iteration++)
+    {
+      int result = SSL_do_handshake (client->ssl);
+
+      if (result != 1)
+        {
+          int ssl_error = SSL_get_error (client->ssl, result);
+
+          if (ssl_error != SSL_ERROR_WANT_READ &&
+              ssl_error != SSL_ERROR_WANT_WRITE)
+            return FALSE;
+        }
+      pairing_graph_feed_client_records (f, client);
+      pairing_graph_drain_server_records (f, seam, client);
+      if (SSL_is_init_finished (client->ssl) &&
+          goodix_secure_session_get_phase (session) ==
+            GOODIX_SECURE_PHASE_STOP)
+        return TRUE;
+      if (goodix_secure_session_get_phase (session) ==
+            GOODIX_SECURE_PHASE_TERMINAL)
+        return FALSE;
+    }
+  return FALSE;
+}
+
+static void
+pairing_graph_drive_secure_to_stop (TestFixture      *f,
+                                    PairingGraphSeam *seam)
+{
+  PairingGraphTlsClient client;
+  GoodixSecureSession *session =
+    goodix_device_context_get_secure_session (f->ctx);
+
+  g_assert_nonnull (session);
+  while (goodix_secure_session_get_phase (session) < GOODIX_SECURE_PHASE_D1)
+    pairing_graph_respond_secure (f, seam);
+  pairing_graph_respond_secure (f, seam);
+  pairing_graph_client_init (&client, seam);
+  g_assert_true (pairing_graph_pump_tls (f, seam, &client));
+  pairing_graph_client_clear (&client);
+  g_assert_cmpint (goodix_secure_session_get_phase (session), ==,
+                   GOODIX_SECURE_PHASE_STOP);
+}
+
+static void
+pairing_graph_cancel_and_close (TestFixture      *f,
+                                PairingGraphSeam *seam,
+                                GCancellable     *cancellable)
+{
+  GoodixFpiUsbBackend *backend =
+    goodix_device_context_get_fpi_usb_backend (f->ctx);
+  g_autoptr(GError) cancelled = g_error_new_literal (
+    G_IO_ERROR, G_IO_ERROR_CANCELLED, "synthetic cancelled transfer");
+  gint64 deadline = g_get_monotonic_time () + TEST_TIMEOUT_MS * 1000;
+
+  g_cancellable_cancel (cancellable);
+  while (!f->done && g_get_monotonic_time () < deadline)
+    {
+      while (!g_queue_is_empty (seam->out))
+        pairing_graph_complete_out (f, pairing_graph_pop_out (seam),
+                                    cancelled);
+      if (goodix_fpi_usb_backend_get_outstanding (backend) != 0u)
+        goodix_device_context_complete_receive (
+          f->ctx, seam->generation, NULL, 0, cancelled);
+      g_main_context_iteration (NULL, FALSE);
+    }
+  test_wait (f);
+  g_assert_false (f->success);
+  g_assert_error (f->error, G_IO_ERROR, G_IO_ERROR_CANCELLED);
+  g_clear_error (&f->error);
+  fixture_close (f);
+}
+
+static void
+pairing_graph_close_tolerant (TestFixture *f)
+{
+  f->done = FALSE;
+  f->completion_count = 0;
+  fp_device_close (FP_DEVICE (f->device), NULL,
+                   (GAsyncReadyCallback) close_cb, f);
+  test_wait (f);
+  g_clear_error (&f->error);
+  f->success = TRUE;
+  g_assert_null (goodix_fpimage_device_get_context (f->device));
+}
+
+static void
+pairing_graph_seam_init (PairingGraphSeam *seam,
+                         const guint8      psk[GOODIX_SELF_STATE_PSK_LENGTH],
+                         guint8            validator_seed)
+{
+  guint8 envelope[GOODIX_PAIRING_ENVELOPE_LENGTH];
+
+  memcpy (seam->psk, psk, sizeof seam->psk);
+  g_assert_true (goodix_pairing_crypto_derive (
+                   psk, GOODIX_SELF_STATE_PSK_LENGTH, envelope,
+                   seam->expected_validator, NULL));
+  pairing_graph_make_bb010002 (seam->bb010002);
+  coordinator_make_otp (seam->otp);
+  for (guint i = 0; i < sizeof seam->live_validator; i++)
+    seam->live_validator[i] = (guint8) (validator_seed + (guint8) i);
+  seam->out = g_queue_new ();
+  seam->server_record = g_byte_array_new ();
+}
+
+static void
+pairing_graph_seam_clear (PairingGraphSeam *seam)
+{
+  pairing_graph_clear_queue (seam);
+  g_clear_pointer (&seam->out, g_queue_free);
+  g_clear_pointer (&seam->server_record, g_byte_array_unref);
+  memset (seam->psk, 0, sizeof seam->psk);
+}
+
+static void
+test_p6_pairing_activation_production_graph (void)
+{
+  PairingGraphSeam seam = { 0 };
+  TestFixture *f;
+  g_autoptr(GCancellable) first_cancellable = g_cancellable_new ();
+  g_autoptr(GCancellable) second_cancellable = g_cancellable_new ();
+  g_autofree gchar *state_directory =
+    pairing_graph_new_directory ("goodix-p6-pairing-state.XXXXXX");
+  g_autofree gchar *legacy_directory =
+    g_strconcat (state_directory, "-legacy-absent", NULL);
+  guint8 psk[GOODIX_SELF_STATE_PSK_LENGTH];
+  GoodixProductionEnrollmentAudit audit;
+
+  for (guint i = 0; i < sizeof psk; i++)
+    psk[i] = (guint8) (0x11u + i);
+  pairing_graph_seam_init (&seam, psk, 0x70u);
+  f = pairing_graph_fixture_new (&seam, state_directory, legacy_directory,
+                                 psk);
+  fixture_open (f);
+  goodix_device_context_set_async_usb_submit_seam (
+    f->ctx, pairing_graph_submit_seam, &seam);
+
+  /* Epoch 1: read-only preflight, then exactly one qualified E0 pairing
+   * transaction with both readbacks, then the strict secure session with a
+   * real TLS 1.2 PSK handshake proving the new pairing. */
+  pairing_graph_start_identify (f, &seam, first_cancellable);
+  pairing_graph_run_preflight (f, &seam);
+  pairing_graph_complete_e0 (f, &seam);
+  pairing_graph_respond_readback (f, &seam, 0xbb010002u, seam.bb010002,
+                                  sizeof seam.bb010002);
+  pairing_graph_respond_readback (f, &seam, 0xbb020003u,
+                                  seam.expected_validator,
+                                  sizeof seam.expected_validator);
+  g_assert_nonnull (goodix_device_context_get_secure_session (f->ctx));
+  g_assert_cmpint (
+    goodix_secure_session_get_phase (
+      goodix_device_context_get_secure_session (f->ctx)), ==,
+    GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2);
+  pairing_graph_drive_secure_to_stop (f, &seam);
+
+  g_assert_cmpint (goodix_device_context_get_state (f->ctx), ==,
+                   GOODIX_DEVICE_CONTEXT_STATE_ACTIVE);
+  g_assert_nonnull (goodix_device_context_get_secure_session (f->ctx));
+  g_assert_nonnull (goodix_device_context_get_post_tls_lifecycle (f->ctx));
+  goodix_device_context_get_production_enrollment_audit (f->ctx, &audit);
+  g_assert_true (audit.live_preflight.complete);
+  g_assert_cmpuint (audit.live_preflight.command_count, ==, 7u);
+  g_assert_cmpuint (audit.live_preflight.persistent_write_count, ==, 0u);
+  g_assert_true (audit.pairing_activation.prepared_journaled);
+  g_assert_true (audit.pairing_activation.e0_reserved_before_submit);
+  g_assert_cmpuint (audit.pairing_activation.persistent_write_count, ==, 1u);
+  g_assert_cmpuint (audit.pairing_activation.provision.logical_e0_count,
+                    ==, 1u);
+  g_assert_cmpuint (audit.pairing_activation.provision.retry_count, ==, 0u);
+  g_assert_true (audit.pairing_activation.bb010002_readback_match);
+  g_assert_true (audit.pairing_activation.validator_readback_match);
+  g_assert_true (audit.pairing_activation.tls_proven);
+  g_assert_true (audit.pairing_activation.active_promoted);
+  g_assert_false (audit.pairing_activation.recovered_without_e0);
+  g_assert_false (audit.pairing_activation.active_reused_without_e0);
+  g_assert_cmpuint (audit.tls.handshake_count, ==, 1u);
+  g_assert_cmpint (audit.runtime_coordinator.source, ==,
+                   GOODIX_RUNTIME_COORDINATOR_SOURCE_STATE_V2);
+  g_assert_true (audit.runtime_coordinator.writer_enabled);
+  g_assert_cmpuint (audit.runtime_coordinator.pairing_write_count, ==, 1u);
+  g_assert_true (audit.runtime_coordinator.zero_fdt_seed);
+  g_assert_cmpuint (seam.e0_frame_count, ==, 1u);
+  pairing_graph_assert_state_phase (&seam, state_directory,
+                                    GOODIX_SELF_STATE_ACTIVE, 2u);
+  pairing_graph_cancel_and_close (f, &seam, first_cancellable);
+
+  /* Epoch 2: the ordinary ACTIVE reopen proves the paired state read-only
+   * and performs zero E0. */
+  memcpy (seam.live_validator, seam.expected_validator,
+          sizeof seam.live_validator);
+  fixture_open (f);
+  goodix_device_context_set_async_usb_submit_seam (
+    f->ctx, pairing_graph_submit_seam, &seam);
+  pairing_graph_start_identify (f, &seam, second_cancellable);
+  pairing_graph_run_preflight (f, &seam);
+  g_assert_cmpuint (seam.e0_frame_count, ==, 1u);
+  g_assert_true (goodix_device_context_has_runtime_material (f->ctx));
+  g_assert_nonnull (goodix_device_context_get_secure_session (f->ctx));
+  goodix_device_context_get_production_enrollment_audit (f->ctx, &audit);
+  g_assert_true (audit.live_preflight.complete);
+  g_assert_cmpuint (audit.pairing_activation.persistent_write_count, ==, 0u);
+  g_assert_false (audit.pairing_activation.prepared_journaled);
+  g_assert_false (audit.pairing_activation.e0_reserved_before_submit);
+  g_assert_false (audit.pairing_activation.tls_proven);
+  g_assert_false (audit.pairing_activation.active_promoted);
+  g_assert_cmpint (audit.runtime_coordinator.decision, ==,
+                   GOODIX_RUNTIME_COORDINATOR_DECISION_READY_ACTIVE);
+  g_assert_cmpint (audit.runtime_coordinator.source, ==,
+                   GOODIX_RUNTIME_COORDINATOR_SOURCE_STATE_V2);
+  g_assert_false (audit.runtime_coordinator.writer_enabled);
+  g_assert_cmpuint (audit.runtime_coordinator.pairing_write_count, ==, 0u);
+  g_assert_true (audit.runtime_coordinator.zero_fdt_seed);
+  pairing_graph_cancel_and_close (f, &seam, second_cancellable);
+
+  test_fixture_free (f);
+  goodix_fpimage_device_test_clear_production_state_override ();
+  pairing_graph_seam_clear (&seam);
+  pairing_graph_remove_directory (state_directory);
+}
+
+static void
+test_p6_pairing_activation_fail_closed_after_reservation (void)
+{
+  PairingGraphSeam seam = { 0 };
+  TestFixture *f;
+  g_autoptr(GCancellable) first_cancellable = g_cancellable_new ();
+  g_autoptr(GCancellable) second_cancellable = g_cancellable_new ();
+  g_autofree gchar *state_directory =
+    pairing_graph_new_directory ("goodix-p6-pairing-fail.XXXXXX");
+  g_autofree gchar *legacy_directory =
+    g_strconcat (state_directory, "-legacy-absent", NULL);
+  guint8 psk[GOODIX_SELF_STATE_PSK_LENGTH];
+  guint8 corrupted[GOODIX_BB010002_LENGTH];
+  GoodixProductionEnrollmentAudit audit;
+
+  for (guint i = 0; i < sizeof psk; i++)
+    psk[i] = (guint8) (0x21u + i);
+  pairing_graph_seam_init (&seam, psk, 0x90u);
+  f = pairing_graph_fixture_new (&seam, state_directory, legacy_directory,
+                                 psk);
+  fixture_open (f);
+  goodix_device_context_set_async_usb_submit_seam (
+    f->ctx, pairing_graph_submit_seam, &seam);
+
+  /* Epoch 1: the E0 is accepted but the BB010002 readback proof fails. */
+  pairing_graph_start_identify (f, &seam, first_cancellable);
+  pairing_graph_run_preflight (f, &seam);
+  pairing_graph_complete_e0 (f, &seam);
+  memcpy (corrupted, seam.bb010002, sizeof corrupted);
+  corrupted[64] ^= 0xffu;
+  pairing_graph_respond_readback (f, &seam, 0xbb010002u, corrupted,
+                                  sizeof corrupted);
+  pairing_graph_respond_readback (f, &seam, 0xbb020003u,
+                                  seam.expected_validator,
+                                  sizeof seam.expected_validator);
+  test_wait (f);
+  g_assert_false (f->success);
+  g_assert_nonnull (f->error);
+  g_assert_true (goodix_device_context_get_poisoned (f->ctx));
+  g_assert_cmpuint (seam.e0_frame_count, ==, 1u);
+  goodix_device_context_get_production_enrollment_audit (f->ctx, &audit);
+  g_assert_true (audit.pairing_activation.prepared_journaled);
+  g_assert_true (audit.pairing_activation.e0_reserved_before_submit);
+  g_assert_cmpuint (audit.pairing_activation.persistent_write_count, ==, 1u);
+  g_assert_false (audit.pairing_activation.bb010002_readback_match);
+  g_assert_false (audit.pairing_activation.validator_readback_match);
+  g_assert_false (audit.pairing_activation.tls_proven);
+  g_assert_false (audit.pairing_activation.active_promoted);
+  pairing_graph_assert_state_phase (&seam, state_directory,
+                                    GOODIX_SELF_STATE_PREPARED, 1u);
+  g_clear_error (&f->error);
+  f->success = TRUE;
+  pairing_graph_close_tolerant (f);
+
+  /* Epoch 2: the device still reports the stale validator, so the reserved
+   * transaction is ambiguous.  Recovery must fail closed with zero E0. */
+  fixture_open (f);
+  goodix_device_context_set_async_usb_submit_seam (
+    f->ctx, pairing_graph_submit_seam, &seam);
+  pairing_graph_start_identify (f, &seam, second_cancellable);
+  pairing_graph_run_preflight (f, &seam);
+  test_wait (f);
+  g_assert_false (f->success);
+  g_assert_nonnull (f->error);
+  g_assert_cmpuint (seam.e0_frame_count, ==, 1u);
+  goodix_device_context_get_production_enrollment_audit (f->ctx, &audit);
+  g_assert_cmpint (audit.runtime_coordinator.decision, ==,
+                   GOODIX_RUNTIME_COORDINATOR_DECISION_USE_PRIOR_REQUIRED);
+  g_assert_cmpuint (audit.pairing_activation.persistent_write_count, ==, 0u);
+  g_assert_false (audit.pairing_activation.prepared_journaled);
+  g_assert_false (audit.pairing_activation.e0_reserved_before_submit);
+  g_clear_error (&f->error);
+  f->success = TRUE;
+  pairing_graph_close_tolerant (f);
+
+  test_fixture_free (f);
+  goodix_fpimage_device_test_clear_production_state_override ();
+  pairing_graph_seam_clear (&seam);
+  pairing_graph_remove_directory (state_directory);
+}
+
 static void
 test_d279_55_production_identify_single_acquisition (void)
 {
@@ -3363,6 +4376,10 @@ main (int argc, char **argv)
                    test_p5_coordinator_active_state);
   g_test_add_func ("/p6/e4-contract-diagnostics",
                    test_p6_e4_contract_diagnostics);
+  g_test_add_func ("/p6/pairing-activation-production-graph",
+                   test_p6_pairing_activation_production_graph);
+  g_test_add_func ("/p6/pairing-activation-fail-closed-after-reservation",
+                   test_p6_pairing_activation_fail_closed_after_reservation);
 
   g_test_add_func ("/goodix-fpimage-device/lifecycle-base-capture",
                    test_lifecycle_base_capture);

@@ -194,6 +194,16 @@ void goodix_fpimage_device_set_production_open_seams (
   GoodixUsbInterfaceSeam             claim_interface,
   GoodixUsbInterfaceSeam             release_interface,
   gpointer                           user_data);
+/* Offline integration seam: redirects the production state-v2/legacy paths to
+ * test-owned directories and optionally pins the pairing PSK.  Absent from
+ * production builds; it never reaches a real reader or the real host state. */
+void goodix_fpimage_device_test_set_production_state_override (
+  const gchar  *state_directory,
+  const gchar  *legacy_directory,
+  guint         uid,
+  guint         gid,
+  const guint8 *pairing_psk);
+void goodix_fpimage_device_test_clear_production_state_override (void);
 gboolean goodix_device_context_has_runtime_material (GoodixDeviceContext *ctx);
 gboolean goodix_device_context_has_usb_claim (GoodixDeviceContext *ctx);
 gboolean goodix_device_context_runtime_handoff_views_cleared (

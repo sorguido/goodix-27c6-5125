@@ -315,6 +315,470 @@ test_out_failure_is_terminal_and_never_retries (void)
   remove_state_directory (directory);
 }
 
+static void
+feed_e0_accepted (GoodixPairingActivation *activation)
+{
+  const guint8 e0_ack_body[] = { 0xe0u, 0x01u };
+  const guint8 e0_done_body[] = { 0x00u, 0x03u };
+  g_autoptr(GBytes) request =
+    goodix_pairing_activation_next_request (activation, NULL);
+  g_autoptr(GBytes) e0_ack = response (0xb0u, e0_ack_body,
+                                       sizeof e0_ack_body);
+  g_autoptr(GBytes) e0_done = response (0xe0u, e0_done_body,
+                                        sizeof e0_done_body);
+
+  g_assert_nonnull (request);
+  g_assert_cmpuint (g_bytes_get_size (request), ==,
+                    GOODIX_PAIRING_PROVISION_E0_FRAME_LENGTH);
+  goodix_pairing_activation_out_complete (activation, NULL);
+  g_assert_true (goodix_pairing_activation_handle_a0 (activation, e0_ack,
+                                                       NULL));
+  g_assert_true (goodix_pairing_activation_handle_a0 (activation, e0_done,
+                                                       NULL));
+}
+
+static void
+feed_readback_bb010002 (GoodixPairingActivation *activation,
+                        const guint8            *payload)
+{
+  const guint8 e4_ack_body[] = { 0xe4u, 0x01u };
+  g_autoptr(GBytes) request =
+    goodix_pairing_activation_next_request (activation, NULL);
+  g_autoptr(GBytes) e4_ack = response (0xb0u, e4_ack_body, sizeof e4_ack_body);
+  g_autoptr(GBytes) typed = e4_response (0xbb010002u, payload,
+                                          GOODIX_BB010002_LENGTH);
+
+  g_assert_nonnull (request);
+  goodix_pairing_activation_out_complete (activation, NULL);
+  g_assert_true (goodix_pairing_activation_handle_a0 (activation, e4_ack,
+                                                       NULL));
+  g_assert_true (goodix_pairing_activation_handle_a0 (activation, typed,
+                                                       NULL));
+}
+
+static void
+fill_test_psk (guint8 psk[32],
+               guint8 seed)
+{
+  for (guint i = 0; i < 32u; i++)
+    psk[i] = (guint8) (seed + (guint8) i);
+}
+
+static void
+init_paths_policy (GoodixPairingActivationPaths  *paths,
+                   GoodixPairingActivationPolicy *policy,
+                   const gchar                   *directory)
+{
+  paths->state_directory = directory;
+  goodix_self_state_policy_for_owner (&policy->state, getuid (), getgid ());
+}
+
+/* Window 1: any failure before the PREPARED receipt is durable must leave no
+ * persistent reservation and must never construct an E0 frame. */
+static void
+test_failure_before_prepared_durable (void)
+{
+  GoodixLivePreflightEvidence evidence = evidence_fixture ();
+  GoodixPairingActivationPaths paths = { 0 };
+  GoodixPairingActivationPolicy policy = { 0 };
+  GoodixPairingActivationAudit audit;
+  g_autofree gchar *directory = new_state_directory ();
+  g_autoptr(GError) error = NULL;
+  guint8 psk[32];
+  GDir *dir;
+
+  if (geteuid () == 0)
+    {
+      g_test_skip ("read-only directory boundary requires an unprivileged user");
+      remove_state_directory (directory);
+      return;
+    }
+  fill_test_psk (psk, 0x20u);
+  init_paths_policy (&paths, &policy, directory);
+  /* A read-only state root makes the durable reservation impossible. */
+  g_assert_cmpint (g_chmod (directory, 0500), ==, 0);
+  g_assert_null (goodix_pairing_activation_new_for_test (
+                   &paths, &policy, &evidence, psk, &audit, &error));
+  g_assert_nonnull (error);
+  g_assert_false (audit.prepared_journaled);
+  g_assert_false (audit.e0_reserved_before_submit);
+  g_clear_error (&error);
+  g_assert_cmpint (g_chmod (directory, 0700), ==, 0);
+  dir = g_dir_open (directory, 0, NULL);
+  g_assert_nonnull (dir);
+  g_assert_null (g_dir_read_name (dir));
+  g_dir_close (dir);
+  remove_state_directory (directory);
+}
+
+/* Window 2: a crash after the durable PREPARED reservation but before the E0
+ * submit leaves the live prior validator in place.  Recovery must fail closed;
+ * it must never authorize a second E0. */
+static void
+test_crash_after_reservation_fails_closed (void)
+{
+  GoodixLivePreflightEvidence evidence = evidence_fixture ();
+  GoodixPairingActivationPaths paths = { 0 };
+  GoodixPairingActivationPolicy policy = { 0 };
+  GoodixPairingActivationAudit audit;
+  GoodixPairingActivationAudit reopen_audit;
+  g_autofree gchar *directory = new_state_directory ();
+  g_autoptr(GoodixPairingActivation) activation = NULL;
+  g_autoptr(GError) error = NULL;
+  guint8 psk[32];
+  guint8 envelope[102];
+  guint8 validator[32];
+  GoodixSelfStateBinding binding = { 0 };
+  GoodixSelfState *state = NULL;
+
+  fill_test_psk (psk, 0x30u);
+  g_assert_true (goodix_pairing_crypto_derive (psk, sizeof psk, envelope,
+                                               validator, NULL));
+  init_paths_policy (&paths, &policy, directory);
+  activation = goodix_pairing_activation_new_for_test (
+    &paths, &policy, &evidence, psk, &audit, NULL);
+  g_assert_nonnull (activation);
+  g_assert_true (audit.prepared_journaled);
+  g_assert_true (audit.e0_reserved_before_submit);
+  g_assert_cmpuint (audit.persistent_write_count, ==, 0u);
+  /* Crash before any submit: no next_request, no out_complete. */
+  g_clear_pointer (&activation, goodix_pairing_activation_free);
+
+  /* The device still reports the prior validator. */
+  g_assert_null (goodix_pairing_activation_new_for_test (
+                   &paths, &policy, &evidence, psk, &reopen_audit, &error));
+  g_assert_nonnull (error);
+  g_assert_false (reopen_audit.prepared_journaled);
+  g_clear_error (&error);
+
+  binding.vid = 0x27c6u;
+  binding.pid = 0x5125u;
+  binding.chip_profile = evidence.chip_id;
+  g_strlcpy (binding.app, "APP12509", sizeof binding.app);
+  {
+    g_autoptr(GChecksum) checksum = g_checksum_new (G_CHECKSUM_SHA256);
+    gsize length = 32u;
+    g_checksum_update (checksum, evidence.otp, sizeof evidence.otp);
+    g_checksum_get_digest (checksum, binding.otp_sha256, &length);
+    g_checksum_reset (checksum);
+    length = 32u;
+    g_checksum_update (checksum, evidence.config90, sizeof evidence.config90);
+    g_checksum_get_digest (checksum, binding.config90_sha256, &length);
+  }
+  g_assert_cmpint (goodix_self_state_load (directory, &binding, &policy.state,
+                                           &state, NULL), ==,
+                   GOODIX_SELF_STATE_LOAD_VALID);
+  g_assert_cmpint (goodix_self_state_get_record (state)->phase, ==,
+                   GOODIX_SELF_STATE_PREPARED);
+  g_assert_true (goodix_self_state_get_record (state)->e0_attempted);
+  goodix_self_state_free (state);
+  remove_state_directory (directory);
+}
+
+/* Windows 5 and 6: E0 ACK or completion contract failures are terminal and
+ * never produce another logical E0. */
+static void
+test_e0_contract_failures_are_terminal (void)
+{
+  GoodixLivePreflightEvidence evidence = evidence_fixture ();
+  GoodixPairingActivationPaths paths = { 0 };
+  GoodixPairingActivationPolicy policy = { 0 };
+  GoodixPairingActivationAudit audit;
+  g_autofree gchar *directory = new_state_directory ();
+  g_autoptr(GoodixPairingActivation) activation = NULL;
+  g_autoptr(GBytes) request = NULL;
+  guint8 psk[32];
+
+  fill_test_psk (psk, 0x40u);
+  init_paths_policy (&paths, &policy, directory);
+  activation = goodix_pairing_activation_new_for_test (
+    &paths, &policy, &evidence, psk, &audit, NULL);
+  g_assert_nonnull (activation);
+  request = goodix_pairing_activation_next_request (activation, NULL);
+  g_assert_nonnull (request);
+  goodix_pairing_activation_out_complete (activation, NULL);
+  {
+    const guint8 bad_ack_body[] = { 0xe0u, 0x02u };
+    g_autoptr(GBytes) bad_ack = response (0xb0u, bad_ack_body,
+                                          sizeof bad_ack_body);
+    g_autoptr(GError) error = NULL;
+    g_assert_false (goodix_pairing_activation_handle_a0 (activation, bad_ack,
+                                                         &error));
+    g_assert_nonnull (error);
+  }
+  g_assert_cmpint (goodix_pairing_activation_get_phase (activation), ==,
+                   GOODIX_PAIRING_ACTIVATION_TERMINAL);
+  g_assert_null (goodix_pairing_activation_next_request (activation, NULL));
+  g_assert_cmpuint (audit.provision.logical_e0_count, ==, 1u);
+  g_assert_cmpuint (audit.provision.retry_count, ==, 0u);
+  g_clear_pointer (&activation, goodix_pairing_activation_free);
+  remove_state_directory (directory);
+
+  directory = new_state_directory ();
+  init_paths_policy (&paths, &policy, directory);
+  activation = goodix_pairing_activation_new_for_test (
+    &paths, &policy, &evidence, psk, &audit, NULL);
+  g_assert_nonnull (activation);
+  g_clear_pointer (&request, g_bytes_unref);
+  request = goodix_pairing_activation_next_request (activation, NULL);
+  g_assert_nonnull (request);
+  goodix_pairing_activation_out_complete (activation, NULL);
+  {
+    const guint8 ack_body[] = { 0xe0u, 0x01u };
+    const guint8 bad_done_body[] = { 0x00u, 0x05u };
+    g_autoptr(GBytes) ack = response (0xb0u, ack_body, sizeof ack_body);
+    g_autoptr(GBytes) bad_done = response (0xe0u, bad_done_body,
+                                           sizeof bad_done_body);
+    g_assert_true (goodix_pairing_activation_handle_a0 (activation, ack,
+                                                        NULL));
+    g_assert_false (goodix_pairing_activation_handle_a0 (activation, bad_done,
+                                                         NULL));
+  }
+  g_assert_cmpint (goodix_pairing_activation_get_phase (activation), ==,
+                   GOODIX_PAIRING_ACTIVATION_TERMINAL);
+  g_assert_null (goodix_pairing_activation_next_request (activation, NULL));
+  g_assert_cmpuint (audit.provision.logical_e0_count, ==, 1u);
+  g_clear_pointer (&activation, goodix_pairing_activation_free);
+  remove_state_directory (directory);
+}
+
+/* Windows 8 and 9: a readback that does not match byte-for-byte fails closed
+ * before TLS and never re-arms the transaction. */
+static void
+test_readback_mismatch_fails_closed (void)
+{
+  GoodixLivePreflightEvidence evidence = evidence_fixture ();
+  GoodixPairingActivationPaths paths = { 0 };
+  GoodixPairingActivationPolicy policy = { 0 };
+  GoodixPairingActivationAudit audit;
+  g_autofree gchar *directory = new_state_directory ();
+  g_autoptr(GoodixPairingActivation) activation = NULL;
+  guint8 psk[32];
+  guint8 envelope[102];
+  guint8 validator[32];
+  guint8 corrupted[GOODIX_BB010002_LENGTH];
+
+  fill_test_psk (psk, 0x50u);
+  g_assert_true (goodix_pairing_crypto_derive (psk, sizeof psk, envelope,
+                                               validator, NULL));
+  init_paths_policy (&paths, &policy, directory);
+  activation = goodix_pairing_activation_new_for_test (
+    &paths, &policy, &evidence, psk, &audit, NULL);
+  g_assert_nonnull (activation);
+  feed_e0_accepted (activation);
+  g_assert_cmpint (goodix_pairing_activation_get_phase (activation), ==,
+                   GOODIX_PAIRING_ACTIVATION_READ_BB010002);
+  memcpy (corrupted, evidence.bb010002, sizeof corrupted);
+  corrupted[100] ^= 0xffu;
+  /* A well-formed but corrupted readback passes the typed contract; the
+   * byte-for-byte mismatch must fail closed at the combined readback proof. */
+  feed_readback_bb010002 (activation, corrupted);
+  g_assert_cmpint (goodix_pairing_activation_get_phase (activation), ==,
+                   GOODIX_PAIRING_ACTIVATION_READ_VALIDATOR);
+  {
+    const guint8 e4_ack_body[] = { 0xe4u, 0x01u };
+    g_autoptr(GBytes) request =
+      goodix_pairing_activation_next_request (activation, NULL);
+    g_autoptr(GBytes) e4_ack = response (0xb0u, e4_ack_body,
+                                         sizeof e4_ack_body);
+    g_autoptr(GBytes) typed = e4_response (0xbb020003u, validator,
+                                           sizeof validator);
+    g_assert_nonnull (request);
+    goodix_pairing_activation_out_complete (activation, NULL);
+    g_assert_true (goodix_pairing_activation_handle_a0 (activation, e4_ack,
+                                                        NULL));
+    g_assert_false (goodix_pairing_activation_handle_a0 (activation, typed,
+                                                         NULL));
+  }
+  g_assert_cmpint (goodix_pairing_activation_get_phase (activation), ==,
+                   GOODIX_PAIRING_ACTIVATION_TERMINAL);
+  g_assert_false (audit.bb010002_readback_match);
+  g_assert_false (audit.validator_readback_match);
+  g_assert_false (audit.provision.bb010002_unchanged);
+  g_assert_cmpuint (audit.persistent_write_count, ==, 1u);
+  g_clear_pointer (&activation, goodix_pairing_activation_free);
+  remove_state_directory (directory);
+
+  directory = new_state_directory ();
+  init_paths_policy (&paths, &policy, directory);
+  activation = goodix_pairing_activation_new_for_test (
+    &paths, &policy, &evidence, psk, &audit, NULL);
+  g_assert_nonnull (activation);
+  feed_e0_accepted (activation);
+  feed_readback_bb010002 (activation, evidence.bb010002);
+  g_assert_cmpint (goodix_pairing_activation_get_phase (activation), ==,
+                   GOODIX_PAIRING_ACTIVATION_READ_VALIDATOR);
+  {
+    guint8 wrong_validator[32];
+    const guint8 e4_ack_body[] = { 0xe4u, 0x01u };
+    g_autoptr(GBytes) request =
+      goodix_pairing_activation_next_request (activation, NULL);
+    g_autoptr(GBytes) e4_ack = response (0xb0u, e4_ack_body,
+                                         sizeof e4_ack_body);
+    g_autoptr(GBytes) typed = NULL;
+    memcpy (wrong_validator, validator, sizeof wrong_validator);
+    wrong_validator[0] ^= 0xffu;
+    typed = e4_response (0xbb020003u, wrong_validator,
+                         sizeof wrong_validator);
+    g_assert_nonnull (request);
+    goodix_pairing_activation_out_complete (activation, NULL);
+    g_assert_true (goodix_pairing_activation_handle_a0 (activation, e4_ack,
+                                                        NULL));
+    g_assert_false (goodix_pairing_activation_handle_a0 (activation, typed,
+                                                         NULL));
+  }
+  g_assert_cmpint (goodix_pairing_activation_get_phase (activation), ==,
+                   GOODIX_PAIRING_ACTIVATION_TERMINAL);
+  g_assert_false (audit.bb010002_readback_match);
+  g_assert_false (audit.validator_readback_match);
+  g_assert_true (audit.provision.bb010002_unchanged);
+  g_assert_false (audit.provision.validator_match);
+  g_clear_pointer (&activation, goodix_pairing_activation_free);
+  remove_state_directory (directory);
+}
+
+/* Windows 7, 10, 11 and 12: any crash after an accepted E0 and before the
+ * ACTIVE promotion is recovered read-only through the proven live validator,
+ * with zero additional E0. */
+static void
+test_crash_after_accepted_e0_recovers_without_e0 (void)
+{
+  GoodixLivePreflightEvidence evidence = evidence_fixture ();
+  GoodixPairingActivationPaths paths = { 0 };
+  GoodixPairingActivationPolicy policy = { 0 };
+  GoodixPairingActivationAudit audit;
+  GoodixPairingActivationAudit recovery_audit;
+  g_autofree gchar *directory = new_state_directory ();
+  g_autoptr(GoodixPairingActivation) activation = NULL;
+  g_autoptr(GoodixPairingActivation) recovery = NULL;
+  guint8 psk[32];
+  guint8 envelope[102];
+  guint8 validator[32];
+
+  fill_test_psk (psk, 0x60u);
+  g_assert_true (goodix_pairing_crypto_derive (psk, sizeof psk, envelope,
+                                               validator, NULL));
+  init_paths_policy (&paths, &policy, directory);
+  activation = goodix_pairing_activation_new_for_test (
+    &paths, &policy, &evidence, psk, &audit, NULL);
+  g_assert_nonnull (activation);
+  feed_e0_accepted (activation);
+  /* Crash after the accepted E0 but before the BB010002 readback. */
+  g_clear_pointer (&activation, goodix_pairing_activation_free);
+
+  memcpy (evidence.validator, validator, sizeof evidence.validator);
+  recovery = goodix_pairing_activation_new_for_test (
+    &paths, &policy, &evidence, psk, &recovery_audit, NULL);
+  g_assert_nonnull (recovery);
+  g_assert_cmpint (recovery_audit.disposition, ==,
+                   GOODIX_PAIRING_ACTIVATION_DISPOSITION_RECOVER_PREPARED_TLS);
+  g_assert_true (recovery_audit.recovered_without_e0);
+  g_assert_cmpuint (recovery_audit.persistent_write_count, ==, 0u);
+  g_assert_null (goodix_pairing_activation_next_request (recovery, NULL));
+  g_assert_true (goodix_pairing_activation_mark_tls_and_promote (recovery,
+                                                                 NULL));
+  g_assert_true (recovery_audit.tls_proven);
+  g_assert_true (recovery_audit.active_promoted);
+  g_clear_pointer (&recovery, goodix_pairing_activation_free);
+  remove_state_directory (directory);
+}
+
+/* Window 14: a proven external replacement of an ACTIVE generation reuses the
+ * same Linux PSK in a new generation with exactly one new E0. */
+static void
+test_external_replacement_restores_linux_psk (void)
+{
+  GoodixLivePreflightEvidence evidence = evidence_fixture ();
+  GoodixPairingActivationPaths paths = { 0 };
+  GoodixPairingActivationPolicy policy = { 0 };
+  GoodixPairingActivationAudit audit;
+  GoodixPairingActivationAudit restore_audit;
+  GoodixPairingActivationAudit reopen_audit;
+  g_autofree gchar *directory = new_state_directory ();
+  g_autoptr(GoodixPairingActivation) activation = NULL;
+  g_autoptr(GoodixPairingActivation) restore = NULL;
+  g_autoptr(GoodixPairingActivation) reopen = NULL;
+  guint8 psk[32];
+  guint8 envelope[102];
+  guint8 validator[32];
+
+  fill_test_psk (psk, 0x70u);
+  g_assert_true (goodix_pairing_crypto_derive (psk, sizeof psk, envelope,
+                                               validator, NULL));
+  init_paths_policy (&paths, &policy, directory);
+  activation = goodix_pairing_activation_new_for_test (
+    &paths, &policy, &evidence, psk, &audit, NULL);
+  g_assert_nonnull (activation);
+  feed_successful_write_and_readback (activation, validator);
+  g_assert_true (goodix_pairing_activation_mark_tls_and_promote (activation,
+                                                                 NULL));
+  g_clear_pointer (&activation, goodix_pairing_activation_free);
+
+  /* An external writer replaced the live pairing. */
+  for (guint i = 0; i < sizeof evidence.validator; i++)
+    evidence.validator[i] = (guint8) (0xc0u ^ i);
+  restore = goodix_pairing_activation_new_for_test (
+    &paths, &policy, &evidence, psk, &restore_audit, NULL);
+  g_assert_nonnull (restore);
+  g_assert_cmpint (restore_audit.disposition, ==,
+                   GOODIX_PAIRING_ACTIVATION_DISPOSITION_RESTORE_ACTIVE_PSK);
+  g_assert_true (restore_audit.prepared_journaled);
+  g_assert_true (restore_audit.e0_reserved_before_submit);
+  g_assert_cmpuint (restore_audit.persistent_write_count, ==, 0u);
+  feed_successful_write_and_readback (restore, validator);
+  g_assert_cmpuint (restore_audit.persistent_write_count, ==, 1u);
+  g_assert_cmpuint (restore_audit.provision.logical_e0_count, ==, 1u);
+  g_assert_true (goodix_pairing_activation_mark_tls_and_promote (restore,
+                                                                 NULL));
+  g_assert_true (restore_audit.active_promoted);
+  g_clear_pointer (&restore, goodix_pairing_activation_free);
+
+  memcpy (evidence.validator, validator, sizeof evidence.validator);
+  reopen = goodix_pairing_activation_new_for_test (
+    &paths, &policy, &evidence, psk, &reopen_audit, NULL);
+  g_assert_nonnull (reopen);
+  g_assert_cmpint (reopen_audit.disposition, ==,
+                   GOODIX_PAIRING_ACTIVATION_DISPOSITION_REUSE_ACTIVE_TLS);
+  g_assert_true (reopen_audit.active_reused_without_e0);
+  g_assert_null (goodix_pairing_activation_next_request (reopen, NULL));
+  g_clear_pointer (&reopen, goodix_pairing_activation_free);
+  remove_state_directory (directory);
+}
+
+/* The production constructor must generate a working local CSPRNG PSK and
+ * reserve the transaction before any E0 frame exists. */
+static void
+test_production_construction_generates_local_psk (void)
+{
+  GoodixLivePreflightEvidence evidence = evidence_fixture ();
+  GoodixPairingActivationPaths paths;
+  GoodixPairingActivationPolicy policy;
+  GoodixPairingActivationAudit audit;
+  g_autofree gchar *directory = new_state_directory ();
+  g_autoptr(GoodixPairingActivation) activation = NULL;
+  g_autoptr(GBytes) request = NULL;
+
+  goodix_pairing_activation_paths_production (&paths);
+  goodix_pairing_activation_policy_production (&policy);
+  paths.state_directory = directory;
+  goodix_self_state_policy_for_owner (&policy.state, getuid (), getgid ());
+  activation = goodix_pairing_activation_new (&paths, &policy, &evidence,
+                                              &audit, NULL);
+  g_assert_nonnull (activation);
+  g_assert_cmpint (audit.disposition, ==,
+                   GOODIX_PAIRING_ACTIVATION_DISPOSITION_NEW_PSK);
+  g_assert_true (audit.prepared_journaled);
+  g_assert_true (audit.e0_reserved_before_submit);
+  g_assert_cmpuint (audit.persistent_write_count, ==, 0u);
+  request = goodix_pairing_activation_next_request (activation, NULL);
+  g_assert_nonnull (request);
+  g_assert_cmpuint (g_bytes_get_size (request), ==,
+                    GOODIX_PAIRING_PROVISION_E0_FRAME_LENGTH);
+  g_assert_cmpuint (audit.persistent_write_count, ==, 1u);
+  g_clear_pointer (&activation, goodix_pairing_activation_free);
+  remove_state_directory (directory);
+}
+
 int
 main (int argc,
       char **argv)
@@ -324,5 +788,19 @@ main (int argc,
                    test_journal_write_readback_tls_and_recovery);
   g_test_add_func ("/goodix/pairing-activation/no-retry-after-out-failure",
                    test_out_failure_is_terminal_and_never_retries);
+  g_test_add_func ("/goodix/pairing-activation/failure-before-prepared-durable",
+                   test_failure_before_prepared_durable);
+  g_test_add_func ("/goodix/pairing-activation/crash-after-reservation-fails-closed",
+                   test_crash_after_reservation_fails_closed);
+  g_test_add_func ("/goodix/pairing-activation/e0-contract-failures-are-terminal",
+                   test_e0_contract_failures_are_terminal);
+  g_test_add_func ("/goodix/pairing-activation/readback-mismatch-fails-closed",
+                   test_readback_mismatch_fails_closed);
+  g_test_add_func ("/goodix/pairing-activation/crash-after-accepted-e0-recovers",
+                   test_crash_after_accepted_e0_recovers_without_e0);
+  g_test_add_func ("/goodix/pairing-activation/external-replacement-restores-psk",
+                   test_external_replacement_restores_linux_psk);
+  g_test_add_func ("/goodix/pairing-activation/production-csprng-construction",
+                   test_production_construction_generates_local_psk);
   return g_test_run ();
 }

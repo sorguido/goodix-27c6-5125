@@ -287,6 +287,44 @@
       ]
     },
     {
+      "path": "libfprint-driver/goodix_pairing_activation.c",
+      "git_status": "added",
+      "role": "CRASH_SAFE_PAIRING_ACTIVATION_ORCHESTRATION",
+      "relevance": [
+        "P6",
+        "P7",
+        "P10"
+      ]
+    },
+    {
+      "path": "libfprint-driver/goodix_pairing_activation.h",
+      "git_status": "added",
+      "role": "PAIRING_ACTIVATION_BOUNDARY_INTERFACE",
+      "relevance": [
+        "P6",
+        "P7",
+        "P10"
+      ]
+    },
+    {
+      "path": "libfprint-driver/tests/run_goodix_pairing_activation_test.sh",
+      "git_status": "added",
+      "role": "P6_PAIRING_ACTIVATION_OFFLINE_TEST_RUNNER",
+      "relevance": [
+        "P6",
+        "P10"
+      ]
+    },
+    {
+      "path": "libfprint-driver/tests/test_goodix_pairing_activation.c",
+      "git_status": "added",
+      "role": "P6_PAIRING_ACTIVATION_CRASH_WINDOW_TESTS",
+      "relevance": [
+        "P6",
+        "P10"
+      ]
+    },
+    {
       "path": "libfprint-driver/tests/run_goodix_live_preflight_test.sh",
       "git_status": "added",
       "role": "P6_READ_ONLY_PREFLIGHT_OFFLINE_TEST_RUNNER",
@@ -510,6 +548,9 @@
         "libfprint-driver/goodix_live_preflight.h",
         "libfprint-driver/goodix_pairing_provision.c",
         "libfprint-driver/goodix_pairing_provision.h",
+        "libfprint-driver/tests/run_goodix_pairing_activation_test.sh",
+        "libfprint-driver/goodix_pairing_activation.h",
+        "libfprint-driver/goodix_pairing_activation.c",
         "libfprint-driver/goodix_fpimage_device.c",
         "libfprint-driver/goodix_runtime_coordinator.c",
         "libfprint-driver/goodix_self_state.c",
@@ -519,7 +560,7 @@
         "development/psk/README.md",
         "docs/LICENSING_AND_PROVENANCE.md"
       ],
-      "note": "The writer boundary is compiled but remains unreachable from production until PREPARED journaling, exact action gating and post-write recovery are integrated and verified offline."
+      "note": "The pairing writer has exactly one reviewed production caller: the crash-safe activation orchestration in goodix_pairing_activation. The full preflight -> PREPARED reservation -> single E0 -> readback -> TLS -> ACTIVE -> zero-seed FDT chain, the crash/failure windows and the fail-closed reopen behavior are qualified offline with fake USB; no live E0 has occurred and installation of this candidate requires its separate Human Gate."
     },
     "P10": {
       "purpose": "Publication cleanup and classification.",
