@@ -315,6 +315,11 @@ derived `BB020003` validator, and only then starts TLS. There is no automatic E0
 retry. TLS proof promotes `PREPARED` to `ACTIVE`; only after that proof does the
 runtime continue into the zero-seed FDT boundary.
 
+**Factory-unpaired readers are currently unsupported.** If the reader has never
+been initialized by a compatible OEM environment and no valid pairing state is
+present, the driver fails closed. Automatic first-time pairing of a
+factory-uninitialized reader has not been hardware-qualified.
+
 The host-only state-v2 boundary uses two fixed-size generations. Each generation
 contains a 32-byte PSK record and a receipt authenticated by that PSK. The
 receipt binds VID:PID, exact application, chip profile, OTP digest and CONFIG90

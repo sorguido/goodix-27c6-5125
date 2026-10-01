@@ -100,6 +100,11 @@ writes and persistent factory changes. Compatibility with future Fedora
 releases, other Windows VM/OEM configurations, and broader hardware remains
 outside the qualified scope.
 
+**Factory-unpaired readers are currently unsupported.** If the reader has never
+been initialized by a compatible OEM environment and no valid pairing state is
+present, the driver fails closed. Automatic first-time pairing of a
+factory-uninitialized reader has not been hardware-qualified.
+
 ## Documentation
 
 - [Beginner learning guide](docs/learning/README.md)
