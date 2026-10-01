@@ -18,7 +18,9 @@
     "FDT_ZERO_SEED_OFFLINE",
     "STATE_V2_AND_MIGRATION_OFFLINE",
     "COORDINATOR_HOST_VM",
-    "LIVE_NO_FINGER_APPROVAL"
+    "LIVE_NO_FINGER_APPROVAL",
+    "P6_READ_ONLY_PREFLIGHT_LIVE",
+    "P6_CONFIG90_AND_TARGET_BOUNDARY_LIVE"
   ],
   "pending_gates": [
     "SELF_CONTAINED_LIVE_NO_FINGER",
@@ -89,7 +91,10 @@
       "P6_FRAGMENTED_SEVEN_COMMAND_PREFLIGHT_OFFLINE",
       "P6_E0_FRAME_CHECKSUM_PARITY_OFFLINE",
       "P6_LIVE_PREFLIGHT_CHIP82_BOUNDARY_ROOT_CAUSE",
-      "P6_CHIP82_OPAQUE_ENVELOPE_OFFLINE"
+      "P6_CHIP82_OPAQUE_ENVELOPE_OFFLINE",
+      "P6_LIVE_PREFLIGHT_SEVEN_COMMANDS",
+      "P6_LIVE_CONFIG90_AND_TARGET_EVIDENCE_MATCH",
+      "P6_LIVE_LEGACY_VALIDATOR_EXTERNAL_REPLACEMENT"
     ],
     "inferred": [
       "REPEATED_REUSE_OF_SAME_LINUX_PSK_AFTER_WINDOWS_RETURN",
@@ -99,7 +104,8 @@
     "initial_blockers": []
   },
   "current_blockers": [
-    "P6_CHIP82_CONTRACT_FIX_LIVE_CONFIRMATION_PENDING"
+    "P6_ZERO_SEED_LIVE_REQUIRES_TLS_BUT_PAIRING_MISMATCH_PREVENTS_TLS_BEFORE_E0",
+    "P6_CANONICAL_LIVE_ORDER_DECISION_REQUIRED"
   ],
   "host_modified": false,
   "relevant_artifacts": [
@@ -147,9 +153,9 @@
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "After a new explicit HUMAN_REQUIRED approval, install the offline-qualified candidate on the physical Fedora 44 KDE target and run one no-finger fprintd-enroll diagnostic. The fprintd IDENTIFY precheck must complete all seven non-persistent commands with the corrected A0 checksum and qualified CHIP_82 discovery contract; the known legacy E4 validator mismatch must then stop the path before secure-session TLS or runtime configuration writes. Return the client result and the single GOODIX_PRODUCTION_EPOCH_AUDIT line. Do not repeat, touch the sensor, journal PREPARED or enable E0.",
-  "last_verified_head": "0170862746d7b83f35c989f565675506483941e8",
-  "state_note": "P0A through P5 are accepted. The approved P6_STRUCTURAL_PREFLIGHT_REVALIDATION was consumed exactly once against 0170862: no finger contact occurred and it stopped fail-closed with preflight_complete=0, preflight_commands=6, tls=0, secure_commands=0, no retry, no persistent or pairing write, and clean drain/context closure. Command count increments when a request is constructed, so 6/7 identifies CHIP_82 as submitted but not accepted; OTP_A6 was never submitted. The root cause is PROVEN offline without reconstructing protected raw bytes. For target chip profile 0x2504, the P6 parser accepted only the four-byte body 00 04 25 00 because it invented zero constraints for opaque bytes 0 and 3. SHA-256 of that sole accepted body is 85d71424865a86046b9e07a3b371a646a2b36f0c36fa5c8dceca4c712c2d5ee6, which differs from the qualified non-secret target pin 82537d2c108887baef128b47ad401fc888d54b184673b1fc23811d79ab6d5703. The legacy path has always treated CHIP_82 as an exact four-byte digest-pinned body and decodes the little-endian chip profile only from bytes 1 and 2; it never required the two opaque coordinates to be zero. P6 now reuses that boundary: exact four-byte length, supported 0x2503/0x2504 profile, preservation of all four bytes, followed by the unchanged whole-body legacy digest comparison before any secure graph. Synthetic nonzero opaque-coordinate cases, unsupported-chip rejection, the complete seven-command graph and exact USB fragmentation pass normal and ASan/UBSan; the integrated image-device suite passes 61/61 in both modes with REAL_USB_SUBMIT=0 and the production E0 writer still has zero runtime callers. The source manifest and 16 production-builder tests pass, and the reproducible offline build has SOURCE_ID 5cbde19fe6c9b1898c5c6a5c5bc46ba798c33f0f5757292912c5095987a777c6. Firmware/IAP/ClearApp/OTP/factory writes, biometric tests and E0 remain excluded. A new explicit live gate is required. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
+  "next_action": "Obtain explicit HUMAN_REQUIRED approval for the minimal ROADMAP.md P6 ordering correction: retain read-only target and CONFIG90 gates first, then journal PREPARED, perform at most one qualified E0 with readback/hash/TLS proof, and only after TLS run the zero-seed no-finger FDT qualification. Do not integrate or enable the production pairing writer before that canonical decision.",
+  "last_verified_head": "3a6c36e3eb002085b0d308943a55dce040a2c686",
+  "state_note": "P0A through P5 are accepted. The single approved P6 CHIP_82 preflight revalidation against 3a6c36e passed exactly: preflight_complete=1, preflight_commands=7, preflight_persistent=0, tls=0, secure_commands=0, no retry/reopen, no persistent or pairing write, and clean drain/context closure; no finger contact occurred. The terminal error was the expected read-only live E4 validator difference from the qualified legacy pairing state. Because production_live_preflight_accept_legacy checks generated CONFIG90, A2, full CHIP_82 and OTP evidence before the validator, reaching this exact error proves the preceding target and CONFIG90 boundaries matched the qualified legacy material. P6 read-only item 1 and CONFIG90 item 2 are therefore live-proven. The next canonical item is zero-seed FDT no-finger, but the production lifecycle starts FDT only after secure-session STOP/TLS establishment, while the proven live validator mismatch prevents TLS with the preserved legacy PSK. Project policy forbids exporting or sharing the current Windows PSK into Linux. ROADMAP.md currently places zero-seed FDT before PREPARED/E0, whereas the current technical state machine and causal dependency require qualified pairing plus TLS before FDT. Reordering this canonical P6 segment changes the authorized live risk order and requires CANONICAL_FILE_CHANGE_APPROVAL before production writer integration. Firmware/IAP/ClearApp/OTP/factory writes, biometric tests and E0 remain excluded pending that decision. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }
