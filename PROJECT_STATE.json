@@ -94,7 +94,11 @@
       "P6_CHIP82_OPAQUE_ENVELOPE_OFFLINE",
       "P6_LIVE_PREFLIGHT_SEVEN_COMMANDS",
       "P6_LIVE_CONFIG90_AND_TARGET_EVIDENCE_MATCH",
-      "P6_LIVE_LEGACY_VALIDATOR_EXTERNAL_REPLACEMENT"
+      "P6_LIVE_LEGACY_VALIDATOR_EXTERNAL_REPLACEMENT",
+      "P6_ONE_SHOT_PAIRING_ACTIVATION_PRODUCTION_GRAPH_OFFLINE",
+      "P6_PAIRING_CRASH_WINDOW_AND_RECOVERY_MATRIX_OFFLINE",
+      "P6_ORDINARY_ACTIVE_REOPEN_ZERO_E0_OFFLINE",
+      "P6_POST_E0_AMBIGUITY_FAIL_CLOSED_OFFLINE"
     ],
     "inferred": [
       "REPEATED_REUSE_OF_SAME_LINUX_PSK_AFTER_WINDOWS_RETURN",
@@ -104,8 +108,7 @@
     "initial_blockers": []
   },
   "current_blockers": [
-    "P6_ZERO_SEED_LIVE_REQUIRES_TLS_BUT_PAIRING_MISMATCH_PREVENTS_TLS_BEFORE_E0",
-    "P6_CANONICAL_LIVE_ORDER_DECISION_REQUIRED"
+    "P6_LIVE_SINGLE_E0_AWAITS_HUMAN_GATE_APPROVAL"
   ],
   "host_modified": false,
   "relevant_artifacts": [
@@ -137,6 +140,10 @@
     "libfprint-driver/goodix_live_preflight.c",
     "libfprint-driver/goodix_live_preflight.h",
     "libfprint-driver/tests/test_goodix_live_preflight.c",
+    "libfprint-driver/goodix_pairing_activation.c",
+    "libfprint-driver/goodix_pairing_activation.h",
+    "libfprint-driver/tests/test_goodix_pairing_activation.c",
+    "libfprint-driver/tests/run_goodix_pairing_activation_test.sh",
     "libfprint-driver/goodix_pairing_provision.c",
     "libfprint-driver/goodix_pairing_provision.h",
     "libfprint-driver/tests/test_goodix_pairing_provision.c",
@@ -153,9 +160,9 @@
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "Obtain explicit HUMAN_REQUIRED approval for the minimal ROADMAP.md P6 ordering correction: retain read-only target and CONFIG90 gates first, then journal PREPARED, perform at most one qualified E0 with readback/hash/TLS proof, and only after TLS run the zero-seed no-finger FDT qualification. Do not integrate or enable the production pairing writer before that canonical decision.",
-  "last_verified_head": "3a6c36e3eb002085b0d308943a55dce040a2c686",
-  "state_note": "P0A through P5 are accepted. The single approved P6 CHIP_82 preflight revalidation against 3a6c36e passed exactly: preflight_complete=1, preflight_commands=7, preflight_persistent=0, tls=0, secure_commands=0, no retry/reopen, no persistent or pairing write, and clean drain/context closure; no finger contact occurred. The terminal error was the expected read-only live E4 validator difference from the qualified legacy pairing state. Because production_live_preflight_accept_legacy checks generated CONFIG90, A2, full CHIP_82 and OTP evidence before the validator, reaching this exact error proves the preceding target and CONFIG90 boundaries matched the qualified legacy material. P6 read-only item 1 and CONFIG90 item 2 are therefore live-proven. The next canonical item is zero-seed FDT no-finger, but the production lifecycle starts FDT only after secure-session STOP/TLS establishment, while the proven live validator mismatch prevents TLS with the preserved legacy PSK. Project policy forbids exporting or sharing the current Windows PSK into Linux. ROADMAP.md currently places zero-seed FDT before PREPARED/E0, whereas the current technical state machine and causal dependency require qualified pairing plus TLS before FDT. Reordering this canonical P6 segment changes the authorized live risk order and requires CANONICAL_FILE_CHANGE_APPROVAL before production writer integration. Firmware/IAP/ClearApp/OTP/factory writes, biometric tests and E0 remain excluded pending that decision. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
+  "next_action": "Stop at HUMAN_REQUIRED GATE=P6_SINGLE_E0_LIVE_APPROVAL: authorize the first production one-shot Linux pairing transaction (canonical P6 items 3-6: durable PREPARED reservation, maximum one E0, ACK/completion plus BB010002/BB020003 readback plus TLS proof, then post-TLS zero-seed FDT no-finger) on the physical Fedora 44 KDE host with the offline-qualified candidate commit dcaf965. Do not install or run the candidate before that explicit approval.",
+  "last_verified_head": "dcaf965",
+  "state_note": "P0A through P5 are accepted. The approved canonical P6 order is in ROADMAP.md: read-only target/CONFIG90 items 1-2 are live-proven; item 3 journal PREPARED, item 4 maximum one E0, item 5 ACK/completion plus BB010002 unchanged plus BB020003 match plus TLS, item 6 zero-seed FDT only after TLS, then zero-E0 reopen and read-only crash recovery. The interrupted WIP checkpoint 5d61d24 was recovered, audited and completed offline: goodix_pairing_activation durably reserves PREPARED with e0_attempted and the BB010002 digest before constructing E0, delegates the frame to the qualified provision boundary, requires both exact readbacks before exposing secure material, promotes ACTIVE only after the TLS STOP proof, and never retries E0; ambiguous or prior-validator states fail closed through state-v2 reconciliation. Offline evidence: activation crash-window suite (9 cases), integrated fake-USB production graph proving preflight(7/7 read-only) -> pairing -> single E0 -> readbacks -> TLS 1.2 PSK handshake -> ACTIVE promotion -> zero-seed post-TLS handoff, ordinary ACTIVE reopen with zero E0, fail-closed reopen after an ambiguous reservation (USE_PRIOR_REQUIRED, no second E0), all module suites and the 63-test fpimage suite in normal and ASan/UBSan modes inside a no-device sandbox (epoch audit: persistent=1, pairing_writes=1, real_submit=0, drained=1, context_closed=1), and public build GOODIX_BUILD=PASS SOURCE_ID=7d7e285c79e0551da9b871ecffa13c087c8d01396203872b114ef29ab6547305. Source audit now reports P6_PRODUCTION_E0_WRITER_HAS_ONE_REVIEWED_RUNTIME_CALLER and VERIFY also routes through the read-only preflight, so installing this candidate on the qualification host could enter the pairing path from an ordinary biometric action; installation and any live E0 remain forbidden until the P6_SINGLE_E0_LIVE_APPROVAL gate. REAL_USB_ACCESS=0 and REAL_USB_SUBMIT=0 throughout recovery. Git/evidence/ROADMAP.md remain authoritative.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }
