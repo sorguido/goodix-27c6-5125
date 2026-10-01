@@ -19,12 +19,12 @@
     "base_ref": "main",
     "indexed_ref": "development",
     "base_head": "2a8ae714c0b847be6d92316191d9a6189a50a76e",
-    "indexed_head": "79c8b893ea4a8e2824bf700f68eb275aeafcc80d",
+    "indexed_head": "1f0f5ca9255294e5eac835719cb642c3c8a492a0",
     "merge_base": "2a8ae714c0b847be6d92316191d9a6189a50a76e",
     "relationship": "development_ahead_of_main",
-    "development_ahead_by": 58,
+    "development_ahead_by": 61,
     "development_behind_main_by": 0,
-    "note": "The development artifact inventory below is based on the development side of the merge-base diff at indexed_head. There are no main-only commits at this baseline. The inventory was reconciled against the real Git delta when P6 closed; the reconciliation commit itself follows indexed_head."
+    "note": "The development artifact inventory below is based on the development side of the merge-base diff at indexed_head. There are no main-only commits at this baseline. The inventory was reconciled against the real Git delta when P6 closed and re-verified when P7 closed; the reconciliation commit itself follows indexed_head."
   },
   "canonical_routing": {
     "governance": "AGENTS.md",
@@ -829,7 +829,20 @@
         "docs/DEVICE_MATERIALS.md",
         "docs/VALIDATION.md"
       ],
-      "note": "Human Gate: WINDOWS_INTEROP_APPROVAL is required before any live Windows transition, and no agent may run it. Linux must preserve the current Windows BB010002 byte-for-byte; an E4 mismatch is classified only as external pairing replacement and never attributed automatically to Windows. Every OS transition costs at most one qualified write and every same-OS reopen must stay at zero writes and zero E0. Only WINDOWS_LINUX_PING_PONG=PASS promotes repeated L1/Wn reuse from INFERRED to PROVEN."
+      "note": "Closed: WINDOWS_LINUX_PING_PONG=PASS on the operator-executed bounded sequence L1 -> W1 -> L1 -> W2 -> L1 with the same Windows 11 VM and USB passthrough. Windows recovered autonomously twice, each Linux return classified the change read-only as an external replacement and restored the same stored L1 with exactly one qualified write preserving the live Windows BB010002 byte-for-byte, and each same-OS reopen stayed at zero writes and zero E0 through REUSE_ACTIVE_TLS; no new Linux key, no loop and no second writer. Evidence boundary: no Windows fingerprint enrollment or authentication was performed, so Windows biometric functionality is outside the qualified scope. Decisive counters are summarized in docs/VALIDATION.md; the operator holds the full sanitized audit blocks. Load these artifacts only for read-only analysis of the restore/reuse dispositions: no pairing, E0, secure-session or state-v2 write path may change without a new gate."
+    },
+    "P8": {
+      "purpose": "Biometric and desktop integration qualification on the self-contained bootstrap.",
+      "load": [
+        "libfprint-driver/goodix_fpimage_device.c",
+        "libfprint-driver/goodix_post_tls_lifecycle.c",
+        "libfprint-driver/goodix_enrollment_fdt_state.c",
+        "libfprint-driver/goodix_fdt_irq_policy.c",
+        "deployment/install.py",
+        "docs/VALIDATION.md",
+        "TECHNICAL_MANUAL.md"
+      ],
+      "note": "Operator-managed phase. The User executes the P8 live qualification manually, one bounded step at a time, and supplies a consolidated PASS/FAIL evidence package. Until it arrives AI PM must not advance into active P8 orchestration, request P8 live tests, implement speculative P8 changes, modify P8 evidence or qualification status, create P8 gates, or infer P8 PASS from historical pre-self-contained enrollment/login/KScreenLocker/sudo/PolicyKit evidence, which is background only. Bounded physical series: at most three attempts, stop at the first MATCH, no fourth or hidden retry; a fingerprint failure must not compromise password, desktop, sudo or PolicyKit. If a P8 live test exposes a concrete implementation defect, the bounded failure evidence returns to AI PM for code analysis."
     },
     "P10": {
       "purpose": "Publication cleanup and classification.",

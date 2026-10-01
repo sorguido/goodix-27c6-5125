@@ -8,8 +8,8 @@
     "qualified_host": "Fedora 44 KDE x86_64"
   },
   "execution_path": "PRIMARY",
-  "phase": "P7",
-  "phase_status": "HUMAN_REQUIRED",
+  "phase": "P8",
+  "phase_status": "AWAITING_LIVE_EVIDENCE",
   "completed_gates": [
     "SELF_CONTAINED_ARCHITECTURE_APPROVAL",
     "ARTIFACT_INDEX_BASELINE_RECONCILED",
@@ -21,11 +21,11 @@
     "LIVE_NO_FINGER_APPROVAL",
     "P6_READ_ONLY_PREFLIGHT_LIVE",
     "P6_CONFIG90_AND_TARGET_BOUNDARY_LIVE",
-    "SELF_CONTAINED_LIVE_NO_FINGER"
+    "SELF_CONTAINED_LIVE_NO_FINGER",
+    "WINDOWS_INTEROP_APPROVAL",
+    "WINDOWS_LINUX_PING_PONG"
   ],
   "pending_gates": [
-    "WINDOWS_INTEROP_APPROVAL",
-    "WINDOWS_LINUX_PING_PONG",
     "SELF_CONTAINED_BIOMETRIC_STACK",
     "SELF_CONTAINED_RELEASE_CANDIDATE",
     "PUBLICATION_CLEANUP",
@@ -104,12 +104,16 @@
       "P6_LIVE_ZERO_E0_ACTIVE_REOPEN_ON_TARGET",
       "EPOCH_AUDIT_CANCEL_SAFE_FDT_LEARNING_TELEMETRY_OFFLINE",
       "P6_LIVE_ZERO_SEED_FDT_BOOTSTRAP_ON_TARGET",
-      "P6_HOST_SHAPED_PREPARED_RECOVERY_ZERO_E0_OFFLINE"
+      "P6_HOST_SHAPED_PREPARED_RECOVERY_ZERO_E0_OFFLINE",
+      "P7_LIVE_L1_ACTIVE_BASELINE_ZERO_E0_ON_TARGET",
+      "P7_LIVE_WINDOWS_W1_CLEAN_ENUMERATION_AND_PAIRING_REPLACEMENT",
+      "P7_LIVE_EXTERNAL_REPLACEMENT_RESTORE_OF_SAME_L1_ONE_QUALIFIED_WRITE",
+      "P7_LIVE_ZERO_WRITE_SAME_OS_REOPEN_AFTER_RESTORE",
+      "P7_LIVE_WINDOWS_W2_SECOND_CYCLE_REPEATED_RESTORE_OF_SAME_L1",
+      "P7_LIVE_FINAL_ZERO_E0_SAME_OS_REOPEN_ON_TARGET",
+      "WINDOWS_GENERATED_BB010002_STRUCTURAL_ACCEPTANCE_ON_TARGET"
     ],
-    "inferred": [
-      "REPEATED_REUSE_OF_SAME_LINUX_PSK_AFTER_WINDOWS_RETURN",
-      "L1_W1_L1_W2_L1_STABLE_PING_PONG"
-    ],
+    "inferred": [],
     "initial_blockers": []
   },
   "current_blockers": [],
@@ -163,9 +167,9 @@
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "Stop at HUMAN_REQUIRED GATE=WINDOWS_INTEROP_APPROVAL, which ROADMAP P6 NEXT places before P7. P7 qualifies real Windows/Linux coexistence and stable reuse of the same Linux PSK L1 across the L1 -> W1 -> L1 -> W2 -> L1 sequence; every step needs live Windows transitions on the qualification reader, which no agent may perform, and only WINDOWS_LINUX_PING_PONG=PASS may promote repeated L1/Wn reuse from INFERRED to PROVEN. Offline preparation that stays inside the current authorization is limited to read-only analysis: no pairing, E0, secure-session or state-v2 write path may change before the gate is answered.",
-  "last_verified_head": "79c8b89",
-  "state_note": "P0A through P6 are accepted; SELF_CONTAINED_LIVE_NO_FINGER=PASS closes P6. Canonical P6 items 1-7 are live-proven on the qualification reader: the read-only seven-command preflight and generated CONFIG90, the one-shot pairing transaction with a single logical E0, exact BB010002/BB020003 readbacks, TLS proof and ACTIVE promotion, the ordinary ACTIVE reopen with zero E0 through the REUSE_ACTIVE_TLS disposition, and the zero-seed FDT no-finger bootstrap with the corrected first-sample touch-mask boundary; the sanitized epoch audit lines were not retained, so items 6-7 are recorded as operator-reported evidence in docs/VALIDATION.md. Item 8, read-only recovery from an interrupted post-E0/pre-ACTIVE transaction, is closed by the User's explicit option-A decision on offline evidence: the crash-window matrix plus test_active_generation_loss_recovers_from_superseded_prepared, which reproduces the host-shaped slot layout (PREPARED generation surviving in slot A, ACTIVE displaced from slot B) and proves RECOVER_PREPARED_TLS with persistent_write_count=0, logical_e0_count=0 and no next request, followed by TLS proof, ACTIVE promotion and a zero-E0 REUSE_ACTIVE_TLS reopen. Residual risk, accepted and recorded in docs/VALIDATION.md: no live reproduction of that boundary exists, because the successful pairing consumed the window and recreating it on the reader would require either a second E0 (NEW_PSK if the PREPARED slot failed to load) or displacing the qualified ACTIVE record. ROADMAP.md section 2 now lists the zero-seed FDT bootstrap as PROVEN under the approved CANONICAL_FILE_CHANGE_APPROVAL, and the corresponding initial blocker was removed. Offline evidence at 79c8b89: pairing activation suite 10/10, public source ledger ALL_DIGESTS_MATCH, GOODIX_BUILD=PASS SOURCE_ID=1fb93468bd4f8b0ae717a2e92da4684b00c99fdb8cf3e3e0693fa6f0e1a34aea, unchanged because the closure touched only governance and public documentation outside the build inventory; the code tree is identical to the fully verified 800f445 (seven other C module suites, post-TLS lifecycle 26/26 both modes, 63-test fpimage suite both modes in a no-device sandbox, Python deployment/build suites). REAL_USB_ACCESS=0 and REAL_USB_SUBMIT=0 throughout; no privileged host mutation, no reader access and no pairing or E0 change in this task. ARTIFACT_INDEX.json was reconciled against the real Git delta and gained a P7 route. Persisting the learned FDT table through the existing state-v2 fdt_present/fdt_table mechanism remains deferred to P9. Git/evidence/ROADMAP.md remain authoritative.",
+  "next_action": "Remain idle at the P8 handoff boundary. WINDOWS_LINUX_PING_PONG=PASS closes P7 and the User executes P8 manually with a bounded operator-side approach, so AI PM must not advance into active P8 orchestration, request P8 live tests, implement speculative P8 changes, modify P8 evidence or P8-specific documentation, create P8 gates, or infer P8 PASS from historical pre-self-contained enrollment/login/sudo/PolicyKit evidence, which is background only. Resume only when the User supplies a consolidated P8 PASS/FAIL evidence package, or bounded P8 failure evidence naming a concrete implementation defect for code analysis. No pairing, E0, secure-session or state-v2 write path changes while waiting.",
+  "last_verified_head": "1f0f5ca",
+  "state_note": "P0A through P7 are accepted; WINDOWS_LINUX_PING_PONG=PASS closes P7 on the operator-reported bounded sequence L1 -> W1 -> L1 -> W2 -> L1 executed manually on the qualification reader with the same Windows 11 VM and USB passthrough, and no Windows enrollment, reset, driver reinstall, firmware operation or manual PSK manipulation. Criterion-by-criterion: Windows recovered autonomously twice (clean OEM enumeration with no warning indicator, plus a pairing replacement that the following Linux run proved had occurred); Linux recognized each replacement read-only before restoring, classifying ACTIVE-plus-validator-mismatch as external replacement and never attributing it automatically to Windows; the same stored L1 was actually reused, since disposition 2 RESTORE_ACTIVE_PSK copies the PSK from the ACTIVE state-v2 record and no disposition 1 NEW_PSK was ever selected; each OS transition cost exactly one qualified write (pairing_writes=1, persistent=1, prepared and E0 reserved once, readback and validator matching, TLS proven, ACTIVE promoted) with the live Windows BB010002 preserved byte-for-byte as the written host object; each same-OS reopen stayed at zero writes and zero E0 through disposition 4 REUSE_ACTIVE_TLS; the repeated W2/L1 cycle created no new Linux key and no loop, only the expected alternating host-side state-v2 generation per qualified write; a second writer is excluded by construction, because the pairing writer has the single activation caller, one logical E0 per transaction, no automatic retry, a durable PREPARED reservation before submit and fail-closed reconciliation, and the live sequence showed no writer during Windows ownership; neither OS was left unrecoverable, since both Windows transitions started from a Linux L1 state and succeeded and Linux restored from each Windows state. Evidence boundary, recorded publicly in docs/VALIDATION.md: no Windows fingerprint enrollment or authentication was performed, so Windows biometric functionality stays outside the qualified scope, and the decisive counters are summarized there while the operator holds the full sanitized audit blocks. Each Linux run also completed the seven-command read-only preflight, so the generalized structural validator accepted two Windows-generated BB010002 objects on the target. ROADMAP.md section 2 promotes repeated L1/Wn reuse and the stable cycle to PROVEN, which only this gate may do. Offline evidence at 1f0f5ca: the closure touched only governance and public documentation, so the public source ledger stays ALL_DIGESTS_MATCH and GOODIX_BUILD=PASS SOURCE_ID=1fb93468bd4f8b0ae717a2e92da4684b00c99fdb8cf3e3e0693fa6f0e1a34aea is unchanged; the code tree is identical to the fully verified 800f445, and at 1f0f5ca the pairing activation suite was re-run 10/10 and the read-only preflight suite passed. REAL_USB_ACCESS=0 and REAL_USB_SUBMIT=0 throughout; no agent reader access, no privileged host mutation and no pairing or E0 change in this task. P6 item 8 remains closed on accepted offline evidence with its residual risk stated. Persisting the learned FDT table through the existing state-v2 fdt_present/fdt_table mechanism remains deferred to P9. Git/evidence/ROADMAP.md remain authoritative.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }
