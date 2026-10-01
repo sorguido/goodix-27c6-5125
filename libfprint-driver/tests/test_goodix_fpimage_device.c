@@ -8,6 +8,7 @@
 #include "../goodix_fpimage_device.h"
 #include "../goodix_a0_protocol.h"
 #include "../goodix_pairing_crypto.h"
+#include "../goodix_pairing_activation.h"
 #include "../goodix_enrollment_fpi_usb_binding.h"
 #include "../goodix_enrollment_post_tls_events.h"
 #include "../goodix_fpi_usb_backend.h"
@@ -3213,6 +3214,10 @@ test_p6_pairing_activation_production_graph (void)
   g_assert_cmpuint (audit.tls.handshake_count, ==, 1u);
   g_assert_cmpint (audit.runtime_coordinator.source, ==,
                    GOODIX_RUNTIME_COORDINATOR_SOURCE_STATE_V2);
+  g_assert_cmpint (audit.runtime_coordinator.decision, ==,
+                   GOODIX_RUNTIME_COORDINATOR_DECISION_STATE_V2_PAIRING_ACTIVATION);
+  g_assert_cmpint (audit.pairing_activation.disposition, ==,
+                   GOODIX_PAIRING_ACTIVATION_DISPOSITION_NEW_PSK);
   g_assert_true (audit.runtime_coordinator.writer_enabled);
   g_assert_cmpuint (audit.runtime_coordinator.pairing_write_count, ==, 1u);
   g_assert_true (audit.runtime_coordinator.zero_fdt_seed);
@@ -3242,6 +3247,8 @@ test_p6_pairing_activation_production_graph (void)
   g_assert_false (audit.pairing_activation.active_promoted);
   g_assert_cmpint (audit.runtime_coordinator.decision, ==,
                    GOODIX_RUNTIME_COORDINATOR_DECISION_READY_ACTIVE);
+  g_assert_cmpint (audit.pairing_activation.disposition, ==,
+                   GOODIX_PAIRING_ACTIVATION_DISPOSITION_NONE);
   g_assert_cmpint (audit.runtime_coordinator.source, ==,
                    GOODIX_RUNTIME_COORDINATOR_SOURCE_STATE_V2);
   g_assert_false (audit.runtime_coordinator.writer_enabled);

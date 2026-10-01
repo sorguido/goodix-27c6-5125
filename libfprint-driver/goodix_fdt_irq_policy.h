@@ -23,8 +23,9 @@ typedef enum
  * channel.  Contact contexts conservatively require at least one of the six
  * known bits; baseline and finger-up require zero.  Reserved high bits always
  * fail closed.  The first baseline sample instead accepts any subset of the
- * six bits: its reference is the host seed, which an absent or stale seed
- * cannot match, so the mask there carries no finger information. */
+ * six bits: its reference is the host seed, so a zero or stale reference may
+ * legitimately leave touch bits set, and those bits alone neither prove nor
+ * exclude a finger. */
 gboolean goodix_fdt_irq_flags_valid (GoodixFdtFlagsContext context,
                                      guint16               flags);
 

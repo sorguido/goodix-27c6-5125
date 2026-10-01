@@ -811,6 +811,12 @@ test_zero_seed_learns_minimal_fdt (void)
   g_assert_cmpmem (learned, sizeof learned,
                    (guint8[GOODIX_POST_TLS_FDT_TABLE_LENGTH]) { 0 },
                    sizeof learned);
+  g_assert_false (fixture->audit.learned_fdt_ready);
+  g_assert_cmpuint (fixture->audit.fresh_fdt_count, ==, 1u);
+  g_assert_cmpuint (fixture->audit.fdt_irq100_count, ==,
+                    GOODIX_POST_TLS_FDT_SAMPLE_LIMIT);
+  g_assert_cmpuint (fixture->audit.fdt_delta_within_threshold_count, ==, 2u);
+  g_assert_cmpuint (fixture->audit.fdt_delta_outside_threshold_count, ==, 0u);
   fixture_free (fixture);
 }
 

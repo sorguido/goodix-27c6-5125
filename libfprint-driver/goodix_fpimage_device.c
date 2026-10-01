@@ -650,6 +650,8 @@ production_pairing_activation_ready_tls (GoodixDeviceContext *ctx)
   OPENSSL_cleanse (ctx->runtime_fdt_seed, sizeof ctx->runtime_fdt_seed);
   ctx->runtime_coordinator_audit.source =
     GOODIX_RUNTIME_COORDINATOR_SOURCE_STATE_V2;
+  ctx->runtime_coordinator_audit.decision =
+    GOODIX_RUNTIME_COORDINATOR_DECISION_STATE_V2_PAIRING_ACTIVATION;
   ctx->runtime_coordinator_audit.writer_enabled = TRUE;
   ctx->runtime_coordinator_audit.pairing_write_count =
     ctx->pairing_activation_audit.persistent_write_count;
@@ -775,6 +777,8 @@ production_start_pairing_activation (
   ctx->runtime_coordinator_audit.writer_enabled = TRUE;
   ctx->runtime_coordinator_audit.source =
     GOODIX_RUNTIME_COORDINATOR_SOURCE_STATE_V2;
+  ctx->runtime_coordinator_audit.decision =
+    GOODIX_RUNTIME_COORDINATOR_DECISION_STATE_V2_PAIRING_ACTIVATION;
   goodix_fpi_usb_backend_set_out_completed_callback (
     ctx->fpi_usb_backend, production_pairing_activation_out_complete, ctx);
   production_pairing_activation_progress (ctx);
@@ -1356,6 +1360,8 @@ goodix_fpimage_device_log_production_audit (
     "identify_enroll_armed=%u consumed=%u tls=%u "
     "first_image=%u release_tail=%u single_terminal=%u rearm32=%u "
     "fdt_samples=%u fdt_learned=%u "
+    "fdt_learned_once=%u fdt_delta_within=%u fdt_delta_outside=%u "
+    "fdt36_submits=%u fdt_baseline_b0=%u fdt_baseline_decode=%u "
     "enroll_stages=%u enroll_rearm32=%u enroll_terminal=%u "
     "enroll_contacts=%u enroll_retry_scans=%u "
     "secure_commands=%u secure_acks=%u secure_typed=%u "
@@ -1369,7 +1375,7 @@ goodix_fpimage_device_log_production_audit (
     "preflight_persistent=%u zero_seed=%u pairing_writer=%u pairing_writes=%u "
     "pairing_prepared=%u pairing_e0_reserved=%u pairing_readback=%u "
     "pairing_validator=%u pairing_tls=%u pairing_active=%u pairing_recovered=%u "
-    "pairing_active_reused=%u "
+    "pairing_active_reused=%u pairing_disposition=%u "
     "sigfm_baseline_pinned=%u sigfm_baseline_reused=%u "
     "real_submit=%" G_GUINT64_FORMAT " "
     "outstanding=%u drained=%u context_closed=%u",
@@ -1390,6 +1396,12 @@ goodix_fpimage_device_log_production_audit (
     audit->post_tls.rearm_0x32_count,
     audit->post_tls.fdt_irq100_count,
     audit->post_tls.learned_fdt_ready,
+    audit->post_tls.fresh_fdt_count,
+    audit->post_tls.fdt_delta_within_threshold_count,
+    audit->post_tls.fdt_delta_outside_threshold_count,
+    audit->post_tls.fdt36_submit_count,
+    audit->post_tls.baseline_b0_count,
+    audit->post_tls.baseline_decode_count,
     audit->enrollment_events.lifecycle.plan.pipeline.protocol.completed_stage_count,
     audit->enrollment_events.lifecycle.plan.inter_stage_rearm_count,
     audit->enrollment_events.lifecycle.plan.pipeline.protocol.terminal_transition_count,
@@ -1438,6 +1450,7 @@ goodix_fpimage_device_log_production_audit (
     audit->pairing_activation.active_promoted,
     audit->pairing_activation.recovered_without_e0,
     audit->pairing_activation.active_reused_without_e0,
+    audit->pairing_activation.disposition,
     audit->sigfm_normalization_baseline_pinned,
     audit->sigfm_normalization_baseline_reused,
     audit->usb_real_submit_count,

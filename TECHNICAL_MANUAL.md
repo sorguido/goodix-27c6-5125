@@ -579,8 +579,10 @@ closed. Let `R[i]` be raw channel word `i` and `T[i]` its touch bit:
 The IRQ `0x0100` touch mask is relative, not an absolute contact detector: it
 reports the channels whose fresh reading differs from the FDT reference in
 effect. The first manual sample of a bootstrap is measured against the
-host-supplied seed, so an absent or stale seed legitimately reports every
-channel and the mask carries no finger information there. Each later sample is
+host-supplied seed, so with an absent (zero) or stale reference that sample may
+legitimately carry nonzero touch bits, up to all six; those bits alone do not
+establish finger presence, and a zero mask there does not by itself establish
+absence of contact. Each later sample is
 measured against the table derived from the immediately preceding one, so a
 touch bit in that position is a real disturbance and fails closed. Absence of
 contact during the bootstrap is therefore carried by the bounded sample count,
