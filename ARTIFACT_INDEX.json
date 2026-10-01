@@ -610,7 +610,7 @@
         "development/psk/README.md",
         "docs/LICENSING_AND_PROVENANCE.md"
       ],
-      "note": "The pairing writer has exactly one reviewed production caller: the crash-safe activation orchestration in goodix_pairing_activation. The preflight -> PREPARED reservation -> single E0 -> exact readbacks -> TLS proof -> ACTIVE promotion transaction is live-proven on the qualification reader; the zero-seed FDT continuation that follows it stopped at the first manual sample and is not qualified. The first-sample touch-mask boundary is corrected and offline-qualified. The ordinary zero-E0 ACTIVE reopen and read-only crash recovery remain offline-qualified only."
+      "note": "The pairing writer has exactly one reviewed production caller: the crash-safe activation orchestration in goodix_pairing_activation. Live-proven on the qualification reader: the read-only preflight, the one-shot pairing transaction (PREPARED reservation, exactly one E0, exact BB010002/BB020003 readbacks, TLS proof, ACTIVE promotion) and the ordinary ACTIVE reopen with zero E0, which the host enters through the pairing-activation REUSE_ACTIVE_TLS disposition while the offline fixture enters it through the coordinator READY_ACTIVE path. Not yet proven: the zero-seed FDT no-finger bootstrap, whose first sample legitimately carries a nonzero touch mask, and the read-only post-E0 crash recovery. The epoch audit now exposes monotonic FDT learning, both delta-gate counters, the baseline image counters and the pairing disposition, so a cancelled no-finger action is decidable."
     },
     "P10": {
       "purpose": "Publication cleanup and classification.",
