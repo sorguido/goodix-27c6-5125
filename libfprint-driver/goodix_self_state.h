@@ -84,6 +84,8 @@ typedef struct
   guint8 fdt_table[GOODIX_SELF_STATE_FDT_LENGTH];
   gboolean migrated_legacy;
   guint8 legacy_source_sha256[GOODIX_SELF_STATE_DIGEST_LENGTH];
+  gboolean bb010002_sha256_present;
+  guint8 bb010002_sha256[GOODIX_SELF_STATE_DIGEST_LENGTH];
   gboolean e0_attempted;
   gboolean terminal_proof;
 } GoodixSelfStateRecord;

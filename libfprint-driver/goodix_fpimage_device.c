@@ -21,6 +21,7 @@
 #include "goodix_post_tls_lifecycle.h"
 #include "goodix_runtime_coordinator.h"
 #include "goodix_live_preflight.h"
+#include "goodix_pairing_activation.h"
 #include "goodix_enrollment_fpi_usb_binding.h"
 #include "goodix_enrollment_diversity.h"
 
@@ -100,10 +101,12 @@ struct _GoodixDeviceContext
 
   GoodixRuntimeCoordinator  *runtime_material;
   GoodixLivePreflight       *live_preflight;
+  GoodixPairingActivation   *pairing_activation;
   GoodixSecureSessionMaterial runtime_secure_view;
   guint8                     runtime_fdt_seed[GOODIX_RUNTIME_FDT_SEED_LENGTH];
   GoodixRuntimeCoordinatorAudit runtime_coordinator_audit;
   GoodixLivePreflightAudit    live_preflight_audit;
+  GoodixPairingActivationAudit pairing_activation_audit;
   GoodixRuntimeMaterialAudit runtime_material_audit;
   GoodixSecureSessionAudit    runtime_secure_audit;
   GoodixTlsAudit              runtime_tls_audit;
@@ -240,6 +243,7 @@ static gboolean goodix_fpimage_device_release_claim (
 static void goodix_device_context_release_epoch_objects (
   GoodixDeviceContext *ctx);
 static void production_live_preflight_progress (GoodixDeviceContext *ctx);
+static void production_pairing_activation_progress (GoodixDeviceContext *ctx);
 static void production_activation_start_live_preflight (
   GoodixDeviceContext *ctx);
 static gboolean default_acquire_runtime_material_with_live (
@@ -254,11 +258,25 @@ static gboolean default_acquire_runtime_material_with_live (
 static gboolean
 production_action_requires_live_preflight (FpiDeviceAction action)
 {
-  /* Stock fprintd starts enrollment with an IDENTIFY duplicate check.  That
-   * read-only epoch must establish the P6 live boundary before the strict
-   * legacy secure session can assume that its stored pairing is still live. */
+  /* State-v2 is target-bound by evidence that can only be reconstructed by
+   * the read-only preflight.  Every biometric capture action therefore needs
+   * that evidence before selecting legacy or state-v2 material.  Stock
+   * fprintd starts enrollment with an IDENTIFY duplicate check. */
   return action == FPI_DEVICE_ACTION_ENROLL ||
-         action == FPI_DEVICE_ACTION_IDENTIFY;
+         action == FPI_DEVICE_ACTION_IDENTIFY ||
+         action == FPI_DEVICE_ACTION_VERIFY;
+}
+
+static gboolean
+production_action_may_start_without_material (
+  FpiDeviceAction                  action,
+  GoodixRuntimeCoordinatorDecision decision)
+{
+  return production_action_requires_live_preflight (action) &&
+         (decision ==
+            GOODIX_RUNTIME_COORDINATOR_DECISION_NEEDS_LIVE_PREFLIGHT ||
+          decision ==
+            GOODIX_RUNTIME_COORDINATOR_DECISION_NEEDS_INITIALIZATION);
 }
 
 static void
@@ -371,6 +389,8 @@ context_usb_in_completed (GoodixFpiUsbBackend *backend,
         goodix_secure_session_needs_receive (ctx->secure_session)) ||
        (ctx->live_preflight != NULL &&
         goodix_live_preflight_needs_receive (ctx->live_preflight)) ||
+       (ctx->pairing_activation != NULL &&
+        goodix_pairing_activation_needs_receive (ctx->pairing_activation)) ||
        (ctx->enrollment_binding != NULL &&
         goodix_enrollment_fpi_usb_binding_needs_receive (
           ctx->enrollment_binding))) &&
@@ -427,7 +447,8 @@ production_activation_start_secure_graph (GoodixDeviceContext *ctx)
 
   if (ctx->state != GOODIX_DEVICE_CONTEXT_STATE_ACTIVATING ||
       ctx->terminal_fence || ctx->operator_epoch ||
-      ctx->runtime_material == NULL || !ctx->usb_interface_claimed)
+      (ctx->runtime_material == NULL && ctx->pairing_activation == NULL) ||
+      !ctx->usb_interface_claimed)
     return;
 
   action = fpi_device_get_current_action (FP_DEVICE (ctx->device));
@@ -510,7 +531,7 @@ production_digest_matches (const guint8 *data,
 }
 
 static gboolean
-production_live_preflight_accept_legacy (
+production_live_preflight_validate_legacy_target (
   GoodixDeviceContext              *ctx,
   const GoodixLivePreflightEvidence *evidence,
   GError                          **error)
@@ -549,25 +570,20 @@ production_live_preflight_accept_legacy (
         "read-only target evidence differs from the qualified legacy boundary");
       return FALSE;
     }
-  if (ctx->runtime_secure_view.e4_validator == NULL ||
-      ctx->runtime_secure_view.e4_validator_length !=
-        sizeof evidence->validator ||
-      CRYPTO_memcmp (ctx->runtime_secure_view.e4_validator,
-                     evidence->validator, sizeof evidence->validator) != 0)
-    {
-      g_set_error_literal (
-        error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_PROTO,
-        "read-only live E4 validator differs from the qualified legacy pairing state");
-      return FALSE;
-    }
-
-  /* The explicit enrollment preflight has now proved the generated CONFIG90
-   * byte-for-byte against the qualified legacy baseline.  Use an explicit
-   * absent seed for the P6 no-finger lifecycle; no protected payload or image
-   * baseline is learned here. */
-  OPENSSL_cleanse (ctx->runtime_fdt_seed, sizeof ctx->runtime_fdt_seed);
-  ctx->runtime_coordinator_audit.zero_fdt_seed = TRUE;
   return TRUE;
+}
+
+static gboolean
+production_live_preflight_legacy_validator_matches (
+  GoodixDeviceContext               *ctx,
+  const GoodixLivePreflightEvidence *evidence)
+{
+  return ctx->runtime_secure_view.e4_validator != NULL &&
+         ctx->runtime_secure_view.e4_validator_length ==
+           sizeof evidence->validator &&
+         CRYPTO_memcmp (ctx->runtime_secure_view.e4_validator,
+                        evidence->validator,
+                        sizeof evidence->validator) == 0;
 }
 
 static gboolean
@@ -589,6 +605,8 @@ production_live_preflight_acquire_state (
     .otp_length = sizeof evidence->otp,
     .live_validator = evidence->validator,
     .live_validator_length = sizeof evidence->validator,
+    .bb010002 = evidence->bb010002,
+    .bb010002_length = sizeof evidence->bb010002,
     .tls_proven = FALSE,
   };
 
@@ -599,11 +617,143 @@ production_live_preflight_acquire_state (
 }
 
 static void
+production_release_runtime_material (GoodixDeviceContext *ctx)
+{
+  if (ctx->runtime_material == NULL)
+    return;
+#ifdef GOODIX_ENABLE_TEST_SEAMS
+  g_assert (ctx->runtime_material_release != NULL);
+  ctx->runtime_material_release (ctx->runtime_material,
+                                 ctx->runtime_material_release_data);
+#else
+  default_release_runtime_material (ctx->runtime_material, NULL);
+#endif
+  ctx->runtime_material = NULL;
+  OPENSSL_cleanse (&ctx->runtime_secure_view,
+                   sizeof ctx->runtime_secure_view);
+  OPENSSL_cleanse (ctx->runtime_fdt_seed, sizeof ctx->runtime_fdt_seed);
+}
+
+static void
+production_pairing_activation_ready_tls (GoodixDeviceContext *ctx)
+{
+  g_autoptr(GError) error = NULL;
+
+  goodix_fpi_usb_backend_set_out_completed_callback (ctx->fpi_usb_backend,
+                                                      NULL, NULL);
+  if (!goodix_pairing_activation_get_secure_view (
+        ctx->pairing_activation, &ctx->runtime_secure_view, &error))
+    {
+      context_protocol_failure (ctx, error);
+      return;
+    }
+  OPENSSL_cleanse (ctx->runtime_fdt_seed, sizeof ctx->runtime_fdt_seed);
+  ctx->runtime_coordinator_audit.source =
+    GOODIX_RUNTIME_COORDINATOR_SOURCE_STATE_V2;
+  ctx->runtime_coordinator_audit.writer_enabled = TRUE;
+  ctx->runtime_coordinator_audit.pairing_write_count =
+    ctx->pairing_activation_audit.persistent_write_count;
+  ctx->runtime_coordinator_audit.zero_fdt_seed = TRUE;
+  production_activation_start_secure_graph (ctx);
+}
+
+static void
+production_pairing_activation_progress (GoodixDeviceContext *ctx)
+{
+  GoodixPairingActivationPhase phase;
+  g_autoptr(GBytes) request = NULL;
+  g_autoptr(GError) error = NULL;
+
+  if (ctx == NULL || ctx->pairing_activation == NULL || ctx->terminal_fence)
+    return;
+  phase = goodix_pairing_activation_get_phase (ctx->pairing_activation);
+  if (phase == GOODIX_PAIRING_ACTIVATION_TERMINAL)
+    {
+      context_protocol_failure (
+        ctx, goodix_pairing_activation_get_error (ctx->pairing_activation));
+      return;
+    }
+  if (phase == GOODIX_PAIRING_ACTIVATION_TLS)
+    {
+      production_pairing_activation_ready_tls (ctx);
+      return;
+    }
+  request = goodix_pairing_activation_next_request (ctx->pairing_activation,
+                                                     &error);
+  if (error != NULL)
+    {
+      context_protocol_failure (ctx, error);
+      return;
+    }
+  if (request != NULL &&
+      !goodix_fpi_usb_backend_submit_out (ctx->fpi_usb_backend,
+                                          ctx->generation, request, &error))
+    {
+      goodix_pairing_activation_out_complete (ctx->pairing_activation, error);
+      context_protocol_failure (ctx, error);
+      return;
+    }
+  ctx->runtime_coordinator_audit.pairing_write_count =
+    ctx->pairing_activation_audit.persistent_write_count;
+  if (goodix_pairing_activation_needs_receive (ctx->pairing_activation) &&
+      goodix_fpi_usb_backend_get_outstanding (ctx->fpi_usb_backend) == 0u &&
+      !goodix_device_context_arm_receive (ctx, &error))
+    context_protocol_failure (ctx, error);
+}
+
+static void
+production_pairing_activation_out_complete (GoodixFpiUsbBackend *backend,
+                                            guint64 submit_generation,
+                                            const GError *error,
+                                            gpointer user_data)
+{
+  GoodixDeviceContext *ctx = user_data;
+
+  (void) backend;
+  if (ctx->pairing_activation == NULL ||
+      submit_generation != ctx->generation || ctx->terminal_fence)
+    return;
+  goodix_pairing_activation_out_complete (ctx->pairing_activation, error);
+  production_pairing_activation_progress (ctx);
+}
+
+static gboolean
+production_start_pairing_activation (
+  GoodixDeviceContext               *ctx,
+  const GoodixLivePreflightEvidence *evidence,
+  GError                           **error)
+{
+  GoodixPairingActivationPaths paths;
+  GoodixPairingActivationPolicy policy;
+
+  if (ctx->runtime_material != NULL || ctx->pairing_activation != NULL)
+    {
+      g_set_error_literal (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_PROTO,
+                           "pairing activation ownership is not clean");
+      return FALSE;
+    }
+  goodix_pairing_activation_paths_production (&paths);
+  goodix_pairing_activation_policy_production (&policy);
+  ctx->pairing_activation = goodix_pairing_activation_new (
+    &paths, &policy, evidence, &ctx->pairing_activation_audit, error);
+  if (ctx->pairing_activation == NULL)
+    return FALSE;
+  ctx->runtime_coordinator_audit.writer_enabled = TRUE;
+  ctx->runtime_coordinator_audit.source =
+    GOODIX_RUNTIME_COORDINATOR_SOURCE_STATE_V2;
+  goodix_fpi_usb_backend_set_out_completed_callback (
+    ctx->fpi_usb_backend, production_pairing_activation_out_complete, ctx);
+  production_pairing_activation_progress (ctx);
+  return !ctx->terminal_fence;
+}
+
+static void
 production_live_preflight_finish (GoodixDeviceContext *ctx)
 {
   GoodixLivePreflightEvidence evidence = { 0 };
   g_autoptr(GError) error = NULL;
-  gboolean ready;
+  gboolean ready = FALSE;
+  gboolean start_pairing = FALSE;
 
   if (!goodix_live_preflight_copy_evidence (ctx->live_preflight, &evidence))
     {
@@ -615,11 +765,45 @@ production_live_preflight_finish (GoodixDeviceContext *ctx)
   goodix_fpi_usb_backend_set_out_completed_callback (ctx->fpi_usb_backend,
                                                       NULL, NULL);
   if (ctx->runtime_material != NULL)
-    ready = production_live_preflight_accept_legacy (ctx, &evidence, &error);
+    {
+      ready = production_live_preflight_validate_legacy_target (
+        ctx, &evidence, &error);
+      if (ready && production_live_preflight_legacy_validator_matches (
+                     ctx, &evidence))
+        {
+          OPENSSL_cleanse (ctx->runtime_fdt_seed,
+                           sizeof ctx->runtime_fdt_seed);
+          ctx->runtime_coordinator_audit.zero_fdt_seed = TRUE;
+        }
+      else if (ready)
+        {
+          production_release_runtime_material (ctx);
+          start_pairing = TRUE;
+          ready = FALSE;
+        }
+    }
   else
-    ready = production_live_preflight_acquire_state (ctx, &evidence, &error);
+    {
+      ready = production_live_preflight_acquire_state (ctx, &evidence, &error);
+      if (!ready &&
+          (ctx->runtime_coordinator_audit.state_load_result ==
+             GOODIX_SELF_STATE_LOAD_ABSENT ||
+           ctx->runtime_coordinator_audit.decision ==
+             GOODIX_RUNTIME_COORDINATOR_DECISION_EXTERNAL_REPLACEMENT))
+        {
+          g_clear_error (&error);
+          start_pairing = TRUE;
+        }
+    }
   goodix_live_preflight_free (ctx->live_preflight);
   ctx->live_preflight = NULL;
+  if (start_pairing)
+    {
+      if (!production_start_pairing_activation (ctx, &evidence, &error))
+        context_protocol_failure (ctx, error);
+      OPENSSL_cleanse (&evidence, sizeof evidence);
+      return;
+    }
   OPENSSL_cleanse (&evidence, sizeof evidence);
   if (!ready)
     {
@@ -878,6 +1062,18 @@ static void context_a0_consumer (guint8 type, GBytes *frame, gpointer user_data)
       else
         production_live_preflight_progress (ctx);
     }
+  else if (ctx->pairing_activation != NULL &&
+           goodix_pairing_activation_get_phase (ctx->pairing_activation) <
+             GOODIX_PAIRING_ACTIVATION_TLS)
+    {
+      g_autoptr(GError) error = NULL;
+
+      if (!goodix_pairing_activation_handle_a0 (ctx->pairing_activation,
+                                                 frame, &error))
+        context_protocol_failure (ctx, error);
+      else
+        production_pairing_activation_progress (ctx);
+    }
   else if (ctx->enrollment_binding != NULL)
     {
       g_autoptr(GError) error = NULL;
@@ -1067,6 +1263,7 @@ goodix_device_context_collect_production_enrollment_audit (
       ctx->terminal_enroll_completion_held,
     .pre_session_rx_sync = ctx->pre_session_rx_sync_audit,
     .live_preflight = ctx->live_preflight_audit,
+    .pairing_activation = ctx->pairing_activation_audit,
     .runtime_coordinator = ctx->runtime_coordinator_audit,
     .runtime_material = ctx->runtime_material_audit,
     .secure = ctx->runtime_secure_audit,
@@ -1136,6 +1333,9 @@ goodix_fpimage_device_log_production_audit (
     "reset=%u clear_halt=%u persistent=%u coordinator_source=%u "
     "coordinator_decision=%u preflight_complete=%u preflight_commands=%u "
     "preflight_persistent=%u zero_seed=%u pairing_writer=%u pairing_writes=%u "
+    "pairing_prepared=%u pairing_e0_reserved=%u pairing_readback=%u "
+    "pairing_validator=%u pairing_tls=%u pairing_active=%u pairing_recovered=%u "
+    "pairing_active_reused=%u "
     "sigfm_baseline_pinned=%u sigfm_baseline_reused=%u "
     "real_submit=%" G_GUINT64_FORMAT " "
     "outstanding=%u drained=%u context_closed=%u",
@@ -1186,7 +1386,8 @@ goodix_fpimage_device_log_production_audit (
     audit->secure.clear_halt_count + audit->post_tls.clear_halt_count,
     audit->secure.persistent_write_count +
       audit->post_tls.persistent_device_write_count +
-      audit->enrollment_binding.transaction.frame.persistent_family_count,
+      audit->enrollment_binding.transaction.frame.persistent_family_count +
+      audit->pairing_activation.persistent_write_count,
     audit->runtime_coordinator.source,
     audit->runtime_coordinator.decision,
     audit->live_preflight.complete,
@@ -1195,6 +1396,14 @@ goodix_fpimage_device_log_production_audit (
     audit->runtime_coordinator.zero_fdt_seed,
     audit->runtime_coordinator.writer_enabled,
     audit->runtime_coordinator.pairing_write_count,
+    audit->pairing_activation.prepared_journaled,
+    audit->pairing_activation.e0_reserved_before_submit,
+    audit->pairing_activation.bb010002_readback_match,
+    audit->pairing_activation.validator_readback_match,
+    audit->pairing_activation.tls_proven,
+    audit->pairing_activation.active_promoted,
+    audit->pairing_activation.recovered_without_e0,
+    audit->pairing_activation.active_reused_without_e0,
     audit->sigfm_normalization_baseline_pinned,
     audit->sigfm_normalization_baseline_reused,
     audit->usb_real_submit_count,
@@ -1223,6 +1432,7 @@ goodix_device_context_free (GoodixDeviceContext              *ctx,
   g_free (ctx->backend.last_command);
   goodix_post_tls_lifecycle_free (ctx->post_tls_lifecycle);
   goodix_live_preflight_free (ctx->live_preflight);
+  goodix_pairing_activation_free (ctx->pairing_activation);
   goodix_secure_session_free (ctx->secure_session);
   goodix_tls_server_free (ctx->tls_server);
   goodix_enrollment_fpi_usb_binding_free (ctx->enrollment_binding);
@@ -1391,6 +1601,7 @@ goodix_fpimage_device_acquire_action_resources (GoodixFpImageDevice *self,
 #endif
 
   if (ctx == NULL || ctx->runtime_material != NULL ||
+      ctx->pairing_activation != NULL ||
       ctx->usb_interface_claimed)
     {
       g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_CLOSED,
@@ -1428,9 +1639,7 @@ goodix_fpimage_device_acquire_action_resources (GoodixFpImageDevice *self,
       GoodixRuntimeCoordinatorDecision decision =
         ctx->runtime_coordinator_audit.decision;
 
-      if (action != FPI_DEVICE_ACTION_ENROLL ||
-          (decision != GOODIX_RUNTIME_COORDINATOR_DECISION_NEEDS_LIVE_PREFLIGHT &&
-           decision != GOODIX_RUNTIME_COORDINATOR_DECISION_NEEDS_INITIALIZATION))
+      if (!production_action_may_start_without_material (action, decision))
         goto fail;
       if (error != NULL)
         g_clear_error (error);
@@ -1516,6 +1725,8 @@ goodix_device_context_release_epoch_objects (GoodixDeviceContext *ctx)
   ctx->post_tls_lifecycle = NULL;
   goodix_live_preflight_free (ctx->live_preflight);
   ctx->live_preflight = NULL;
+  goodix_pairing_activation_free (ctx->pairing_activation);
+  ctx->pairing_activation = NULL;
   goodix_secure_session_free (ctx->secure_session);
   ctx->secure_session = NULL;
   goodix_tls_server_free (ctx->tls_server);
@@ -1652,6 +1863,8 @@ goodix_device_context_reset_for_capture_reopen (GoodixDeviceContext *ctx,
           sizeof ctx->runtime_coordinator_audit);
   memset (&ctx->live_preflight_audit, 0,
           sizeof ctx->live_preflight_audit);
+  memset (&ctx->pairing_activation_audit, 0,
+          sizeof ctx->pairing_activation_audit);
   memset (&ctx->runtime_secure_audit, 0,
           sizeof ctx->runtime_secure_audit);
   memset (&ctx->runtime_tls_audit, 0,
@@ -1673,6 +1886,7 @@ goodix_fpimage_device_reopen_for_capture_action (
   GoodixFpImageDevicePrivate *priv =
     goodix_fpimage_device_get_instance_private (self);
   GoodixDeviceContext *ctx = priv->ctx;
+  gboolean material_ready;
 #ifdef GOODIX_ENABLE_TEST_SEAMS
   GoodixRuntimeCoordinatorAcquireSeam acquire_material;
   GoodixUsbInterfaceSeam claim_interface;
@@ -1690,7 +1904,8 @@ goodix_fpimage_device_reopen_for_capture_action (
         action != FPI_DEVICE_ACTION_IDENTIFY &&
         action != FPI_DEVICE_ACTION_ENROLL)) ||
       ctx->state != GOODIX_DEVICE_CONTEXT_STATE_INACTIVE ||
-      ctx->runtime_material != NULL || ctx->usb_interface_claimed ||
+      ctx->runtime_material != NULL || ctx->pairing_activation != NULL ||
+      ctx->usb_interface_claimed ||
       ctx->secure_session != NULL || ctx->post_tls_lifecycle != NULL ||
       !goodix_fpi_usb_backend_reset_epoch_audit (ctx->fpi_usb_backend, error))
     return FALSE;
@@ -1712,23 +1927,33 @@ goodix_fpimage_device_reopen_for_capture_action (
   ctx->runtime_material_release = priv->release_material != NULL ?
     priv->release_material : default_release_runtime_material;
   ctx->runtime_material_release_data = priv->production_seam_data;
-  if (!acquire_material (&ctx->runtime_material,
-                         &ctx->runtime_secure_view,
-                         ctx->runtime_fdt_seed,
-                         &ctx->runtime_coordinator_audit,
-                         &ctx->runtime_material_audit,
-                         priv->production_seam_data, error) ||
-      ctx->runtime_material == NULL)
+  material_ready = acquire_material (&ctx->runtime_material,
+                                     &ctx->runtime_secure_view,
+                                     ctx->runtime_fdt_seed,
+                                     &ctx->runtime_coordinator_audit,
+                                     &ctx->runtime_material_audit,
+                                     priv->production_seam_data, error) &&
+                   ctx->runtime_material != NULL;
 #else
-  if (!default_acquire_runtime_material (&ctx->runtime_material,
-                                         &ctx->runtime_secure_view,
-                                         ctx->runtime_fdt_seed,
-                                         &ctx->runtime_coordinator_audit,
-                                         &ctx->runtime_material_audit,
-                                         NULL, error) ||
-      ctx->runtime_material == NULL)
+  material_ready = default_acquire_runtime_material (
+                     &ctx->runtime_material, &ctx->runtime_secure_view,
+                     ctx->runtime_fdt_seed, &ctx->runtime_coordinator_audit,
+                     &ctx->runtime_material_audit, NULL, error) &&
+                   ctx->runtime_material != NULL;
 #endif
-    goto fail;
+  if (!material_ready)
+    {
+      GoodixRuntimeCoordinatorDecision decision =
+        ctx->runtime_coordinator_audit.decision;
+
+      if (!production_action_may_start_without_material (action, decision))
+        goto fail;
+      if (error != NULL)
+        g_clear_error (error);
+      OPENSSL_cleanse (&ctx->runtime_secure_view,
+                       sizeof ctx->runtime_secure_view);
+      OPENSSL_cleanse (ctx->runtime_fdt_seed, sizeof ctx->runtime_fdt_seed);
+    }
 
 #ifdef GOODIX_ENABLE_TEST_SEAMS
   claim_interface = priv->claim_interface != NULL ?
@@ -2238,7 +2463,7 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
                      ctx->production_capture_attempt_count,
                      action == FPI_DEVICE_ACTION_VERIFY ? "VERIFY" : "IDENTIFY");
         }
-      if ((ctx->runtime_material == NULL || !ctx->usb_interface_claimed) &&
+      if (!ctx->usb_interface_claimed &&
           !goodix_fpimage_device_acquire_action_resources (self, &error))
         {
           ctx->poisoned = TRUE;
@@ -2281,7 +2506,9 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
   goodix_device_context_set_state (ctx, GOODIX_DEVICE_CONTEXT_STATE_ACTIVATING);
   if (goodix_fpimage_device_is_production_usb (self))
     {
-      if (ctx->runtime_material == NULL || !ctx->usb_interface_claimed)
+      if ((!ctx->usb_interface_claimed) ||
+          (ctx->runtime_material == NULL &&
+           !production_action_requires_live_preflight (action)))
         {
           error = g_error_new_literal (
             FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_OPEN,
@@ -3206,6 +3433,28 @@ context_secure_phase (GoodixSecureSession *session,
   if (phase != GOODIX_SECURE_PHASE_STOP || generation != ctx->generation ||
       ctx->terminal_fence || ctx->post_tls_lifecycle == NULL)
     return;
+  if (ctx->pairing_activation != NULL)
+    {
+      if (!goodix_pairing_activation_mark_tls_and_promote (
+            ctx->pairing_activation, &error))
+        {
+          context_protocol_failure (ctx, error);
+          return;
+        }
+    }
+  else if (ctx->runtime_material != NULL &&
+           ctx->runtime_coordinator_audit.decision ==
+             GOODIX_RUNTIME_COORDINATOR_DECISION_READY_RETRY_TLS)
+    {
+      if (!goodix_runtime_coordinator_promote_after_tls (
+            ctx->runtime_material, &error))
+        {
+          context_protocol_failure (ctx, error);
+          return;
+        }
+      ctx->runtime_coordinator_audit.decision =
+        GOODIX_RUNTIME_COORDINATOR_DECISION_READY_ACTIVE;
+    }
   goodix_secure_session_set_post_tls_plaintext_callback (
     session, context_post_tls_plaintext, ctx);
   if (!goodix_secure_session_handoff_backend (session, &error) ||

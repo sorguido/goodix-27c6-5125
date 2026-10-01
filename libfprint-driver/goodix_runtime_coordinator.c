@@ -34,6 +34,9 @@ struct _GoodixRuntimeCoordinator
   guint8 validator[GOODIX_SELF_STATE_DIGEST_LENGTH];
   guint8 config90[GOODIX_CONFIG90_LENGTH];
   guint8 fdt_seed[GOODIX_RUNTIME_FDT_SEED_LENGTH];
+  gchar *state_directory;
+  GoodixSelfStatePolicy state_policy;
+  GoodixRuntimeCoordinatorDecision decision;
 };
 
 static GQuark
@@ -82,6 +85,24 @@ sha256 (const guint8 *input,
          EVP_Digest (input, input_length, output, &length, EVP_sha256 (),
                      NULL) == 1 &&
          length == GOODIX_SELF_STATE_DIGEST_LENGTH;
+}
+
+static gboolean
+record_bb010002_matches (const GoodixSelfStateRecord              *record,
+                         const GoodixRuntimeCoordinatorLiveEvidence *live)
+{
+  guint8 digest[GOODIX_SELF_STATE_DIGEST_LENGTH] = { 0 };
+  gboolean matches;
+
+  if (!record->bb010002_sha256_present)
+    return TRUE;
+  if (live->bb010002 == NULL || live->bb010002_length == 0u ||
+      !sha256 (live->bb010002, live->bb010002_length, digest))
+    return FALSE;
+  matches = CRYPTO_memcmp (digest, record->bb010002_sha256,
+                           sizeof digest) == 0;
+  OPENSSL_cleanse (digest, sizeof digest);
+  return matches;
 }
 
 static gboolean
@@ -154,6 +175,7 @@ acquire_state (const GoodixRuntimeCoordinatorPaths        *paths,
             "state-v2 is incomplete or unavailable", error);
       goto fail;
     }
+  record = goodix_self_state_get_record (coordinator->state);
   reconciliation = goodix_self_state_reconcile (
     coordinator->state, live->live_validator, live->tls_proven);
   if (audit != NULL)
@@ -161,10 +183,26 @@ acquire_state (const GoodixRuntimeCoordinatorPaths        *paths,
   switch (reconciliation)
     {
     case GOODIX_SELF_STATE_RECONCILE_ACTIVE_MATCH:
+      if (!record_bb010002_matches (record, live))
+        {
+          set_decision_error (
+            audit, GOODIX_RUNTIME_COORDINATOR_DECISION_FAIL_CLOSED,
+            "live BB010002 differs from the journaled pairing transaction",
+            error);
+          goto fail;
+        }
       if (audit != NULL)
         audit->decision = GOODIX_RUNTIME_COORDINATOR_DECISION_READY_ACTIVE;
       break;
     case GOODIX_SELF_STATE_RECONCILE_RETRY_TLS:
+      if (!record_bb010002_matches (record, live))
+        {
+          set_decision_error (
+            audit, GOODIX_RUNTIME_COORDINATOR_DECISION_RECOVERY_REQUIRED,
+            "prepared state BB010002 proof differs from live readback",
+            error);
+          goto fail;
+        }
       if (audit != NULL)
         audit->decision = GOODIX_RUNTIME_COORDINATOR_DECISION_READY_RETRY_TLS;
       break;
@@ -190,7 +228,6 @@ acquire_state (const GoodixRuntimeCoordinatorPaths        *paths,
         "state-v2 reconciliation requires explicit recovery", error);
       goto fail;
     }
-  record = goodix_self_state_get_record (coordinator->state);
   if (!goodix_self_state_copy_psk (coordinator->state, coordinator->psk) ||
       !sha256 (live->live_validator, live->live_validator_length,
                coordinator->secure_view.e4_validator_sha256) ||
@@ -226,6 +263,12 @@ acquire_state (const GoodixRuntimeCoordinatorPaths        *paths,
   else if (audit != NULL)
     audit->zero_fdt_seed = TRUE;
   coordinator->source = GOODIX_RUNTIME_COORDINATOR_SOURCE_STATE_V2;
+  coordinator->state_directory = g_strdup (paths->state_directory);
+  coordinator->state_policy = policy->state;
+  coordinator->decision = audit != NULL ? audit->decision :
+    (reconciliation == GOODIX_SELF_STATE_RECONCILE_RETRY_TLS ?
+       GOODIX_RUNTIME_COORDINATOR_DECISION_READY_RETRY_TLS :
+       GOODIX_RUNTIME_COORDINATOR_DECISION_READY_ACTIVE);
   if (audit != NULL)
     audit->source = coordinator->source;
   OPENSSL_cleanse (otp_sha256, sizeof otp_sha256);
@@ -410,6 +453,29 @@ goodix_runtime_coordinator_get_fdt_seed (
   return TRUE;
 }
 
+gboolean
+goodix_runtime_coordinator_promote_after_tls (
+  GoodixRuntimeCoordinator *coordinator,
+  GError                   **error)
+{
+  if (coordinator == NULL ||
+      coordinator->source != GOODIX_RUNTIME_COORDINATOR_SOURCE_STATE_V2 ||
+      coordinator->decision !=
+        GOODIX_RUNTIME_COORDINATOR_DECISION_READY_RETRY_TLS ||
+      coordinator->state == NULL || coordinator->state_directory == NULL)
+    {
+      g_set_error_literal (error, coordinator_error_quark (), EINVAL,
+                           "runtime state is not awaiting TLS promotion");
+      return FALSE;
+    }
+  if (!goodix_self_state_promote_active (coordinator->state_directory,
+                                         coordinator->state,
+                                         &coordinator->state_policy, error))
+    return FALSE;
+  coordinator->decision = GOODIX_RUNTIME_COORDINATOR_DECISION_READY_ACTIVE;
+  return TRUE;
+}
+
 GoodixRuntimeCoordinatorSource
 goodix_runtime_coordinator_get_source (
   const GoodixRuntimeCoordinator *coordinator)
@@ -427,6 +493,7 @@ goodix_runtime_coordinator_free (GoodixRuntimeCoordinator *coordinator)
     coordinator->legacy_release (coordinator->legacy,
                                  coordinator->legacy_user_data);
   goodix_self_state_free (coordinator->state);
+  g_free (coordinator->state_directory);
   OPENSSL_cleanse (coordinator, sizeof *coordinator);
   g_free (coordinator);
 }

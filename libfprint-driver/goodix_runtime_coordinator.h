@@ -61,6 +61,8 @@ typedef struct
   gsize otp_length;
   const guint8 *live_validator;
   gsize live_validator_length;
+  const guint8 *bb010002;
+  gsize bb010002_length;
   gboolean tls_proven;
 } GoodixRuntimeCoordinatorLiveEvidence;
 
@@ -117,6 +119,9 @@ gboolean goodix_runtime_coordinator_get_secure_view (
 gboolean goodix_runtime_coordinator_get_fdt_seed (
   GoodixRuntimeCoordinator *coordinator,
   guint8 output[GOODIX_RUNTIME_FDT_SEED_LENGTH],
+  GError **error);
+gboolean goodix_runtime_coordinator_promote_after_tls (
+  GoodixRuntimeCoordinator *coordinator,
   GError **error);
 GoodixRuntimeCoordinatorSource goodix_runtime_coordinator_get_source (
   const GoodixRuntimeCoordinator *coordinator);

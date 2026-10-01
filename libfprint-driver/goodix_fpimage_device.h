@@ -11,6 +11,7 @@
 #include "goodix_post_tls_lifecycle.h"
 #include "goodix_runtime_coordinator.h"
 #include "goodix_live_preflight.h"
+#include "goodix_pairing_activation.h"
 #include "goodix_enrollment_fpi_usb_binding.h"
 
 G_BEGIN_DECLS
@@ -108,6 +109,7 @@ typedef struct
   gboolean terminal_enroll_completion_held;
   GoodixPreSessionRxSyncAudit pre_session_rx_sync;
   GoodixLivePreflightAudit live_preflight;
+  GoodixPairingActivationAudit pairing_activation;
   GoodixRuntimeCoordinatorAudit runtime_coordinator;
   GoodixRuntimeMaterialAudit runtime_material;
   GoodixSecureSessionAudit secure;

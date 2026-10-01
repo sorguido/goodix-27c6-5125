@@ -156,6 +156,9 @@ test_roundtrip_and_promotion (void)
   record.fdt_present = TRUE;
   fill_bytes (record.fdt_table, sizeof record.fdt_table, 0x40u);
   record.e0_attempted = TRUE;
+  record.bb010002_sha256_present = TRUE;
+  fill_bytes (record.bb010002_sha256,
+              sizeof record.bb010002_sha256, 0x61u);
   g_assert_true (goodix_self_state_write_prepared (directory, &binding, &record,
                                                     psk, &policy, NULL));
   assert_file_policy (directory, "secret-a.bin", 48);
@@ -164,6 +167,12 @@ test_roundtrip_and_promotion (void)
   g_assert_cmpint (goodix_self_state_get_record (prepared)->phase, ==,
                    GOODIX_SELF_STATE_PREPARED);
   g_assert_true (goodix_self_state_get_record (prepared)->e0_attempted);
+  g_assert_true (
+    goodix_self_state_get_record (prepared)->bb010002_sha256_present);
+  g_assert_cmpmem (goodix_self_state_get_record (prepared)->bb010002_sha256,
+                   sizeof record.bb010002_sha256,
+                   record.bb010002_sha256,
+                   sizeof record.bb010002_sha256);
   g_assert_true (goodix_self_state_copy_psk (prepared, copied));
   g_assert_cmpmem (copied, sizeof copied, psk, sizeof psk);
   g_assert_cmpint (goodix_self_state_reconcile (prepared,

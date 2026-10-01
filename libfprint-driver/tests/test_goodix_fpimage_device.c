@@ -1520,6 +1520,7 @@ test_p5_coordinator_active_state (void)
   guint8 config[GOODIX_CONFIG90_LENGTH];
   guint8 validator[GOODIX_SELF_STATE_DIGEST_LENGTH];
   guint8 psk[GOODIX_SELF_STATE_PSK_LENGTH];
+  guint8 bb010002[GOODIX_BB010002_LENGTH];
   GError *error = NULL;
 
   g_assert_nonnull (root);
@@ -1530,6 +1531,7 @@ test_p5_coordinator_active_state (void)
       validator[i] = (guint8) (0x20u + i);
       psk[i] = (guint8) (0xa0u + i);
     }
+  memset (bb010002, 0x6cu, sizeof bb010002);
   g_assert_true (goodix_config90_derive (0x2504u, otp, sizeof otp, config,
                                          &calibration, NULL));
   binding.vid = 0x27c6u;
@@ -1541,6 +1543,10 @@ test_p5_coordinator_active_state (void)
   record.phase = GOODIX_SELF_STATE_PREPARED;
   record.generation = 1u;
   memcpy (record.expected_validator, validator, sizeof validator);
+  record.e0_attempted = TRUE;
+  record.bb010002_sha256_present = TRUE;
+  production_digest (bb010002, sizeof bb010002,
+                     record.bb010002_sha256);
   record.fdt_present = TRUE;
   memset (record.fdt_table, 0x5au, sizeof record.fdt_table);
   goodix_self_state_policy_for_owner (&policy.state, getuid (), getgid ());
@@ -1549,8 +1555,6 @@ test_p5_coordinator_active_state (void)
   g_assert_cmpint (goodix_self_state_load (state_dir, &binding, &policy.state,
                                            &prepared, NULL), ==,
                    GOODIX_SELF_STATE_LOAD_VALID);
-  g_assert_true (goodix_self_state_promote_active (state_dir, prepared,
-                                                   &policy.state, NULL));
   goodix_self_state_free (prepared);
   paths.state_directory = state_dir;
   paths.legacy.directory_path = legacy_dir;
@@ -1570,7 +1574,31 @@ test_p5_coordinator_active_state (void)
     .otp_length = sizeof otp,
     .live_validator = validator,
     .live_validator_length = sizeof validator,
+    .bb010002 = bb010002,
+    .bb010002_length = sizeof bb010002,
   };
+  bb010002[0] ^= 1u;
+  coordinator = goodix_runtime_coordinator_acquire (
+    &paths, &policy, &live, coordinator_legacy_acquire,
+    coordinator_legacy_release, &seam, &legacy_audit, &audit, &error);
+  g_assert_null (coordinator);
+  g_assert_nonnull (error);
+  g_clear_error (&error);
+  g_assert_cmpint (audit.decision, ==,
+                   GOODIX_RUNTIME_COORDINATOR_DECISION_RECOVERY_REQUIRED);
+  bb010002[0] ^= 1u;
+  coordinator = goodix_runtime_coordinator_acquire (
+    &paths, &policy, &live, coordinator_legacy_acquire,
+    coordinator_legacy_release, &seam, &legacy_audit, &audit, &error);
+  g_assert_no_error (error);
+  g_assert_nonnull (coordinator);
+  g_assert_cmpint (audit.decision, ==,
+                   GOODIX_RUNTIME_COORDINATOR_DECISION_READY_RETRY_TLS);
+  g_assert_true (goodix_runtime_coordinator_promote_after_tls (coordinator,
+                                                               &error));
+  g_assert_no_error (error);
+  goodix_runtime_coordinator_free (coordinator);
+
   coordinator = goodix_runtime_coordinator_acquire (
     &paths, &policy, &live, coordinator_legacy_acquire,
     coordinator_legacy_release, &seam, &legacy_audit, &audit, &error);
@@ -2291,7 +2319,7 @@ test_p6_e4_contract_diagnostics (void)
     FPI_DEVICE_ACTION_IDENTIFY));
   g_assert_true (goodix_fpimage_device_test_action_requires_live_preflight (
     FPI_DEVICE_ACTION_ENROLL));
-  g_assert_false (goodix_fpimage_device_test_action_requires_live_preflight (
+  g_assert_true (goodix_fpimage_device_test_action_requires_live_preflight (
     FPI_DEVICE_ACTION_VERIFY));
 }
 

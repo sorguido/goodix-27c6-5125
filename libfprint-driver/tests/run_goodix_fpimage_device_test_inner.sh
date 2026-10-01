@@ -57,11 +57,13 @@ pairing_writer_callers=$(find "$git_root/libfprint-driver" \
   ! -name 'goodix_pairing_provision.c' \
   ! -name 'goodix_pairing_provision.h' -exec \
   grep -l 'goodix_pairing_provision_begin_e0' {} + | wc -l)
-if [ "$pairing_writer_callers" -ne 0 ]; then
-  echo "pairing E0 writer became reachable from the production runtime" >&2
+if [ "$pairing_writer_callers" -ne 1 ] ||
+   ! grep -F 'goodix_pairing_provision_begin_e0' \
+      "$git_root/libfprint-driver/goodix_pairing_activation.c" >/dev/null; then
+  echo "pairing E0 writer caller set differs from the reviewed singleton" >&2
   exit 1
 fi
-echo P6_PRODUCTION_E0_WRITER_HAS_NO_RUNTIME_CALLER=PASS
+echo P6_PRODUCTION_E0_WRITER_HAS_ONE_REVIEWED_RUNTIME_CALLER=PASS
 
 # ---- Generated enum registrations (host-only Python shim) ----
 python3 "$test_dir/support/generate_libfprint_enums.py" \
@@ -137,6 +139,15 @@ gcc $strict_flags $glib_cflags $includes -c \
 gcc $strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_live_preflight.c" \
   -o "$build_dir/goodix_live_preflight.o"
+gcc $strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_pairing_crypto.c" \
+  -o "$build_dir/goodix_pairing_crypto.o"
+gcc $strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_pairing_provision.c" \
+  -o "$build_dir/goodix_pairing_provision.o"
+gcc $strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_pairing_activation.c" \
+  -o "$build_dir/goodix_pairing_activation.o"
 gcc $strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_secure_session.c" \
   -o "$build_dir/goodix_secure_session.o"
@@ -218,6 +229,9 @@ gcc -Wl,--gc-sections "$build_dir/metrics.o" -lstdc++ \
   "$build_dir/goodix_runtime_coordinator.o" \
   "$build_dir/goodix_bb010002.o" \
   "$build_dir/goodix_live_preflight.o" \
+  "$build_dir/goodix_pairing_crypto.o" \
+  "$build_dir/goodix_pairing_provision.o" \
+  "$build_dir/goodix_pairing_activation.o" \
   "$build_dir/goodix_secure_session.o" \
   "$build_dir/goodix_image_decoder.o" \
   "$build_dir/goodix_post_tls_lifecycle.o" \
@@ -313,6 +327,15 @@ gcc $san_strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_live_preflight.c" \
   -o "$build_dir/goodix_live_preflight_san.o"
 gcc $san_strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_pairing_crypto.c" \
+  -o "$build_dir/goodix_pairing_crypto_san.o"
+gcc $san_strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_pairing_provision.c" \
+  -o "$build_dir/goodix_pairing_provision_san.o"
+gcc $san_strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_pairing_activation.c" \
+  -o "$build_dir/goodix_pairing_activation_san.o"
+gcc $san_strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_secure_session.c" \
   -o "$build_dir/goodix_secure_session_san.o"
 gcc $san_strict_flags $glib_cflags $includes -c \
@@ -382,6 +405,9 @@ gcc $san_common -Wl,--gc-sections "$build_dir/metrics_san.o" -lstdc++ \
   "$build_dir/goodix_runtime_coordinator_san.o" \
   "$build_dir/goodix_bb010002_san.o" \
   "$build_dir/goodix_live_preflight_san.o" \
+  "$build_dir/goodix_pairing_crypto_san.o" \
+  "$build_dir/goodix_pairing_provision_san.o" \
+  "$build_dir/goodix_pairing_activation_san.o" \
   "$build_dir/goodix_secure_session_san.o" \
   "$build_dir/goodix_image_decoder_san.o" \
   "$build_dir/goodix_post_tls_lifecycle_san.o" \

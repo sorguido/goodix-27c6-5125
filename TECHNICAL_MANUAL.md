@@ -285,8 +285,9 @@ uninitialized login do not load material or claim USB. During migration, the
 coordinator uses the legacy owner when no bounded live preflight is available.
 With complete live evidence it derives CONFIG90, constructs the full target
 binding and may select a matching state-v2 generation. A state-only activation
-without that evidence fails before USB claim. The production pairing writer
-remains absent.
+without that evidence fails before USB claim. If neither the live validator nor
+the host state can establish an already-active Linux pairing, the production
+activation boundary can reserve and execute one qualified pairing transaction.
 
 The bounded read-only preflight applies to both a direct enrollment action and
 the identify action that stock fprintd uses as its enrollment duplicate check.
@@ -294,32 +295,47 @@ It validates the target, reads `BB010002` and the current `BB020003` validator,
 and derives CONFIG90 before the strict secure session is allowed to rely on
 legacy pairing state. A structurally valid `BB020003` record whose 32-byte value
 differs from the expected validator is a pairing-state mismatch, not a malformed
-typed response; it fails closed before TLS or runtime configuration writes.
+typed response. A matching legacy validator continues with the legacy owner;
+an authorized mismatch transfers ownership to the state-v2 activation graph.
 This pre-material graph and the material-driven secure-session graph share the
 same bounded USB router and canonical A0 codec. They remain separate state
 machines because the secure-session graph requires an already selected
 PSK/validator/configuration and proceeds into runtime configuration and TLS,
-whereas the preflight exists to gather the live evidence needed to make that
-selection without a pairing write.
+whereas the preflight gathers the evidence needed either to select existing
+material or to construct a fully bound pairing transaction.
+
+The activation graph generates a local CSPRNG PSK only for an absent state, or
+reuses the existing Linux PSK after a proven external replacement. Before an E0
+frame can be constructed, it durably writes and reloads a `PREPARED` receipt
+that reserves the sole logical write. It then permits exactly one E0, requires
+the qualified ACK and completion, reads back `BB010002` byte-for-byte and the
+derived `BB020003` validator, and only then starts TLS. There is no automatic E0
+retry. TLS proof promotes `PREPARED` to `ACTIVE`; only after that proof does the
+runtime continue into the zero-seed FDT boundary.
 
 The host-only state-v2 boundary uses two fixed-size generations. Each generation
 contains a 32-byte PSK record and a receipt authenticated by that PSK. The
 receipt binds VID:PID, exact application, chip profile, OTP digest and CONFIG90
-digest, and records `PREPARED`, `ACTIVE` or `RECOVERY_REQUIRED` transaction
-state plus the minimum optional 12-byte FDT table. Files are regular,
+digest. Pairing-generated receipts also bind the SHA-256 digest of the preserved
+live `BB010002`. The receipt records `PREPARED`, `ACTIVE` or
+`RECOVERY_REQUIRED` transaction state plus the minimum optional 12-byte FDT
+table. Files are regular,
 non-linked, root-owned mode `0600` below a root-owned mode `0700` directory;
 loads use no-follow opens and writes synchronize each temporary file, atomic
 rename and containing directory. A complete older generation remains the only
 choice until the replacement secret and receipt both validate. After an
-interrupted pairing attempt, reconciliation only compares the live validator
-with the candidate and optional prior validator: candidate match retries TLS,
-prior match uses the prior state, and any other result requires recovery. It
-never authorizes a speculative second pairing write. Legacy import is
+interrupted pairing attempt, reconciliation compares the live validator and,
+when present, the journaled `BB010002` digest with the candidate and optional
+prior validator. A candidate match retries TLS without E0, a prior match after a
+reserved transaction requires explicit recovery, and any other result requires
+recovery. It never authorizes a speculative second pairing write. Legacy import is
 side-by-side and records the source digest without changing or removing the old
 bundle. The production coordinator can select an ACTIVE match or a PREPARED
-candidate for TLS retry, but exposes no pairing write or host-state promotion
-operation. Prior-generation, external-replacement and ambiguous recovery results
-fail closed for a later explicit recovery boundary.
+candidate for TLS retry and can perform the host-only ACTIVE promotion after
+TLS proof. The coordinator itself exposes no pairing write. Ordinary ACTIVE
+reopen uses the journaled Linux PSK with zero E0. Prior-generation and ambiguous
+recovery results fail closed; a proven external replacement is handled only by
+the separately bounded activation graph.
 
 The manifest binds the bundle to `27c6:5125`, the supported application, the
 other four files, and target responses used during initialization. File names,

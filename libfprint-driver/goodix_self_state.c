@@ -28,7 +28,8 @@
 #define RECEIPT_FLAG_MIGRATED (1u << 2)
 #define RECEIPT_FLAG_E0_ATTEMPTED (1u << 3)
 #define RECEIPT_FLAG_TERMINAL_PROOF (1u << 4)
-#define RECEIPT_FLAGS_ALL ((1u << 5) - 1u)
+#define RECEIPT_FLAG_BB010002_SHA256 (1u << 5)
+#define RECEIPT_FLAGS_ALL ((1u << 6) - 1u)
 
 static const guint8 secret_magic[8] = { 'G', 'D', 'X', 'P', 'S', 'K', '2', 0 };
 static const guint8 receipt_magic[8] = { 'G', 'D', 'X', 'S', 'T', 'A', '2', 0 };
@@ -174,6 +175,7 @@ record_valid (const GoodixSelfStateRecord *record)
          (record->phase == GOODIX_SELF_STATE_PREPARED ||
           record->phase == GOODIX_SELF_STATE_ACTIVE ||
           record->phase == GOODIX_SELF_STATE_RECOVERY_REQUIRED) &&
+         !(record->migrated_legacy && record->bb010002_sha256_present) &&
          (record->terminal_proof ==
           (record->phase == GOODIX_SELF_STATE_ACTIVE));
 }
@@ -328,8 +330,14 @@ decode_receipt (const guint8 receipt[RECEIPT_SIZE],
   record->fdt_present = (flags & RECEIPT_FLAG_FDT) != 0u;
   memcpy (record->fdt_table, receipt + 188, GOODIX_SELF_STATE_FDT_LENGTH);
   record->migrated_legacy = (flags & RECEIPT_FLAG_MIGRATED) != 0u;
-  memcpy (record->legacy_source_sha256, receipt + 200,
-          GOODIX_SELF_STATE_DIGEST_LENGTH);
+  record->bb010002_sha256_present =
+    (flags & RECEIPT_FLAG_BB010002_SHA256) != 0u;
+  if (record->bb010002_sha256_present)
+    memcpy (record->bb010002_sha256, receipt + 200,
+            GOODIX_SELF_STATE_DIGEST_LENGTH);
+  else
+    memcpy (record->legacy_source_sha256, receipt + 200,
+            GOODIX_SELF_STATE_DIGEST_LENGTH);
   record->e0_attempted = (flags & RECEIPT_FLAG_E0_ATTEMPTED) != 0u;
   record->terminal_proof = (flags & RECEIPT_FLAG_TERMINAL_PROOF) != 0u;
   return binding_valid (binding) && record_valid (record);
@@ -358,6 +366,8 @@ encode_receipt (const GoodixSelfStateBinding *binding,
     flags |= RECEIPT_FLAG_E0_ATTEMPTED;
   if (record->terminal_proof)
     flags |= RECEIPT_FLAG_TERMINAL_PROOF;
+  if (record->bb010002_sha256_present)
+    flags |= RECEIPT_FLAG_BB010002_SHA256;
   receipt[10] = flags;
   put_u64_le (receipt + 12, record->generation);
   put_u16_le (receipt + 20, binding->vid);
@@ -373,8 +383,12 @@ encode_receipt (const GoodixSelfStateBinding *binding,
   memcpy (receipt + 156, record->prior_validator,
           GOODIX_SELF_STATE_DIGEST_LENGTH);
   memcpy (receipt + 188, record->fdt_table, GOODIX_SELF_STATE_FDT_LENGTH);
-  memcpy (receipt + 200, record->legacy_source_sha256,
-          GOODIX_SELF_STATE_DIGEST_LENGTH);
+  if (record->bb010002_sha256_present)
+    memcpy (receipt + 200, record->bb010002_sha256,
+            GOODIX_SELF_STATE_DIGEST_LENGTH);
+  else
+    memcpy (receipt + 200, record->legacy_source_sha256,
+            GOODIX_SELF_STATE_DIGEST_LENGTH);
   return hmac_sha256 (psk, receipt, RECEIPT_PREFIX_SIZE,
                       receipt + RECEIPT_PREFIX_SIZE);
 }

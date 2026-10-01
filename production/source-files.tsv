@@ -48,6 +48,8 @@ libfprint-driver/goodix_post_tls_lifecycle.c	LGPL-2.1-or-later	LOCAL_GOODIX
 libfprint-driver/goodix_post_tls_lifecycle.h	LGPL-2.1-or-later	LOCAL_GOODIX
 libfprint-driver/goodix_pairing_crypto.c	LGPL-2.1-or-later	LOCAL_GOODIX
 libfprint-driver/goodix_pairing_crypto.h	LGPL-2.1-or-later	LOCAL_GOODIX
+libfprint-driver/goodix_pairing_activation.c	LGPL-2.1-or-later	LOCAL_GOODIX
+libfprint-driver/goodix_pairing_activation.h	LGPL-2.1-or-later	LOCAL_GOODIX
 libfprint-driver/goodix_pairing_provision.c	GPL-2.0-or-later	LOCAL_GOODIX_PSK_POC_ADAPTATION
 libfprint-driver/goodix_pairing_provision.h	GPL-2.0-or-later	LOCAL_GOODIX_PSK_POC_ADAPTATION
 libfprint-driver/goodix_runtime_inputs.c	LGPL-2.1-or-later	LOCAL_GOODIX

@@ -120,9 +120,10 @@ recognition accuracy, hardware behavior or complete operating-system recovery.
   unrelated future denials.
 - Full factory-state readback, exhaustive Windows compatibility, power-loss recovery
   and every future update combination have not been demonstrated.
-- The state-v2 self-initialization and pairing path has not yet been qualified on
-  the real reader. The reader-absent host lifecycle evidence does not authorize or
-  establish the later live no-finger transaction.
+- The seven-command read-only target and CONFIG90 preflight is qualified on the
+  real reader. The state-v2 pairing mutation, readback/TLS proof, zero-seed FDT
+  continuation and ordinary reopen remain offline-qualified only; they require
+  their separate live no-finger authorization and evidence.
 
 Report exact behavior and errors without protected data. See
 [Security](SECURITY.md), [Installation](INSTALLATION.md) and [Removal](UNINSTALL.md).

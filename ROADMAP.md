@@ -395,10 +395,10 @@ Il live deve procedere dal meno invasivo al più invasivo:
 
 1. identity/chip/OTP/`BB010002`/E4 read-only;
 2. CONFIG90 generata confrontata con la baseline qualificata;
-3. zero-seed FDT no-finger;
-4. solo dopo i gate precedenti: journal `PREPARED`;
-5. massimo un `E0`;
-6. ACK/completion, `BB010002` invariato, E4 match e TLS;
+3. solo dopo i gate precedenti: journal `PREPARED`;
+4. massimo un `E0`;
+5. ACK/completion, `BB010002` invariato, E4 match e TLS;
+6. zero-seed FDT no-finger;
 7. reopen ordinario con zero `E0`;
 8. recovery read-only da crash post-E0/pre-ACTIVE senza secondo write.
 

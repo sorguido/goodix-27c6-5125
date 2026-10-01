@@ -16,6 +16,7 @@ change the original copyright or grant of any source file.
 | APP12509 state-v2 | Project source | LGPL-2.1-or-later; host-only root-protected PSK/receipt generations, authenticated crash recovery and side-by-side legacy-state import, with no USB or pairing writer |
 | APP12509 live preflight | Project source; independently implemented from the repository's documented command contracts | LGPL-2.1-or-later; bounded A2/A8/E4/chip/OTP read-only discovery and CONFIG90 derivation, with no persistent command or retry |
 | APP12509 pairing provision boundary | Minimal adaptation of the project-authored qualified writer in `development/psk` | GPL-2.0-or-later; fixed E0 construction, one-logical-write guard, exact ACK/completion parser and readback/TLS proof gates; no USB ownership, automatic retry or firmware command |
+| APP12509 pairing activation | Project source | LGPL-2.1-or-later; crash-safe PREPARED reservation, state-v2 reconciliation and bounded orchestration of the separately licensed pairing-provision boundary, readbacks, TLS and ACTIVE promotion |
 | SIGFM | Rockytkg's materialized libfprint fork, commit `7ebe0c809b4d1df3400e84299a4ec4acdea84590` | LGPL-2.1-or-later; feature extraction and matching |
 | Image preprocessing | Adapted from Rockytkg, commit `227eba219fa9e3fbac5bd59aca79f624f67cd11b` | GPL-2.0-or-later; device-independent preprocessing subset |
 | OpenCV | Fedora OpenCV 4 packages (actual installed version recorded at build) | Fedora expression `BSD-3-Clause AND Apache-2.0 AND ISC`; required runtime libraries |
@@ -89,8 +90,9 @@ bundle untouched for rollback.
 
 `libfprint-driver/goodix_runtime_coordinator.[ch]` is project-authored. It
 combines the existing legacy loader, CONFIG90 derivation and state-v2 reader
-behind an activation-only, read-only selection boundary. It contains no USB
-transport, pairing writer or copied third-party implementation.
+behind an activation-only selection boundary. It contains no USB transport or
+pairing writer; its only mutation is host-side ACTIVE promotion after a separate
+TLS proof. No third-party implementation is copied.
 
 `libfprint-driver/goodix_live_preflight.[ch]` is project-authored from the
 documented APP12509 A0 command/response contracts and reuses the local A0 codec.
@@ -100,7 +102,12 @@ persistent command. `libfprint-driver/goodix_pairing_provision.[ch]` adapts only
 the fixed E0 layout, response contract and one-write guard from the
 project-authored GPL PoC in `development/psk`; it therefore retains
 GPL-2.0-or-later. It owns neither USB transport nor state persistence and cannot
-retry a transaction.
+retry a transaction. `libfprint-driver/goodix_pairing_activation.[ch]` is
+project-authored LGPL orchestration. It durably reserves the transaction through
+state-v2, delegates the single E0 frame and proof contract to the GPL provision
+boundary, routes the two exact readbacks, and promotes host state only after TLS.
+It introduces no copied external implementation; the combined library remains
+subject to the licensing boundary described above.
 
 ## Excluded material
 
