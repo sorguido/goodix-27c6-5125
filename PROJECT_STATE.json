@@ -8,7 +8,7 @@
     "qualified_host": "Fedora 44 KDE x86_64"
   },
   "execution_path": "PRIMARY",
-  "phase": "P6",
+  "phase": "P7",
   "phase_status": "HUMAN_REQUIRED",
   "completed_gates": [
     "SELF_CONTAINED_ARCHITECTURE_APPROVAL",
@@ -20,10 +20,10 @@
     "COORDINATOR_HOST_VM",
     "LIVE_NO_FINGER_APPROVAL",
     "P6_READ_ONLY_PREFLIGHT_LIVE",
-    "P6_CONFIG90_AND_TARGET_BOUNDARY_LIVE"
+    "P6_CONFIG90_AND_TARGET_BOUNDARY_LIVE",
+    "SELF_CONTAINED_LIVE_NO_FINGER"
   ],
   "pending_gates": [
-    "SELF_CONTAINED_LIVE_NO_FINGER",
     "WINDOWS_INTEROP_APPROVAL",
     "WINDOWS_LINUX_PING_PONG",
     "SELF_CONTAINED_BIOMETRIC_STACK",
@@ -112,9 +112,7 @@
     ],
     "initial_blockers": []
   },
-  "current_blockers": [
-    "P6_ITEM8_LIVE_CRASH_RECOVERY_DECISION_REQUIRED"
-  ],
+  "current_blockers": [],
   "host_modified": false,
   "relevant_artifacts": [
     "START.md",
@@ -165,9 +163,9 @@
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "Stop at HUMAN_REQUIRED GATE=P6_ITEM8_CRASH_RECOVERY_EVIDENCE_DECISION: canonical P6 items 1-7 are live-proven on the qualification reader and item 8, read-only recovery from an interrupted post-E0/pre-ACTIVE transaction without a second write, is the only open requirement. Its live window was consumed by the successful pairing, so the User must choose between (A) accepting the offline crash-window matrix plus the new host-shaped superseded-PREPARED recovery test as item 8 evidence and closing SELF_CONTAINED_LIVE_NO_FINGER with an explicit residual-risk note, (B) authorizing one bounded live recovery action that displaces the ACTIVE generation's two slot artifacts and expects RECOVER_PREPARED_TLS with zero E0, accepting the residual hazard that an unmet precondition would make the load absent and select NEW_PSK, or (C) authorizing a small read-only state-v2 inspector first so option B precondition can be verified before any displacement. A separate CANONICAL_FILE_CHANGE_APPROVAL is needed to promote 'bootstrap FDT da seed iniziale zero' from INFERRED to PROVEN in ROADMAP.md section 2.",
-  "last_verified_head": "800f445",
-  "state_note": "P0A through P5 are accepted. Canonical P6 items 1-7 are live-proven on the qualification reader: the read-only seven-command preflight and generated CONFIG90, the one-shot pairing transaction with a single logical E0, exact BB010002/BB020003 readbacks, TLS proof and ACTIVE promotion, the ordinary ACTIVE reopen with zero E0 entered through the pairing-activation REUSE_ACTIVE_TLS disposition, and the zero-seed FDT no-finger bootstrap, which the operator reports as PASS on candidate d14a495 with the corrected first-sample touch-mask boundary; the sanitized epoch audit lines were not retained in the repository, so those two results are recorded as operator-reported evidence in docs/VALIDATION.md. ROADMAP.md item 8 is the only open P6 requirement. Analysis: the promotion writes the ACTIVE generation to the other slot and leaves the journaled PREPARED generation in place, so the host still holds a superseded PREPARED receipt; reconciliation of that receipt with a matching live validator and unproven TLS yields RETRY_TLS, and the activation graph turns it into RECOVER_PREPARED_TLS, which never constructs an E0 frame and marks TLS before promoting. That exact host-shaped sequence is now qualified offline, including the inherited prepared_journaled/e0_reserved_before_submit markers that stay true on the recovery path while the write and E0 counters stay zero. Reproducing it live requires displacing the qualified ACTIVE generation's two root-only slot artifacts; if the precondition did not hold the load would be absent and the activation would select NEW_PSK, which is a second E0, so the choice is a material risk decision reserved to the User. Offline evidence at 800f445: pairing activation suite 10/10 normal and ASan/UBSan, seven other C module suites, post-TLS lifecycle 26/26 both modes, 63-test fpimage suite both modes in a no-device sandbox, Python deployment/build suites, ledger ALL_DIGESTS_MATCH, public build GOODIX_BUILD=PASS SOURCE_ID=1fb93468bd4f8b0ae717a2e92da4684b00c99fdb8cf3e3e0693fa6f0e1a34aea. REAL_USB_ACCESS=0 and REAL_USB_SUBMIT=0 throughout; no privileged host mutation, no reader access and no pairing or E0 change in this task. Persisting the learned FDT table through the existing state-v2 fdt_present/fdt_table mechanism remains deferred to P9. Git/evidence/ROADMAP.md remain authoritative.",
+  "next_action": "Stop at HUMAN_REQUIRED GATE=WINDOWS_INTEROP_APPROVAL, which ROADMAP P6 NEXT places before P7. P7 qualifies real Windows/Linux coexistence and stable reuse of the same Linux PSK L1 across the L1 -> W1 -> L1 -> W2 -> L1 sequence; every step needs live Windows transitions on the qualification reader, which no agent may perform, and only WINDOWS_LINUX_PING_PONG=PASS may promote repeated L1/Wn reuse from INFERRED to PROVEN. Offline preparation that stays inside the current authorization is limited to read-only analysis: no pairing, E0, secure-session or state-v2 write path may change before the gate is answered.",
+  "last_verified_head": "79c8b89",
+  "state_note": "P0A through P6 are accepted; SELF_CONTAINED_LIVE_NO_FINGER=PASS closes P6. Canonical P6 items 1-7 are live-proven on the qualification reader: the read-only seven-command preflight and generated CONFIG90, the one-shot pairing transaction with a single logical E0, exact BB010002/BB020003 readbacks, TLS proof and ACTIVE promotion, the ordinary ACTIVE reopen with zero E0 through the REUSE_ACTIVE_TLS disposition, and the zero-seed FDT no-finger bootstrap with the corrected first-sample touch-mask boundary; the sanitized epoch audit lines were not retained, so items 6-7 are recorded as operator-reported evidence in docs/VALIDATION.md. Item 8, read-only recovery from an interrupted post-E0/pre-ACTIVE transaction, is closed by the User's explicit option-A decision on offline evidence: the crash-window matrix plus test_active_generation_loss_recovers_from_superseded_prepared, which reproduces the host-shaped slot layout (PREPARED generation surviving in slot A, ACTIVE displaced from slot B) and proves RECOVER_PREPARED_TLS with persistent_write_count=0, logical_e0_count=0 and no next request, followed by TLS proof, ACTIVE promotion and a zero-E0 REUSE_ACTIVE_TLS reopen. Residual risk, accepted and recorded in docs/VALIDATION.md: no live reproduction of that boundary exists, because the successful pairing consumed the window and recreating it on the reader would require either a second E0 (NEW_PSK if the PREPARED slot failed to load) or displacing the qualified ACTIVE record. ROADMAP.md section 2 now lists the zero-seed FDT bootstrap as PROVEN under the approved CANONICAL_FILE_CHANGE_APPROVAL, and the corresponding initial blocker was removed. Offline evidence at 79c8b89: pairing activation suite 10/10, public source ledger ALL_DIGESTS_MATCH, GOODIX_BUILD=PASS SOURCE_ID=1fb93468bd4f8b0ae717a2e92da4684b00c99fdb8cf3e3e0693fa6f0e1a34aea, unchanged because the closure touched only governance and public documentation outside the build inventory; the code tree is identical to the fully verified 800f445 (seven other C module suites, post-TLS lifecycle 26/26 both modes, 63-test fpimage suite both modes in a no-device sandbox, Python deployment/build suites). REAL_USB_ACCESS=0 and REAL_USB_SUBMIT=0 throughout; no privileged host mutation, no reader access and no pairing or E0 change in this task. ARTIFACT_INDEX.json was reconciled against the real Git delta and gained a P7 route. Persisting the learned FDT table through the existing state-v2 fdt_present/fdt_table mechanism remains deferred to P9. Git/evidence/ROADMAP.md remain authoritative.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }
