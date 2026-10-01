@@ -80,21 +80,20 @@ indipendente tramite readback/hash/TLS.
 - intervallo di 10 ms tra record B0 TLS consecutivi;
 - recovery Windows dopo uno stato persistente originato da Linux;
 - `gx_wb_encrypt()` equivalente byte-per-byte alla rappresentazione OEM
-  qualificata.
+  qualificata;
+- bootstrap FDT da seed iniziale zero nel production path.
 
 ### INFERRED — non promuovere a PROVEN prima del gate dedicato
 
 - riutilizzo della stessa PSK Linux `L1` dopo ripetuti ritorni da Windows;
 - ciclo stabile `L1 -> W1 -> L1 -> W2 -> L1`;
-- bootstrap FDT da seed iniziale zero nel production path;
 - generazione completa di CONFIG90 da template type-12 + OTP;
 - parser strutturale generalizzato di `BB010002` per stati Windows legittimi.
 
 ### Blocker tecnici iniziali
 
 1. equivalenza esatta della CONFIG90 generata;
-2. bootstrap FDT con seed iniziale zero;
-3. validazione strutturale generalizzata di `BB010002`.
+2. validazione strutturale generalizzata di `BB010002`.
 
 ## 3. Regola di avanzamento
 

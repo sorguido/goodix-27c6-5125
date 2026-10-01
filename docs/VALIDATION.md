@@ -31,6 +31,7 @@ tests installation and recovery behavior, not live reader behavior.
 | Self-contained pairing activation | On the qualification reader one authorized action journaled the state-v2 `PREPARED` reservation, performed exactly one logical `E0`, confirmed the current `BB010002` byte-for-byte and the new `BB020003` validator, proved TLS and promoted the record to `ACTIVE`; no second write was requested and the epoch reported zero unexpected persistent writes |
 | Zero-`E0` ACTIVE reopen | A later ordinary no-finger identify reused the `ACTIVE` record through the read-only preflight and the pairing-activation reuse disposition, with zero `E0`, zero persistent writes, a matching E4 contract, and complete drain and close |
 | Zero-seed FDT bootstrap | With no imported FDT cache, an ordinary no-finger action completed the three-sample zero-seed bootstrap, including a first manual sample carrying a nonzero touch mask, and reached FDT learning; operator-reported against the declared counters, and the sanitized audit line is not retained in the repository |
+| Interrupted-transaction recovery (offline) | The crash-window matrix and the host-shaped superseded-`PREPARED` recovery test show that reopening after an interrupted post-`E0`/pre-ACTIVE transaction reuses the durable reservation, proves TLS and promotes to `ACTIVE` with zero persistent writes and zero `E0`; no live reproduction exists for this boundary |
 
 ## Complete installation path
 
@@ -131,7 +132,10 @@ recognition accuracy, hardware behavior or complete operating-system recovery.
   interrupted post-`E0`/pre-ACTIVE transaction remains offline-qualified only:
   the successful live pairing consumed that window, and reproducing it on the
   reader would require either a further `E0` or replacing the qualified ACTIVE
-  record.
+  record. That residual risk is accepted; the qualified evidence for the
+  boundary is the offline crash-window matrix plus the host-shaped
+  superseded-`PREPARED` recovery test, which proves `RECOVER_PREPARED_TLS` with
+  zero writes and zero `E0`.
 
 Report exact behavior and errors without protected data. See
 [Security](SECURITY.md), [Installation](INSTALLATION.md) and [Removal](UNINSTALL.md).
