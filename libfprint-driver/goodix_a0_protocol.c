@@ -37,7 +37,9 @@ inner_checksum (guint8        control,
                 const guint8 *body,
                 gsize         body_length)
 {
-  guint sum = control + (guint) body_length + 1u;
+  guint16 inner_length = (guint16) (body_length + 1u);
+  guint sum = (guint) control + (guint) (guint8) inner_length +
+              (guint) (guint8) (inner_length >> 8);
 
   for (gsize i = 0; i < body_length; i++)
     sum += body[i];

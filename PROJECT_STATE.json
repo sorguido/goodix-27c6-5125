@@ -83,7 +83,11 @@
       "P6_LIVE_E4_TYPED_RESPONSE_CONTRACT_MISMATCH",
       "P6_LIVE_E4_VALIDATOR_DIFFERS_FROM_LEGACY_MATERIAL",
       "P6_E4_STATE_MISMATCH_CLASSIFICATION_OFFLINE",
-      "P6_IDENTIFY_READ_ONLY_PREFLIGHT_ROUTE_OFFLINE"
+      "P6_IDENTIFY_READ_ONLY_PREFLIGHT_ROUTE_OFFLINE",
+      "P6_LIVE_PREFLIGHT_LARGE_A0_CHECKSUM_ROOT_CAUSE",
+      "P6_CANONICAL_A0_MULTIBYTE_LENGTH_CHECKSUM_OFFLINE",
+      "P6_FRAGMENTED_SEVEN_COMMAND_PREFLIGHT_OFFLINE",
+      "P6_E0_FRAME_CHECKSUM_PARITY_OFFLINE"
     ],
     "inferred": [
       "REPEATED_REUSE_OF_SAME_LINUX_PSK_AFTER_WINDOWS_RETURN",
@@ -93,7 +97,7 @@
     "initial_blockers": []
   },
   "current_blockers": [
-    "P6_READ_ONLY_PREFLIGHT_LIVE_CONFIRMATION_PENDING"
+    "P6_STRUCTURAL_CHECKSUM_FIX_LIVE_CONFIRMATION_PENDING"
   ],
   "host_modified": false,
   "relevant_artifacts": [
@@ -141,9 +145,9 @@
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "After a new explicit HUMAN_REQUIRED approval, install the offline-qualified candidate on the physical Fedora 44 KDE target and run one no-finger fprintd-enroll diagnostic. The fprintd IDENTIFY precheck must execute the complete seven-command read-only preflight; on the already observed E4 state mismatch it must stop before secure-session TLS or runtime configuration writes. Return the client result, the specific fprintd error and the single GOODIX_PRODUCTION_EPOCH_AUDIT line. Do not repeat, touch the sensor, journal PREPARED or enable E0.",
-  "last_verified_head": "b1a8adfc8c3adcabfdeeff86e0e364754be5e7ca",
-  "state_note": "P0A through P5 are accepted. The previous LIVE_NO_FINGER approval was consumed by the single target attempt described here; a new explicit gate is required. The installed b1a8adf candidate (SOURCE_ID d4aba6a7ce36fedd0cb404527335e364342e7794a499165073441dca8aa9c516) entered fprintd's IDENTIFY-for-enroll precheck and proved a typed E4 response with control 0xE4, canonical 41-byte BB020003 shape and a 32-byte value different from the qualified legacy validator. This is a pairing-state value mismatch, not a response-shape failure; the live bytes remain undisclosed and no replacement validator is inferred. The offline candidate classifies it as TYPED_VALUE_MISMATCH with a precise redacted error and routes both direct ENROLL and fprintd's IDENTIFY duplicate precheck through the complete read-only preflight before any strict legacy secure session. Normal and ASan/UBSan component and 61-case image-device suites pass offline with REAL_USB_ACCESS=0. The compiled production E0 module has zero runtime callers. PREPARED, TLS, CONFIG write, FDT learning and E0 remain unreachable on this mismatch path. Firmware/IAP/ClearApp/OTP/factory writes, biometric tests and any E0 retry remain excluded. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
+  "next_action": "After a new explicit HUMAN_REQUIRED approval, install the offline-qualified candidate on the physical Fedora 44 KDE target and run one no-finger fprintd-enroll diagnostic. The fprintd IDENTIFY precheck must execute the complete seven-command non-persistent preflight using the corrected canonical A0 checksum; on the already observed E4 state mismatch it is expected to stop before secure-session TLS or runtime configuration writes. Return the client result, the specific fprintd error and the single GOODIX_PRODUCTION_EPOCH_AUDIT line. Do not repeat, touch the sensor, journal PREPARED or enable E0.",
+  "last_verified_head": "23a41eda52b586c309c2ac2aff4621fb03d6ea39",
+  "state_note": "P0A through P5 are accepted. The previous LIVE_NO_FINGER approval was consumed by one target attempt against 23a41ed (SOURCE_ID 01cd7ce970fea259a412f1fd1ff689902f149f0c35c65bf711dc9c809bfd2fbf): it stopped at preflight command 3 with a host-side A0 inner checksum mismatch, with preflight_complete=0, preflight_commands=3, secure_commands=0, tls=0, no persistent or pairing write, no retry, and clean drain/context closure. The structural root cause is PROVEN: the shared canonical A0 codec added the little-endian inner length as a numeric value, so modulo 256 it omitted the high byte. Legacy secure-session frames remained below 256 bytes and masked the defect; the 341-byte BB010002 typed response is the first ordinary large A0 frame in the P6 graph. The qualified independent PoC checksum and literal known-answer tests require both length bytes. The fix applies once in the shared codec and also corrects the future 460-byte E0 frame, whose production module still has zero runtime callers. The pre-material preflight and material-driven secure-session graphs intentionally remain separate at the material-selection boundary while sharing the same bounded USB router and canonical A0 codec. Independent multibyte checksum KATs, stale-checksum rejection, the complete seven-command graph through exact 64-byte router fragmentation, E0 checksum parity, normal and ASan/UBSan component suites, post-TLS, enrollment and 61-case image-device suites all pass offline with REAL_USB_ACCESS=0 and REAL_USB_SUBMIT=0. The reproducible offline production build passes with SOURCE_ID 68fe7d145195fdcecd70a8a65640332d950ebb9259a8e097d0d5bfe3e3690c31. Firmware/IAP/ClearApp/OTP/factory writes, biometric tests and E0 remain excluded. A new explicit live gate is required. Git/evidence/ROADMAP.md remain authoritative; ARTIFACT_INDEX.json is a non-authoritative context router.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }

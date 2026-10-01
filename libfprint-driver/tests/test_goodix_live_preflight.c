@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
 #include "goodix_a0_protocol.h"
 #include "goodix_live_preflight.h"
+#include "goodix_usb_router.h"
 
 #include <glib.h>
 #include <string.h>
@@ -124,6 +125,122 @@ frame (guint8 control,
 }
 
 static void
+test_a0_multibyte_inner_length_kat (void)
+{
+  guint8 body[9 + GOODIX_BB010002_LENGTH] = { 0 };
+  guint8 literal[sizeof body + 8u] = { 0 };
+  GoodixA0Message message = { 0 };
+  g_autoptr(GBytes) built = NULL;
+  g_autoptr(GBytes) known = NULL;
+  g_autoptr(GBytes) stale = NULL;
+  g_autoptr(GError) error = NULL;
+  const guint8 *bytes;
+  gsize length;
+
+  /* A 341-byte body has inner length 0x0156 and outer payload length
+   * 0x0159.  With a zero body and E4 checksum coordinate, the independent
+   * additive known answer is 0x6f.  The former low-byte-only implementation
+   * produced 0x70 and therefore rejected the first large live A0 response. */
+  built = goodix_a0_build_frame (0xe4u, 0xe4u, body, sizeof body, &error);
+  g_assert_no_error (error);
+  g_assert_nonnull (built);
+  bytes = g_bytes_get_data (built, &length);
+  g_assert_cmpuint (length, ==, sizeof literal);
+  g_assert_cmphex (bytes[0], ==, 0xa0u);
+  g_assert_cmphex (bytes[1], ==, 0x59u);
+  g_assert_cmphex (bytes[2], ==, 0x01u);
+  g_assert_cmphex (bytes[3], ==, 0xfau);
+  g_assert_cmphex (bytes[4], ==, 0xe4u);
+  g_assert_cmphex (bytes[5], ==, 0x56u);
+  g_assert_cmphex (bytes[6], ==, 0x01u);
+  g_assert_cmphex (bytes[length - 1u], ==, 0x6fu);
+
+  literal[0] = 0xa0u;
+  literal[1] = 0x59u;
+  literal[2] = 0x01u;
+  literal[3] = 0xfau;
+  literal[4] = 0xe4u;
+  literal[5] = 0x56u;
+  literal[6] = 0x01u;
+  literal[sizeof literal - 1u] = 0x6fu;
+  known = g_bytes_new (literal, sizeof literal);
+  g_assert_true (goodix_a0_parse_frame (known, 0xe4u, &message, &error));
+  g_assert_no_error (error);
+  g_assert_cmphex (message.control, ==, 0xe4u);
+  g_assert_cmpuint (g_bytes_get_size (message.body), ==, sizeof body);
+  goodix_a0_message_clear (&message);
+
+  literal[sizeof literal - 1u] = 0x70u;
+  stale = g_bytes_new (literal, sizeof literal);
+  g_assert_false (goodix_a0_parse_frame (stale, 0xe4u, &message, &error));
+  g_assert_nonnull (error);
+  g_assert_nonnull (strstr (error->message, "checksum"));
+}
+
+typedef struct
+{
+  GoodixLivePreflight *preflight;
+  GError *error;
+  guint delivery_count;
+} FragmentedPreflight;
+
+static void
+fragmented_preflight_consume (guint8   outer_type,
+                              GBytes  *input,
+                              gpointer user_data)
+{
+  FragmentedPreflight *route = user_data;
+
+  g_assert_cmphex (outer_type, ==, 0xa0u);
+  route->delivery_count++;
+  if (!goodix_live_preflight_handle_a0 (route->preflight, input,
+                                        &route->error))
+    g_assert_not_reached ();
+}
+
+static void
+feed_fragmented (GoodixUsbRouter *router,
+                 guint64          generation,
+                 GBytes          *input)
+{
+  const guint8 *bytes;
+  gsize length;
+  gsize offset = 0u;
+
+  bytes = g_bytes_get_data (input, &length);
+  while (offset < length)
+    {
+      gsize chunk = MIN ((gsize) 64u, length - offset);
+      g_autoptr(GError) error = NULL;
+
+      g_assert_true (goodix_usb_router_request_receive (router, &error));
+      g_assert_no_error (error);
+      goodix_usb_router_receive_complete (router, generation, bytes + offset,
+                                          chunk, NULL);
+      offset += chunk;
+    }
+}
+
+static void
+complete_phase_fragmented (GoodixLivePreflight *preflight,
+                           GoodixUsbRouter     *router,
+                           guint64              generation,
+                           const guint8        *typed_body,
+                           gsize                typed_length)
+{
+  g_autoptr(GBytes) request = goodix_live_preflight_next_request (preflight,
+                                                                  NULL);
+  const guint8 *request_data = g_bytes_get_data (request, NULL);
+  guint8 ack_body[] = { request_data[4], 0x01u };
+  g_autoptr(GBytes) ack = frame (0xb0u, ack_body, sizeof ack_body);
+  g_autoptr(GBytes) typed = frame (request_data[4], typed_body, typed_length);
+
+  goodix_live_preflight_out_complete (preflight, NULL);
+  feed_fragmented (router, generation, ack);
+  feed_fragmented (router, generation, typed);
+}
+
+static void
 put_le32 (guint8 out[4],
           guint32 value)
 {
@@ -209,6 +326,65 @@ test_complete_read_only_graph (void)
 }
 
 static void
+test_complete_read_only_graph_fragmented (void)
+{
+  static const guint8 a2[] = { 0x00, 0x00, 0x00 };
+  static const guint8 app[] = "GF_ST411SEC_APP_12509";
+  static const guint8 chip[] = { 0x00, 0x04, 0x25, 0x00 };
+  const guint64 generation = 17u;
+  guint8 bb2[GOODIX_BB010002_LENGTH];
+  guint8 validator[32];
+  guint8 otp[GOODIX_CONFIG90_OTP_LENGTH];
+  guint8 e4_bb2[9 + GOODIX_BB010002_LENGTH] = { 0 };
+  guint8 e4_validator[9 + sizeof validator] = { 0 };
+  GoodixLivePreflightAudit audit = { 0 };
+  g_autoptr(GoodixLivePreflight) preflight = goodix_live_preflight_new (&audit);
+  FragmentedPreflight route = { .preflight = preflight };
+  GoodixUsbRouter *router = goodix_usb_router_new (
+    fragmented_preflight_consume, NULL, &route);
+
+  make_bb010002 (bb2);
+  memset (validator, 0xa5, sizeof validator);
+  make_otp (otp);
+  put_le32 (e4_bb2 + 1, 0xbb010002u);
+  put_le32 (e4_bb2 + 5, sizeof bb2);
+  memcpy (e4_bb2 + 9, bb2, sizeof bb2);
+  put_le32 (e4_validator + 1, 0xbb020003u);
+  put_le32 (e4_validator + 5, sizeof validator);
+  memcpy (e4_validator + 9, validator, sizeof validator);
+  goodix_usb_router_begin_generation (router, generation);
+
+  complete_phase_fragmented (preflight, router, generation,
+                             a2, sizeof a2);
+  complete_phase_fragmented (preflight, router, generation,
+                             app, sizeof app);
+  complete_phase_fragmented (preflight, router, generation,
+                             e4_bb2, sizeof e4_bb2);
+  complete_phase_fragmented (preflight, router, generation,
+                             e4_validator, sizeof e4_validator);
+  complete_phase_fragmented (preflight, router, generation,
+                             a2, sizeof a2);
+  complete_phase_fragmented (preflight, router, generation,
+                             chip, sizeof chip);
+  complete_phase_fragmented (preflight, router, generation,
+                             otp, sizeof otp);
+
+  g_assert_no_error (route.error);
+  g_assert_cmpint (goodix_live_preflight_get_phase (preflight), ==,
+                   GOODIX_LIVE_PREFLIGHT_STOP);
+  g_assert_cmpuint (route.delivery_count, ==, 14u);
+  g_assert_cmpuint (goodix_usb_router_get_delivery_count (router), ==, 14u);
+  g_assert_cmpuint (audit.command_count, ==, 7u);
+  g_assert_cmpuint (audit.ack_count, ==, 7u);
+  g_assert_cmpuint (audit.typed_response_count, ==, 7u);
+  g_assert_cmpuint (audit.retry_count, ==, 0u);
+  g_assert_cmpuint (audit.persistent_write_count, ==, 0u);
+  g_assert_true (audit.complete);
+  g_clear_error (&route.error);
+  goodix_usb_router_free (router);
+}
+
+static void
 test_unsupported_chip_fails_closed (void)
 {
   static const guint8 a2[] = { 0x00, 0x00, 0x00 };
@@ -254,8 +430,12 @@ int
 main (int argc, char **argv)
 {
   g_test_init (&argc, &argv, NULL);
+  g_test_add_func ("/goodix/a0/multibyte-inner-length-kat",
+                   test_a0_multibyte_inner_length_kat);
   g_test_add_func ("/goodix/live-preflight/complete",
                    test_complete_read_only_graph);
+  g_test_add_func ("/goodix/live-preflight/complete-fragmented",
+                   test_complete_read_only_graph_fragmented);
   g_test_add_func ("/goodix/live-preflight/unsupported-chip",
                    test_unsupported_chip_fails_closed);
   return g_test_run ();

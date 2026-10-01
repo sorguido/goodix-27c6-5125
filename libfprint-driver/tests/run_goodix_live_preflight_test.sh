@@ -20,6 +20,7 @@ mkdir -p "$build_dir"
 common_flags="-std=c11 -Wall -Wextra -Werror -I$root/libfprint-driver"
 libs=$(pkg-config --cflags --libs glib-2.0 openssl)
 sources="$root/libfprint-driver/goodix_a0_protocol.c
+$root/libfprint-driver/goodix_usb_router.c
 $root/libfprint-driver/goodix_bb010002.c
 $root/libfprint-driver/goodix_config90.c
 $root/libfprint-driver/goodix_live_preflight.c

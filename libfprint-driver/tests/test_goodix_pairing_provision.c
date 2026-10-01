@@ -140,6 +140,9 @@ test_happy_path_and_exact_frame (void)
   g_assert_cmpmem (data + 355, sizeof wb, wb, sizeof wb);
   g_assert_cmphex (data[457], ==, 0x00);
   g_assert_cmphex (data[458], ==, 0x00);
+  /* Independent qualified 460-byte E0 known answer.  The 0x01 high byte of
+   * inner length 0x01c5 participates separately in the additive checksum. */
+  g_assert_cmphex (data[459], ==, 0xba);
 
   ack = response (0xb0, ack_body, sizeof ack_body);
   done = response (0xe2, done_body, sizeof done_body);

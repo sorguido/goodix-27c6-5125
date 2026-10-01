@@ -1,5 +1,13 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
-/* Read-only APP12509 discovery graph used before state reconciliation. */
+/*
+ * Read-only APP12509 discovery graph used before state reconciliation.
+ *
+ * The material-driven secure-session graph cannot perform this prefix: it
+ * requires an already selected PSK/validator/configuration and continues into
+ * runtime writes and TLS.  This graph instead gathers the live inputs needed
+ * to select that material.  Both graphs deliberately share the canonical A0
+ * codec and USB router; framing and checksum rules do not belong here.
+ */
 #include "goodix_live_preflight.h"
 
 #include "goodix_a0_protocol.h"

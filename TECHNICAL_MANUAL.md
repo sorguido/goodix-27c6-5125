@@ -118,7 +118,7 @@ An A0 logical frame has this production layout:
 | `4` | 1 | Wire control | Command or response control carried on the wire |
 | `5..6` | 2 | Inner length | Little-endian; body plus the final checksum |
 | `7..n-2` | variable | Body | Phase-specific bounded bytes |
-| `n-1` | 1 | Inner additive checksum | Chosen so `checksum_control + inner_length + sum(body) + checksum` is `0xAA` modulo 256 |
+| `n-1` | 1 | Inner additive checksum | Chosen so `checksum_control + inner_length_low + inner_length_high + sum(body) + checksum` is `0xAA` modulo 256 |
 
 The codec deliberately accepts a wire control and a checksum control as
 separate inputs. The required checksum coordinate is defined by the specific
@@ -295,6 +295,12 @@ and derives CONFIG90 before the strict secure session is allowed to rely on
 legacy pairing state. A structurally valid `BB020003` record whose 32-byte value
 differs from the expected validator is a pairing-state mismatch, not a malformed
 typed response; it fails closed before TLS or runtime configuration writes.
+This pre-material graph and the material-driven secure-session graph share the
+same bounded USB router and canonical A0 codec. They remain separate state
+machines because the secure-session graph requires an already selected
+PSK/validator/configuration and proceeds into runtime configuration and TLS,
+whereas the preflight exists to gather the live evidence needed to make that
+selection without a pairing write.
 
 The host-only state-v2 boundary uses two fixed-size generations. Each generation
 contains a 32-byte PSK record and a receipt authenticated by that PSK. The
