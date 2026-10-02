@@ -380,6 +380,54 @@ L'orchestrazione PM↔Executor è definita da `START.md` e vincolata alla state 
 
 AI PM deve leggere/riconciliare `PROJECT_STATE.json` al bootstrap, individuare la fase corrente e il primo requisito non soddisfatto, quindi proseguire soltanto entro quel boundary fino al prossimo gate o stop canonico. Dopo un avanzamento materiale aggiorna la cache operativa prima di fermarsi o passare alla fase successiva.
 
+### Stop obbligatorio di AI PM a ogni confine di fase
+
+AI PM **non può concatenare automaticamente due fasi della roadmap**.
+
+Quando una fase raggiunge il proprio `EXIT_GATE`, AI PM deve:
+
+1. completare soltanto la closure coerente della fase corrente;
+2. aggiornare gli artefatti canonici/cache necessari alla chiusura;
+3. commit/push solo se consentiti dal task e dalla governance;
+4. fermarsi sempre con un nuovo `HUMAN_REQUIRED` prima di qualunque attività della fase successiva.
+
+Il gate obbligatorio è:
+
+```text
+HUMAN_REQUIRED
+GATE=NEXT_PHASE_APPROVAL
+PURPOSE=Autorizzare esplicitamente l'avvio della fase successiva della roadmap
+EXPECTED_RESULT=Istruzione esplicita dell'Utente di procedere con la fase successiva
+COMMANDS=N/A
+RISK=Avanzamento autonomo oltre il boundary approvato
+ROLLBACK=N/A
+EVIDENCE_TO_RETURN=Autorizzazione esplicita dell'Utente
+```
+
+Questo stop vale anche quando:
+
+- la fase appena conclusa è PASS senza blocker;
+- la fase successiva è già completamente definita in `ROADMAP.md`;
+- tutti i prerequisiti della fase successiva risultano già soddisfatti;
+- l'attività successiva sarebbe soltanto read-only, documentale, offline o apparentemente innocua;
+- `PROJECT_STATE.json` indica già quale sia la fase successiva;
+- l'Utente aveva in precedenza autorizzato l'esecuzione della fase corrente.
+
+L'autorizzazione a una fase **non autorizza mai quella successiva**.
+
+Per la sequenza corrente dopo P8 il comportamento tassativo è:
+
+```text
+P10 completes -> HUMAN_REQUIRED -> STOP
+P11 completes -> HUMAN_REQUIRED -> STOP
+P9 completes  -> HUMAN_REQUIRED -> STOP
+```
+
+Dopo P10 AI PM non può iniziare P11 senza una nuova istruzione esplicita
+dell'Utente. Dopo P11 non può iniziare P9 senza una nuova istruzione esplicita.
+Dopo P9 non può eseguire merge, pubblicazione, release, tag, cleanup finale o
+altre attività post-milestone senza una nuova istruzione esplicita dell'Utente.
+
 I task interni devono descrivere soltanto il delta necessario: obiettivo, stato rilevante, scope, lavoro richiesto, verifica e stop condition. Non reidratare questa governance nei prompt intermedi.
 
 Non prescrivere o registrare nel repository nomi di modelli AI o livelli di reasoning: la scelta appartiene all'Utente e all'ambiente di esecuzione.
