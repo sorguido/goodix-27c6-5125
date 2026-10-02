@@ -505,11 +505,11 @@ Stock-stack biometric and desktop qualification evidence.
 
 **NEXT**
 
-P10.
+P9.
 
 ---
 
-## P10 — Publication cleanup and development-branch sanitization
+## P9 — Publication cleanup and development-branch sanitization
 
 **PURPOSE**
 
@@ -572,11 +572,11 @@ possibile dimostrare l'assenza di protected/nonredistributable material.
 
 **NEXT**
 
-P11.
+P10.
 
 ---
 
-## P11 — Final technical documentation reconciliation
+## P10 — Final technical documentation reconciliation
 
 **PURPOSE**
 
@@ -589,7 +589,7 @@ Non riscrivere per gusto personale e non mutilare contenuto ancora corretto.
 
 **PRIMARY_ARTIFACT**
 
-Public documentation set candidata, destinata a essere verificata end-to-end da P12.
+Public documentation set candidata, destinata a essere verificata end-to-end da P11.
 
 **RULES**
 
@@ -624,11 +624,11 @@ Public documentation set candidata, destinata a essere verificata end-to-end da 
 
 **NEXT**
 
-P12.
+P11.
 
 ---
 
-## P12 — Clean-VM user lifecycle and release-candidate closure
+## P11 — Clean-VM user lifecycle and release-candidate closure
 
 **PURPOSE**
 
@@ -636,15 +636,15 @@ Qualificare come ultimo passaggio la release candidate dal punto di vista di un 
 utente Fedora, usando una VM Fedora 44 KDE pulita e il reader fisico presente
 per l'intera sequenza.
 
-P12 non è una matrice esaustiva di combinazioni artificiali: deve verificare in
+P11 non è una matrice esaustiva di combinazioni artificiali: deve verificare in
 ordine il lifecycle realmente documentato e utilizzabile dall'utente, senza
 ripetere P8 e senza introdurre scenari non necessari.
 
 La prova deve seguire alla lettera le istruzioni pubbliche della release candidate
-come risultano dopo P10 e P11. Non sostituire i comandi documentati con scorciatoie,
+come risultano dopo P9 e P10. Non sostituire i comandi documentati con scorciatoie,
 comandi di sviluppo o procedure ad hoc: eventuali failure di istruzioni, riferimenti,
 sequenza o aspettative documentate sono failure reali della candidate e vanno corrette
-prima di riprendere P12.
+prima di riprendere P11.
 
 **PRIMARY_ARTIFACT**
 
@@ -661,7 +661,7 @@ rimozione normale, reinstallazione e rimozione di emergenza.
   fine della sequenza;
 - test eseguiti sulla release candidate del branch operativo corrente;
 - installazione, update, uso e rimozione eseguiti seguendo le istruzioni ufficiali
-  del repository così come risultano dopo P10 e P11.
+  del repository così come risultano dopo P9 e P10.
 
 **TEST SEQUENCE**
 
@@ -704,7 +704,7 @@ Eseguire in questo ordine e fermarsi alla prima failure non spiegata:
      state-v2 e fingerprint templates, non scrivere sul reader e lasciare
      password/desktop recuperabili secondo il normale percorso Fedora.
 
-Non aggiungere a P12 una matrice reader-presente/reader-assente, rollback verso
+Non aggiungere a P11 una matrice reader-presente/reader-assente, rollback verso
 uno schema precedente, migration matrix separata o prove artificiali
 preserve/purge: non fanno parte di questa qualificazione lineare salvo che una
 failure reale renda necessaria un'analisi specifica.
@@ -730,7 +730,7 @@ failure reale renda necessaria un'analisi specifica.
   lifecycle;
 - nessun lifecycle operation introduce firmware/IAP/ClearApp/OTP/factory-data
   write o altra mutazione persistente inattesa del reader;
-- la documentazione ufficiale risultante da P11 è sufficiente e corretta per
+- la documentazione ufficiale risultante da P10 è sufficiente e corretta per
   completare l'intero lifecycle senza conoscenza privata o istruzioni aggiuntive.
 
 **NEXT**
