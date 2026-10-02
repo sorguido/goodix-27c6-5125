@@ -505,105 +505,6 @@ Stock-stack biometric and desktop qualification evidence.
 
 **NEXT**
 
-P9.
-
----
-
-## P9 — Clean-VM user lifecycle and release-candidate closure
-
-**PURPOSE**
-
-Qualificare la release candidate dal punto di vista di un normale utente
-Fedora, usando una VM Fedora 44 KDE pulita e il reader fisico presente per
-l'intera sequenza.
-
-P9 non è una matrice esaustiva di combinazioni artificiali: deve verificare in
-ordine il lifecycle realmente documentato e utilizzabile dall'utente, senza
-ripetere P8 e senza introdurre scenari non necessari.
-
-**PRIMARY_ARTIFACT**
-
-Bounded clean-VM user-lifecycle evidence per installazione, uso, update,
-rimozione normale, reinstallazione e rimozione di emergenza.
-
-**TEST ENVIRONMENT**
-
-- VM Fedora 44 KDE x86_64 pulita;
-- SELinux Enforcing e stack Fedora stock;
-- nessuna precedente installazione del progetto;
-- nessun legacy five-file Windows material bundle;
-- reader Goodix 27c6:5125 presente tramite USB passthrough dall'inizio alla
-  fine della sequenza;
-- test eseguiti sulla release candidate del branch operativo corrente.
-
-**TEST SEQUENCE**
-
-Eseguire in questo ordine e fermarsi alla prima failure non spiegata:
-
-1. **Installazione canonica**
-   - eseguire l'installer documentato sulla VM pulita con reader presente;
-   - la fresh install deve completarsi senza Windows Material Builder e senza
-     legacy material bundle.
-
-2. **Uso reale**
-   - usare il lettore tramite lo stock stack Fedora/KDE per confermare che la
-     fresh install produce un sistema biometrico realmente operativo;
-   - non ripetere l'intera qualificazione P8: basta un uso ordinario
-     rappresentativo e conclusivo.
-
-3. **Update canonico**
-   - rieseguire il normale percorso installer/update sulla installazione
-     funzionante, sempre con reader presente;
-   - l'update deve completarsi senza compromettere lo stato operativo,
-     password o desktop.
-
-4. **Disinstallazione canonica normale**
-   - eseguire `goodix-uninstall` da una normale sessione desktop;
-   - la rimozione deve togliere il progetto dal critical authentication path
-     preservando state-v2 e fingerprint templates e senza scrivere sul reader.
-
-5. **Reinstallazione canonica**
-   - reinstallare con il normale installer dopo la rimozione precedente,
-     sempre con reader presente;
-   - la reinstallazione deve riutilizzare correttamente lo stato preservato e
-     non deve richiedere il legacy material bundle.
-
-6. **Disinstallazione di emergenza da TTY**
-   - passare al percorso TTY documentato ed eseguire
-     `goodix-force-remove`;
-   - la rimozione deve completarsi con il reader presente, preservare
-     state-v2 e fingerprint templates, non scrivere sul reader e lasciare
-     password/desktop recuperabili secondo il normale percorso Fedora.
-
-Non aggiungere a P9 una matrice reader-presente/reader-assente, rollback verso
-uno schema precedente, migration matrix separata o prove artificiali
-preserve/purge: non fanno parte di questa qualificazione lineare salvo che una
-failure reale renda necessaria un'analisi specifica.
-
-**EXIT_GATE**
-
-`SELF_CONTAINED_RELEASE_CANDIDATE=PASS` solo se l'intera sequenza precedente
-è PASS e:
-
-- la fresh install su VM pulita funziona senza Windows Material Builder,
-  USBPcap, DPAPI recovery o five-file material bundle;
-- il normale uso biometrico funziona dopo la fresh install;
-- il percorso update funziona con reader presente;
-- `goodix-uninstall` funziona con reader presente e non provoca writer sul
-  reader;
-- la reinstallazione dopo rimozione normale funziona usando lo stato
-  preservato;
-- `goodix-force-remove` da TTY funziona con reader presente e non provoca
-  writer sul reader;
-- state-v2 e fingerprint templates restano preservati attraverso entrambe le
-  rimozioni;
-- password e desktop restano disponibili e recuperabili lungo l'intero
-  lifecycle;
-- nessun lifecycle operation introduce firmware/IAP/ClearApp/OTP/factory-data
-  write o altra mutazione persistente inattesa del reader.
-
-**NEXT**
-
 P10.
 
 ---
@@ -612,7 +513,7 @@ P10.
 
 **PURPOSE**
 
-Penultimo passaggio obbligatorio. Preparare il contenuto destinato a `main`
+Primo passaggio della closure pubblica dopo P8. Preparare il contenuto destinato a `main`
 separando in modo netto ciò che è pubblico/necessario da ciò che deve restare
 solo nel workspace di sviluppo.
 
@@ -679,7 +580,7 @@ P11.
 
 **PURPOSE**
 
-Ultimo passaggio del progetto. Aggiornare la documentazione pubblica per
+Secondo passaggio della closure pubblica. Aggiornare la documentazione pubblica per
 descrivere con coerenza narrativa e stilistica il driver self-contained ormai
 qualificato.
 
@@ -688,7 +589,7 @@ Non riscrivere per gusto personale e non mutilare contenuto ancora corretto.
 
 **PRIMARY_ARTIFACT**
 
-Public documentation set finale.
+Public documentation set candidata, destinata a essere verificata end-to-end da P9.
 
 **RULES**
 
@@ -720,6 +621,117 @@ Public documentation set finale.
 - i claim `PROVEN`, `INFERRED` e support scope coincidono con le evidenze;
 - link e document index sono validi;
 - nessun contenuto tecnico attuale è stato perso senza ragione.
+
+**NEXT**
+
+P9.
+
+---
+
+## P9 — Clean-VM user lifecycle and release-candidate closure
+
+**PURPOSE**
+
+Qualificare come ultimo passaggio la release candidate dal punto di vista di un normale
+utente Fedora, usando una VM Fedora 44 KDE pulita e il reader fisico presente
+per l'intera sequenza.
+
+P9 non è una matrice esaustiva di combinazioni artificiali: deve verificare in
+ordine il lifecycle realmente documentato e utilizzabile dall'utente, senza
+ripetere P8 e senza introdurre scenari non necessari.
+
+La prova deve seguire alla lettera le istruzioni pubbliche della release candidate
+come risultano dopo P10 e P11. Non sostituire i comandi documentati con scorciatoie,
+comandi di sviluppo o procedure ad hoc: eventuali failure di istruzioni, riferimenti,
+sequenza o aspettative documentate sono failure reali della candidate e vanno corrette
+prima di riprendere P9.
+
+**PRIMARY_ARTIFACT**
+
+Bounded clean-VM user-lifecycle evidence per installazione, uso, update,
+rimozione normale, reinstallazione e rimozione di emergenza.
+
+**TEST ENVIRONMENT**
+
+- VM Fedora 44 KDE x86_64 pulita;
+- SELinux Enforcing e stack Fedora stock;
+- nessuna precedente installazione del progetto;
+- nessun legacy five-file Windows material bundle;
+- reader Goodix 27c6:5125 presente tramite USB passthrough dall'inizio alla
+  fine della sequenza;
+- test eseguiti sulla release candidate del branch operativo corrente;
+- installazione, update, uso e rimozione eseguiti seguendo le istruzioni ufficiali
+  del repository così come risultano dopo P10 e P11.
+
+**TEST SEQUENCE**
+
+Eseguire in questo ordine e fermarsi alla prima failure non spiegata:
+
+1. **Installazione canonica**
+   - seguire alla lettera la procedura di installazione pubblicata nel repository
+     sulla VM pulita con reader presente;
+   - la fresh install deve completarsi senza Windows Material Builder e senza
+     legacy material bundle.
+
+2. **Uso reale**
+   - usare il lettore tramite lo stock stack Fedora/KDE per confermare che la
+     fresh install produce un sistema biometrico realmente operativo;
+   - non ripetere l'intera qualificazione P8: basta un uso ordinario
+     rappresentativo e conclusivo.
+
+3. **Update canonico**
+   - seguire alla lettera la procedura di update pubblicata nel repository sulla installazione
+     funzionante, sempre con reader presente;
+   - l'update deve completarsi senza compromettere lo stato operativo,
+     password o desktop.
+
+4. **Disinstallazione canonica normale**
+   - seguire alla lettera la procedura di disinstallazione normale pubblicata nel
+     repository, incluso `goodix-uninstall` da una normale sessione desktop;
+   - la rimozione deve togliere il progetto dal critical authentication path
+     preservando state-v2 e fingerprint templates e senza scrivere sul reader.
+
+5. **Reinstallazione canonica**
+   - seguire alla lettera la procedura pubblicata per reinstallare dopo la rimozione precedente,
+     sempre con reader presente;
+   - la reinstallazione deve riutilizzare correttamente lo stato preservato e
+     non deve richiedere il legacy material bundle.
+
+6. **Disinstallazione di emergenza da TTY**
+   - seguire alla lettera il percorso TTY documentato nel repository ed eseguire
+     `goodix-force-remove`;
+   - la rimozione deve completarsi con il reader presente, preservare
+     state-v2 e fingerprint templates, non scrivere sul reader e lasciare
+     password/desktop recuperabili secondo il normale percorso Fedora.
+
+Non aggiungere a P9 una matrice reader-presente/reader-assente, rollback verso
+uno schema precedente, migration matrix separata o prove artificiali
+preserve/purge: non fanno parte di questa qualificazione lineare salvo che una
+failure reale renda necessaria un'analisi specifica.
+
+**EXIT_GATE**
+
+`SELF_CONTAINED_RELEASE_CANDIDATE=PASS` solo se l'intera sequenza precedente
+è PASS e:
+
+- la fresh install su VM pulita funziona senza Windows Material Builder,
+  USBPcap, DPAPI recovery o five-file material bundle;
+- il normale uso biometrico funziona dopo la fresh install;
+- il percorso update funziona con reader presente;
+- `goodix-uninstall` funziona con reader presente e non provoca writer sul
+  reader;
+- la reinstallazione dopo rimozione normale funziona usando lo stato
+  preservato;
+- `goodix-force-remove` da TTY funziona con reader presente e non provoca
+  writer sul reader;
+- state-v2 e fingerprint templates restano preservati attraverso entrambe le
+  rimozioni;
+- password e desktop restano disponibili e recuperabili lungo l'intero
+  lifecycle;
+- nessun lifecycle operation introduce firmware/IAP/ClearApp/OTP/factory-data
+  write o altra mutazione persistente inattesa del reader;
+- la documentazione ufficiale risultante da P11 è sufficiente e corretta per
+  completare l'intero lifecycle senza conoscenza privata o istruzioni aggiuntive.
 
 **NEXT**
 
