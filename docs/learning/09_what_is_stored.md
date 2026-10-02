@@ -16,7 +16,7 @@ root-only host directory.
 
 | Kind | Where it lives | What it is for | Project behavior |
 | --- | --- | --- | --- |
-| Factory and persistent reader state | Inside the sensor | Device identity, firmware, existing secure setup, calibration/factory state | Preserved; the supported path does not reprogram it |
+| Factory and persistent reader state | Inside the sensor | Device identity, firmware, existing secure setup, calibration/factory state | Preserved; the supported path does not reprogram it and adds only one bounded host-pairing record |
 | Host pairing state | Host: `/var/lib/fprint/goodix-5125-state-v2/` | The locally generated Linux pairing key and its authenticated receipts | Created on first use; root-only; preserved during removal |
 | Optional legacy device material | Host: `/var/lib/goodix-5125-poc/` | Compatibility input for the legacy path | Imported only when you supply a bundle; read from a root-only directory; preserved during removal |
 | Enrolled fingerprint templates | Host: `/var/lib/fprint/` | Stores user/finger metadata and SIGFM feature samples for later matching | Managed by Fedora `fprintd`; preserved during project removal |

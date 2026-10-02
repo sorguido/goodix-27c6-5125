@@ -68,7 +68,7 @@ device-specific arrangement.
 material before the conversation begins. In this project, the host acts as the
 TLS server and the reader acts as the client.
 
-The important safety point is what the project does **not** do:
+The important safety point is where the boundary sits:
 
 ```text
 factory key and factory data left untouched ✓

@@ -47,8 +47,8 @@ through the separately bounded activation graph, which refuses a second write fo
 the same transaction and fails closed on an ambiguous post-write state.
 
 Fingerprint images are processed in memory. Fedora fprintd stores enrolled
-templates in `/var/lib/fprint/`. Removal preserves templates and device material;
-it does not export or purge them. Manage enrolled fingers using KDE or fprintd,
+templates in `/var/lib/fprint/`. Removal preserves templates, host pairing state
+and any legacy device material; it does not export or purge them. Manage enrolled fingers using KDE or fprintd,
 including before deleting an account where cleanup is needed. This architecture
 does not install an account-deletion hook or promise automatic template deletion.
 
