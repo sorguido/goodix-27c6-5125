@@ -557,19 +557,35 @@ OBSOLETE
 - si controlla esplicitamente se materiale git-ignored oggi contiene invece
   codice o documentazione che deve essere pubblicata;
 - il diff `development -> main candidate` non contiene materiale estraneo;
-- tutti i file canonici di gestione/orchestrazione presenti nella root restano
-  nella root locale, sono coperti da `.gitignore` e non risultano più tracked
-  nella main-candidate;
+- i soli file canonici di gestione/orchestrazione root elencati qui sotto
+  (`AGENTS.md`, `START.md`, `ROADMAP.md`, `PROJECT_STATE.json`,
+  `ARTIFACT_INDEX.json`) restano nella root locale, sono coperti da `.gitignore`
+  e non risultano più tracked nella main-candidate;
 - se materiale sensibile/nonredistribuibile è già presente nella storia Git,
   non si riscrive la history autonomamente: si termina con un Human Gate
   specifico per la bonifica della history.
 
-I file canonici di gestione e orchestrazione presenti nella root del workspace,
-inclusi `AGENTS.md`, `START.md` e tutti gli altri file root con la stessa funzione
-canonica, devono restare fisicamente dove sono. P9 deve aggiungerli a `.gitignore`
-e rimuoverli dal main-candidate tracking senza spostarli, cancellarli o raccoglierli
-sotto `development/`. Devono restare disponibili nella root locale per la governance
-e l'orchestrazione successive, ma non devono essere pubblicati nel futuro `main`.
+I file canonici di gestione/orchestrazione root da trattare in questo modo sono
+**esclusivamente**:
+
+```text
+AGENTS.md
+START.md
+ROADMAP.md
+PROJECT_STATE.json
+ARTIFACT_INDEX.json
+```
+
+P9 deve lasciare tutti e cinque fisicamente nella root del workspace, aggiungerli
+a `.gitignore` e rimuoverli dal main-candidate tracking senza spostarli,
+cancellarli o raccoglierli sotto `development/`. Devono restare disponibili
+nella root locale per la governance, l'orchestrazione, la state cache e il routing
+degli artefatti nelle fasi successive, ma non devono essere pubblicati nel futuro
+`main`.
+
+Non estendere questo elenco per analogia o interpretazione ad altri file della root.
+Qualunque ulteriore file candidato a essere trattato come governance/orchestrazione
+richiede una decisione esplicita dell'Utente.
 
 **STOP_IF**
 
