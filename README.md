@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Goodix 27c6:5125 for Fedora KDE
 
-A userspace fingerprint driver for the Goodix USB reader `27c6:5125` running
+Fingerprint driver for the Goodix USB reader `27c6:5125` running
 `GF_ST411SEC_APP_12509`. It connects a Goodix-enabled libfprint library to Fedora's
 fprintd service and desktop authentication, initializing the reader by itself on
 first use while preserving factory firmware and factory data.
