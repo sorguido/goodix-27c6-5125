@@ -14,7 +14,7 @@ behavior. Original copyright notices are retained.
 
 ## Development tools
 
-OpenAI AI tools assisted analysis, implementation, testing, documentation and
+OpenAI AI and Qwen models assisted analysis, implementation, testing, documentation and
 review. Human contributors retain responsibility for design decisions, hardware
 validation and release approval. [Upstream references](docs/REFERENCES.md)
 identify the source projects separately from those development tools.
