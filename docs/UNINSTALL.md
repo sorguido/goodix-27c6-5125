@@ -57,7 +57,6 @@ assume that cleanup completed.
 | `/usr/local/lib64/goodix-plasma-login/` | Removes the selector and installation metadata |
 | `/etc/systemd/system/fprintd.service.d/90-goodix-5125-runtime.conf` | Removes the private library environment and reloads service configuration |
 | `/usr/local/lib64/goodix-27c6-5125/` | Removes private libfprint/OpenCV, links, notices and installation metadata |
-| Exact project material SELinux mapping | Removes an owned mapping and reapplies current policy labels to explicit material paths |
 | Project-owned SELinux huge-page `dontaudit` module | Removes the project module and restores Fedora's normal audit visibility |
 | `/usr/local/bin/goodix-uninstall`, `/usr/local/bin/goodix-force-remove`, `/usr/local/share/goodix-recovery/` | Removes recovery tools last after successful cleanup |
 
@@ -76,18 +75,15 @@ this same command while password and administrative access remain available.
 Both commands preserve:
 
 - `/var/lib/fprint/goodix-5125-state-v2/` and its host pairing state;
-- `/var/lib/goodix-5125-poc/` and its five protected material files, when that
-  legacy source is in use;
 - fingerprint templates under `/var/lib/fprint/`;
 - firmware, factory data and the reader's current pairing; neither command writes
   to the reader;
-- your staging directory and source clone.
+- your source clone.
 
-Material labels can return to the current Fedora policy; material contents,
-Unix ownership and permissions remain unchanged. Template contents and labels
-are not modified. Normal removal preserves a compatible mapping recorded as
-pre-existing. Emergency removal removes only the exact known project mapping,
-even without its receipt; unrelated SELinux rules are untouched.
+Preserved directory contents, Unix ownership and permissions remain unchanged;
+SELinux labels return to the current Fedora policy. Template contents and labels
+are not modified. Emergency removal deletes only the exact known project SELinux
+module, even without its receipt; unrelated SELinux rules are untouched.
 
 Report the result, exact error, failure point and whether password login and the
 desktop work. Do not send protected files, templates or fingerprint images.

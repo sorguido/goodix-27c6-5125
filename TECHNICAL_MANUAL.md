@@ -19,7 +19,7 @@ manual when reviewing, maintaining, or diagnosing the design.
 2. [Hardware and device identity](#2-hardware-and-device-identity)
 3. [System architecture and ownership](#3-system-architecture-and-ownership)
 4. [libfprint driver architecture](#4-libfprint-driver-architecture)
-5. [Protected device material and secure transport](#5-protected-device-material-and-secure-transport)
+5. [Host pairing state and secure transport](#5-host-pairing-state-and-secure-transport)
 6. [Device initialization and secure-session lifecycle](#6-device-initialization-and-secure-session-lifecycle)
 7. [Finger detection, capture, release, and cancellation](#7-finger-detection-capture-release-and-cancellation)
 8. [Image decoding and preprocessing](#8-image-decoding-and-preprocessing)
@@ -72,8 +72,7 @@ The driver registers only USB vendor/product ID `27c6:5125`; discovery itself is
 based on that ID. Opening the device is inert. A biometric activation claims the
 USB interface and proceeds only after the bounded read-only preflight has
 confirmed the supported `GF_ST411SEC_APP_12509` identity and target binding, and
-has either selected validated legacy material or established the state-v2
-pairing source.
+has established the host pairing state the secure session will rely on.
 
 Interface 0 supplies the bulk transport used by the implementation:
 
@@ -211,7 +210,7 @@ owns the resources that must agree about an action:
 
 | Context member | Role |
 | --- | --- |
-| Runtime material view | Validated target identity, transport material, configuration, and FDT data, from legacy material or state-v2 pairing |
+| Runtime state view | Validated target identity, transport material, configuration, and FDT data derived from host pairing state |
 | USB backend | Bounded asynchronous bulk transfers on interface 0 |
 | Frame router | Sole owner of physical bulk-IN reception and A0/B0 demultiplexing |
 | Secure-session machine | Ordered pre-TLS bootstrap and response validation |
@@ -223,9 +222,9 @@ owns the resources that must agree about an action:
 ### 4.1 Open and close boundary
 
 Opening the libfprint device only allocates the context. It deliberately reads no
-protected material, claims no USB interface and submits no USB traffic, so
+host pairing state, claims no USB interface and submits no USB traffic, so
 enumeration, discovery, boot and an uninitialized login cannot reach the reader.
-Activation is the boundary that selects the runtime material source, claims USB
+Activation is the boundary that selects the runtime state source, claims USB
 interface 0, and starts receive synchronization and the secure reader
 preparation for an enroll, verify, or identify action.
 
@@ -257,62 +256,63 @@ not prove that the reader cannot still emit old bytes. A bounded quiet-IN
 synchronization therefore precedes every new secure session. If a clean boundary
 cannot be proven, the context is poisoned and must be closed rather than reused.
 
-## 5. Protected device material and secure transport
+## 5. Host pairing state and secure transport
 
-The legacy compatibility path cannot invent the target's existing PSK or
-factory-derived runtime data. When that path is used, the user supplies exactly
-five protected files from a lawfully available compatible environment. They stay
-outside the source tree and are imported into `/var/lib/goodix-5125-poc/` as
-root-owned, root-only material. A fresh host installation may instead omit this
-bundle and prepare the separate state-v2 location; installation itself performs
-no reader access or pairing.
+The driver is self-contained. It needs no externally supplied reader secret,
+configuration file or calibration cache: everything the secure session requires is
+either read from the reader during a bounded read-only preflight or derived
+locally from that evidence. Installation performs no reader access and no
+pairing; the host pairing state directory is created empty and root-only.
 
-| File | Technical role | Security treatment |
+Three pure, side-effect-free boundaries supply the session inputs:
+
+| Boundary | Input | Output and rejection rule |
 | --- | --- | --- |
-| `target-material-manifest.json` | Declares the schema, USB/application target, and digests binding all material and selected live responses | Bounded ASCII JSON; exact schema and fields required |
-| `transport-material.bin` | Carries the existing TLS PSK and compatibility validator in a versioned envelope | Secret; never generated, printed, or distributed by the project |
-| `target-config-90.bin` | Supplies the validated 224-byte runtime configuration record | Length, structure, finalizer, and manifest binding checked |
-| `gfusb.dll` | Provides a qualified OEM compatibility data source | Parsed as inert bounded data; never loaded or executed |
-| `fdt-cache.bin` | Supplies the validated FDT seed/cache associated with the target | Length, CRC, manifest binding, and live reader binding checked |
+| Pairing crypto | The 32-byte Linux PSK | The 102-byte `BB010003` envelope and its 32-byte `BB020003` SHA-256 validator. Fixed APP12509 profile; no USB or persistence surface |
+| CONFIG90 derivation | `chip_id` plus a strict 64-byte OTP record | The complete 224-byte ChicagoHS type-12 configuration plus the calibration record it applied. Rejects unknown chip profiles, OTP CRC failures and ambiguous calibration fields |
+| `BB010002` validator | The live 332-byte record | Structural acceptance of the common DPAPI-shaped layout. Treats the protected regions as opaque; neither decrypts nor synthesizes them |
 
-The source tree also contains a pure fixed-profile APP12509 derivation for the
-102-byte `BB010003` envelope and its 32-byte `BB020003` SHA-256 validator. Its
-offline contract matches the five non-circular D190 OEM-oracle known answers
-and the qualified complete-envelope vector. It has no USB or persistence
-surface. A second pure boundary derives the complete 224-byte ChicagoHS
-type-12 CONFIG90 from a strict 64-byte OTP record and rejects unknown chips,
-CRC failures and ambiguous calibration fields. Its output is byte-identical to
-the qualified target configuration. A separate validator accepts the common
-332-byte DPAPI structure of the available legitimate `BB010002` values while
-treating their protected regions as opaque; it neither decrypts nor synthesizes
-them. The production runtime enters the read-only coordinator only after an
-explicit libfprint action. Enumeration, ordinary open, installer, boot and an
-uninitialized login do not load material or claim USB. The coordinator may select
-an installed legacy owner or a matching state-v2 generation; every biometric
+The 224-byte configuration record ends with a little-endian 16-bit finalizer.
+Interpreting the first 222 bytes as 111 little-endian 16-bit words:
+
+```text
+finalizer = (-0xa5a5 - (word[0] + ... + word[110])) mod 65536
+```
+
+The OTP record is accepted only after three independent CRC-8 group checks, each
+using polynomial `0x07`, no reflection and an inverted result, over a fixed
+selection of record bytes and compared against the stored byte at offset `60`,
+`61` and `63` respectively. The derivation output is byte-identical to the
+qualified target configuration.
+
+The production runtime enters the read-only coordinator only after an explicit
+libfprint action. Enumeration, ordinary open, installer, boot and an
+uninitialized login do not load state or claim USB. The coordinator selects the
+matching host pairing generation when one is already usable; every biometric
 capture action then runs the bounded read-only preflight, which derives CONFIG90,
-constructs the full target binding and confirms which source the secure session
-may rely on. An action that has neither validated material nor a coordinator
-decision requiring that preflight fails closed before USB claim. If neither the
-live validator nor the host state can establish an already-active Linux pairing,
-the production activation boundary reserves and executes one qualified pairing
+constructs the full target binding and confirms what the secure session may rely
+on. An action that has neither usable host state nor a coordinator decision
+requiring that preflight fails closed before USB claim. If neither the live
+validator nor the host state can establish an already-active Linux pairing, the
+production activation boundary reserves and executes one qualified pairing
 transaction.
 
 The bounded read-only preflight applies to every biometric capture action:
 enroll, identify (including the identify that stock fprintd uses as its
-enrollment duplicate check) and verify. State-v2 selection is bound to target
+enrollment duplicate check) and verify. Host pairing selection is bound to target
 evidence that only the preflight can reconstruct.
 It validates the target, reads `BB010002` and the current `BB020003` validator,
 and derives CONFIG90 before the strict secure session is allowed to rely on
-legacy pairing state. A structurally valid `BB020003` record whose 32-byte value
+stored pairing state. A structurally valid `BB020003` record whose 32-byte value
 differs from the expected validator is a pairing-state mismatch, not a malformed
-typed response. A matching legacy validator continues with the legacy owner;
-an authorized mismatch transfers ownership to the state-v2 activation graph.
-This pre-material graph and the material-driven secure-session graph share the
+typed response. A matching validator continues with the stored pairing;
+an authorized mismatch transfers ownership to the activation graph.
+This pre-session graph and the secure-session graph share the
 same bounded USB router and canonical A0 codec. They remain separate state
 machines because the secure-session graph requires an already selected
 PSK/validator/configuration and proceeds into runtime configuration and TLS,
-whereas the preflight gathers the evidence needed either to select existing
-material or to construct a fully bound pairing transaction.
+whereas the preflight gathers the evidence needed either to select stored pairing
+state or to construct a fully bound pairing transaction.
 
 The activation graph generates a local CSPRNG PSK only for an absent state, or
 reuses the existing Linux PSK after a proven external replacement. Before an E0
@@ -330,7 +330,7 @@ instead of being written; the driver never synthesizes a `BB010002`, never uses
 a null or dummy PSK, and never exports the Linux PSK to another operating
 system.
 
-The host-only state-v2 boundary uses two fixed-size generations. Each generation
+The host pairing store uses two fixed-size generations. Each generation
 contains a 32-byte PSK record and a receipt authenticated by that PSK. The
 receipt binds VID:PID, exact application, chip profile, OTP digest and CONFIG90
 digest. Pairing-generated receipts also bind the SHA-256 digest of the preserved
@@ -345,53 +345,22 @@ interrupted pairing attempt, reconciliation compares the live validator and,
 when present, the journaled `BB010002` digest with the candidate and optional
 prior validator. A candidate match retries TLS without E0, a prior match after a
 reserved transaction requires explicit recovery, and any other result requires
-recovery. It never authorizes a speculative second pairing write. Legacy import is
-side-by-side and records the source digest without changing or removing the old
-bundle. The production coordinator can select an ACTIVE match or a PREPARED
+recovery. It never authorizes a speculative second pairing write. The production
+coordinator can select an ACTIVE match or a PREPARED
 candidate for TLS retry and can perform the host-only ACTIVE promotion after
 TLS proof. The coordinator itself exposes no pairing write. Ordinary ACTIVE
 reopen uses the journaled Linux PSK with zero E0. Prior-generation and ambiguous
 recovery results fail closed; a proven external replacement is handled only by
 the separately bounded activation graph.
 
-The manifest binds the bundle to `27c6:5125`, the supported application, the
-other four files, and target responses used during initialization. File names,
-types, modes, ownership, hard-link count, sizes, formats, and digests are checked
-before import. The native runtime loader repeats the security-critical content
-checks. Symlinks, extra files, writable-by-others inputs, malformed structures,
-and a bundle belonging to another target fail closed.
-
-The installed directory is mode `0700`; its regular files are root-owned mode
-`0600`. Import uses no-replace semantics. An already installed valid bundle is the
-canonical source for ordinary updates and reinstalls. An explicit external bundle
-is accepted only when byte-identical to that set; an install is not an
-implicit mechanism for swapping one reader's secrets for another's.
-
-See [Device materials](docs/DEVICE_MATERIALS.md) for the complete public
-contract and acquisition boundary. Do not attach these files, their contents,
-raw USB captures, or derived secrets to a bug report.
-
-When the optional legacy bundle is used, the
-[Windows Material Builder](tools/windows_material_builder/README.md) is the
-supported acquisition path for creating it inside
-the reader's qualified Windows VM. That VM uses USB passthrough, the qualified
-Goodix OEM driver, and the original Windows user/DPAPI context. The builder
-validates the captured reader/application identity and required material,
-recovers the existing PSK through Windows DPAPI, verifies same-reader bindings,
-builds the canonical bundle, and validates all five files before publication.
-
-The Linux installer independently validates the bundle before import. The
-canonical material contract and acquisition boundary remain defined in
-[Device materials](docs/DEVICE_MATERIALS.md); implementation details of the
-Windows acquisition tool are documented in the
-[builder audit](tools/windows_material_builder/AUDIT.md).
+Do not attach the host pairing state directory, its contents, raw USB captures,
+or derived secrets to a bug report.
 
 ### 5.1 TLS roles and boundaries
 
 The reader is the TLS client and the host driver is the TLS server. The session
-uses TLS 1.2 with the PSK bound to the current pairing: the stored Linux PSK on
-the self-contained path, or the PSK carried by legacy bundle material when that
-source is selected. OpenSSL runs over memory BIOs; TLS
+uses TLS 1.2 with the Linux PSK held in the host pairing state. OpenSSL runs over
+memory BIOs; TLS
 records are carried inside the validated B0 transport rather than on a socket.
 The implementation pins `PSK-AES128-GCM-SHA256` (TLS codepoint `0x00A8`),
 disables session tickets, and requires the exact client identity
@@ -407,8 +376,8 @@ The implementation:
 - fails closed rather than downgrading or manufacturing replacement material.
 
 The pre-TLS compatibility validator and the PSK have different roles. A valid
-compatibility response does not reveal or replace the secret, and the OEM DLL is
-not treated as the unique identity of a physical reader.
+compatibility response does not reveal or replace the secret, and no externally
+supplied file is treated as the unique identity of a physical reader.
 
 ## 6. Device initialization and secure-session lifecycle
 
@@ -481,7 +450,7 @@ The secure bootstrap is a strict phase machine. Its durable responsibilities are
 
 The bounded read-only preflight and, when no active Linux pairing exists, the
 single pairing transaction run before this bootstrap and are described in
-[Protected device material and secure transport](#5-protected-device-material-and-secure-transport).
+[Host pairing state and secure transport](#5-host-pairing-state-and-secure-transport).
 
 The current phase order is:
 
@@ -528,8 +497,8 @@ changes the expected outer class directly to B0/TLS.
 target-bound response, not a claim that the value is an immutable chip ID.
 During discovery, bytes 1 and 2 encode the supported little-endian chip
 profile (`0x2503` or `0x2504`); bytes 0 and 3 remain opaque and are preserved.
-The legacy-material path subsequently checks the digest of all four bytes, so
-discovery must not invent fixed values for the two opaque coordinates.
+The host pairing receipt binds the 16-bit chip profile, while bytes 0 and 3 stay
+opaque, so discovery must not invent fixed values for those two coordinates.
 `OTP_A6` is a read and check of a 64-byte factory/OTP-related response; it does
 not write OTP. The four DAC phases apply the validated runtime values for
 registers `0x0220`, `0x0236`, `0x0238`, and `0x023A`, and `CONFIG_90` sends the
@@ -580,12 +549,11 @@ state persistence. A reserved touch bit, a touch bit in the second or third
 reading, malformed or duplicate frames, timeout, or temperature/drift
 classification failure terminate the attempt and clear that candidate. The
 decoded image baseline remains action-local and is never part
-of the persistence interface. Legacy activation marks its imported seed as
-supplied. State-v2 activation uses the authenticated 12-byte table when present
-and represents an absent table as a zero seed. The explicit missing-seed
-lifecycle is qualified on the target, so FDT initialization needs no imported
-cache file; each action learns its own table and the learned table is not
-carried across actions.
+of the persistence interface. Host pairing activation uses the authenticated
+12-byte table when present and represents an absent table as a zero seed. The
+explicit missing-seed lifecycle is qualified on the target, so FDT initialization
+needs no imported cache; each action learns its own table and the learned table
+is not carried across actions.
 
 ### 6.4 FDT table derivation and arming
 
@@ -1003,12 +971,11 @@ should not be described as three automatic consecutive 30-second waits.
 
 ## 11. Templates, storage, and multi-user behavior
 
-Protected reader material and biometric templates are different data classes:
+Host pairing state and biometric templates are different data classes:
 
 | Data | Scope | Owner | Location | Removed by project removal? |
 | --- | --- | --- | --- | --- |
-| Reader material | System-wide, target-bound | Project runtime/root | `/var/lib/goodix-5125-poc/` | No |
-| State-v2 pairing state | System-wide, target-bound | Project runtime/root | `/var/lib/fprint/goodix-5125-state-v2/` | No |
+| Host pairing state | System-wide, target-bound | Project runtime/root | `/var/lib/fprint/goodix-5125-state-v2/` | No |
 | Biometric template | Per local username/finger | Fedora `fprintd` | `/var/lib/fprint/` | No |
 | Raw image | One in-memory action | Driver process | Not intentionally persisted | Not applicable |
 
@@ -1148,12 +1115,17 @@ fingerprint login.
 
 ## 14. SELinux and host integration
 
-SELinux remains Enforcing. The installation has two narrow SELinux effects:
+SELinux remains Enforcing. The installation adds one narrow SELinux effect:
 
 | Effect | Purpose | Security boundary |
 | --- | --- | --- |
-| Exact local file-context mapping for `/var/lib/goodix-5125-poc(/.*)?` | Let `fprintd_t` read validated protected material with the Fedora `fprintd_var_lib_t` type | Ownership is recorded; unrelated mappings are not changed |
 | Installer-generated priority-400 module `goodix_5125_hugepage` | Suppress the known denied oneTBB read probe of `nr_hugepages` | `dontaudit` only; grants no read permission |
+
+The host pairing state directory needs no project file-context mapping. It lives
+under `/var/lib/fprint/`, so the installer labels it with `restorecon` and then
+requires the resulting context to be exactly
+`system_u:object_r:fprintd_var_lib_t:s0`, the Fedora type `fprintd_t` may already
+read.
 
 The module generated by this installer contains the narrow
 type/class/permission relationship
@@ -1214,25 +1186,25 @@ claim of a byte-reproducible build or an exhaustive software bill of materials.
 
 `install.sh` is the public entry point. It must be run by a normal user, resolves
 its own source directory, and invokes the build/install orchestrator. A read-only
-privileged material preflight precedes package installation. The build runs as the
-normal user, then a privileged apply phase revalidates material and replaces the
-project-owned integration. Protected bytes never enter the clone or build output;
-installed material is never copied back to Home. The package-manager step also
+privileged host preflight precedes package installation. The build runs as the
+normal user, then a privileged apply phase revalidates host state and replaces the
+project-owned integration. No secret byte enters the clone or build output, and no
+phase opens USB. The package-manager step also
 uses sudo to install Fedora prerequisites.
 
 ```mermaid
 flowchart TD
-    Material["Privileged read-only material selection"] --> Packages["Fedora prerequisites"]
+    Material["Privileged read-only host state check"] --> Packages["Fedora prerequisites"]
     Packages --> Build["Normal-user source build<br/>and validation checks"]
     Build --> Preflight["Privileged host and authentication preflight"]
-    Preflight --> Existing["Validate selected material again;<br/>native binding check for installed set"]
+    Preflight --> Existing["Revalidate host state<br/>and pairing directory"]
     Existing --> Lock["Exclusive lifecycle lock"]
     Lock --> Quiet["Temporarily inhibit and quiesce fprintd"]
-    Quiet --> Recheck["Recheck material and software state"]
+    Quiet --> Recheck["Recheck host state and software"]
     Recheck --> Snapshot["Snapshot project-owned integration"]
     Snapshot --> Replace["If present, remove an existing<br/>valid project installation"]
     Replace --> Recovery["Install recovery tools<br/>and SELinux module"]
-    Recovery --> Native["Preserve installed set, or import new<br/>material with native binding check"]
+    Recovery --> Native["Create or preserve the root-only<br/>host pairing state directory"]
     Native --> Deploy["Labels, runtime, selector,<br/>PAM entry last"]
     Deploy --> Verify["Verify receipts and stopped service"]
     Verify --> ReleaseSuccess["Restore verified<br/>activation-mask state"]
@@ -1258,33 +1230,22 @@ Before project-owned integration mutation, the installer requires:
 - no unrecognized local fprintd drop-in or preload; and
 - either no project library setting or exactly the expected project setting.
 
-Material-source precedence is fixed:
+Host state handling is fixed:
 
-1. Any existing `/var/lib/goodix-5125-poc/` must pass installed-set validation:
-   root:root ownership, exact `0700`/`0600` permissions, directory/regular-file
-   types without links, exactly five files, manifest, hashes and cross-file bindings.
-   Valid installed material takes precedence over the default Home bundle, which
-   is not read. Missing files, corruption or metadata drift cause STOP without fallback.
-2. Only when installed legacy material and project software are absent does the
-   installer validate the normal user's `~/goodix-5125-materials/` (or explicit
-   `--materials`).
-3. If neither material source exists on a first install, the installer creates
-   `/var/lib/fprint/goodix-5125-state-v2/` as root-owned mode `0700` and records a
-   state-v2-only runtime. It does not open USB or initialize pairing. An older
-   installed runtime whose receipt still requires missing legacy material stops
-   for review; a state-v2-only runtime updates without a bundle.
+1. The installer creates `/var/lib/fprint/goodix-5125-state-v2/` as root-owned
+   mode `0700` when it is absent, labels it with `restorecon`, and verifies both
+   the resulting permissions and the exact SELinux context.
+2. An existing host pairing state directory is preserved unchanged. Install,
+   update and reinstall never open USB, initialize pairing, or rewrite it.
+3. The install receipt records the state root, so a later run distinguishes a
+   prepared installation from an absent one without touching the reader.
 
-The preliminary privileged check is read-only and repeats at apply time. A
-root-owned copy of the built native checker validates an installed set's E4
-binding without opening USB before the lifecycle transaction. The same bytes and
-metadata are revalidated under the lock before replacement. For first import,
-native validation runs on private root-owned staging inside the transaction before
-atomic publication; failure rolls back the software transaction. No installed set
-is recreated from a stale snapshot if it disappears during preparation.
+The preliminary privileged check is read-only and repeats at apply time. Host
+state metadata is revalidated under the lifecycle lock before replacement, and
+failure rolls back the software transaction. No preserved directory is recreated
+from a stale snapshot if it disappears during preparation.
 
 `--check` remains unprivileged and does not request sudo or install packages.
-When installed material exists, its output explicitly defers protected-content
-validation to the privileged phase; it does not claim that set is valid.
 The PAM selector
 separately checks the exact vendor, `password-auth`, and `postlogin` shapes at
 authentication time before it enables the fingerprint path.
@@ -1317,8 +1278,7 @@ normal cleanup.
 | --- | --- |
 | `/usr/local/lib64/goodix-27c6-5125/` | Private libfprint/OpenCV runtime, links, notices, and receipts |
 | `/etc/systemd/system/fprintd.service.d/90-goodix-5125-runtime.conf` | Private runtime environment for stock fprintd |
-| `/var/lib/goodix-5125-poc/` | Preserved root-only protected reader material |
-| `/var/lib/fprint/goodix-5125-state-v2/` | Preserved root-only crash-safe pairing state |
+| `/var/lib/fprint/goodix-5125-state-v2/` | Preserved root-only crash-safe host pairing state |
 | `/usr/local/lib64/goodix-plasma-login/` | PAM selector module and metadata |
 | `/etc/pam.d/plasmalogin` | Project-owned opt-in prefix and includes of current Fedora PAM |
 | `/usr/local/bin/goodix-uninstall` | Receipt-validating normal removal |
@@ -1330,31 +1290,28 @@ Plasma PAM entry is installed last, after runtime and removal paths are ready.
 Successful installation leaves fprintd stopped; the next normal consumer causes
 Fedora to activate it.
 
-### 16.4 Update and material retention
+### 16.4 Update and state retention
 
 The single documented bootstrap fast-forwards an existing clone or clones it
 again when absent, then runs the same installer. The installer reports
 `GOODIX_INSTALL_MODE` automatically:
 
-| Valid material source | Project software | Mode |
+| Project software | Host pairing state | Mode |
 | --- | --- | --- |
-| Installed set | Present and passing software preflight | `UPDATE` |
-| Installed set | Absent, including after normal or emergency removal | `REINSTALL` |
-| Home or explicit bundle; installed set absent | Absent | `FIRST_INSTALL` |
-| No legacy bundle; state-v2 prepared or initially empty | Absent | `FIRST_INSTALL` |
+| Present and passing software preflight | Prepared or initially empty | `UPDATE` |
+| Absent, including after normal or emergency removal | Prepared or initially empty | `FIRST_INSTALL` |
+
+The mode label describes the software transaction only. A reinstall after removal
+reuses the preserved host pairing state directory, so it does not re-pair the
+reader and requires no external file.
 
 A valid existing installation is removed and replaced transactionally while
-fprintd is quiescent. Existing templates are never part of replacement. The
-installed material retains its bytes and file paths; default Home material is
-ignored even if different. An explicit `--materials` bundle must validate and
-match the installed set byte-for-byte, or the operation stops. There is no implicit
-reader/bundle replacement.
+fprintd is quiescent. Existing templates and the host pairing state directory are
+never part of replacement: the reader identity is retained across the software
+transaction and there is no implicit reader re-pairing.
 
 The repository clone may be removed after successful installation; runtime and
-removal commands are independent of it. The Home staging copy is not technically
-required for ordinary updates or reinstalls with valid installed material.
-State-v2-only updates and reinstalls preserve their state directory. A separate
-secure backup remains necessary while the legacy compatibility source is used.
+removal commands are independent of it.
 
 ### 16.5 Rollback boundary
 
@@ -1370,8 +1327,8 @@ cleanup as incomplete and retains recovery commands, even if project software
 was already installed. That outcome is not an installation success.
 
 Rollback is not a host snapshot. It does not remove Fedora packages installed
-earlier by the package manager, undo unrelated host changes, or delete newly
-imported protected material. A missing final success marker or an
+earlier by the package manager, undo unrelated host changes, or delete preserved
+host pairing state. A missing final success marker or an
 `incomplete rollback` result is failure and requires recovery.
 
 ## 17. Removal and emergency recovery
@@ -1387,7 +1344,7 @@ integrity of the project installation.
 | Missing/partial files | Refuses unexplained drift | Tolerates absence and continues safely |
 | Clone/build directory needed | No | No |
 | Fedora vendor PAM shape needed | No | No |
-| Data preservation | State-v2, legacy material and templates preserved | State-v2, legacy material and templates preserved |
+| Data preservation | Host pairing state and templates preserved | Host pairing state and templates preserved |
 
 Both use the same safety order:
 
@@ -1408,18 +1365,15 @@ project-owned.
 Both commands preserve:
 
 - `/var/lib/fprint/goodix-5125-state-v2/` and its host pairing state;
-- `/var/lib/goodix-5125-poc/` and all five legacy material files, when present;
 - `/var/lib/fprint/` and enrolled templates;
-- staging files and the public clone;
+- the public clone;
 - firmware, factory data, the reader's current pairing, and other persistent
   reader state; neither command writes to the reader.
 
-The owned material file-context mapping can be removed and current Fedora labels
-reapplied without reading or changing file contents. Restart after successful
+Removal reapplies current Fedora labels to any project-owned file-context mapping
+without reading or changing file contents, and leaves unrelated SELinux rules
+untouched. Restart after successful
 removal so no old login or authentication process retains project code.
-Normal removal preserves a compatible mapping recorded as pre-existing;
-emergency removal deletes only the exact known project mapping and leaves
-unrelated SELinux rules untouched.
 
 Removal exposes the current Fedora configuration. It does not replay a saved PAM
 snapshot or repair an independently broken password stack. Emergency use still
@@ -1442,7 +1396,7 @@ capture. It excludes:
 - unknown command families used as speculative recovery.
 
 The one qualified exception is the host-pairing write defined in
-[Protected device material and secure transport](#5-protected-device-material-and-secure-transport).
+[Host pairing state and secure transport](#5-host-pairing-state-and-secure-transport).
 The driver may generate one local PSK and record it with exactly one logical
 `E0`, preserving the reader's current `BB010002` byte-for-byte and proving the
 result by readback and TLS. There is no automatic `E0` retry, ordinary same-OS
@@ -1459,15 +1413,14 @@ under every device failure.
 
 ### 18.2 Secret and biometric handling
 
-Protected material is outside the repository, held root-only, and never printed
-by the normal tools. Optional legacy bundle material lives in
-`/var/lib/goodix-5125-poc/`; the Linux pairing PSK and its authenticated receipt
-live in the two state-v2 generations under
-`/var/lib/fprint/goodix-5125-state-v2/`. The OEM DLL is parsed for bounded compatibility
-data and is never loaded as executable code. Selected project buffers—including
-the PSK/material transfer buffers and specific normalization wrapper buffers—are
-explicitly cleared at their lifetime boundary. This is not a claim that every
-project-owned image or feature allocation is overwritten before release.
+The Linux pairing PSK and its authenticated receipt are the only secret the
+project persists. They live in the two crash-safe generations under the root-only
+`/var/lib/fprint/goodix-5125-state-v2/`, are never printed by the normal tools,
+and never enter the repository, the clone or build output. Selected project
+buffers—including the PSK transfer buffers and specific normalization wrapper
+buffers—are explicitly cleared at their lifetime boundary. This is not a claim
+that every project-owned image or feature allocation is overwritten before
+release.
 
 Raw images are processed in memory and are not intentionally persisted.
 Templates are sensitive derivative biometric data stored by fprintd; they are
@@ -1507,7 +1460,6 @@ threat boundary.
 | Local-account qualification only | Network/LDAP/AD account behavior is not established |
 | No FAR/FRR study | Score 40 is not a universal biometric security calibration |
 | Unknown physical DPI/orientation/polarity | Do not label captures 500 DPI or promise a natural-facing or calibrated-polarity raster |
-| Legacy device material is optional | The five-file bundle is a compatibility source, not an installation prerequisite. When used, the Windows Material Builder creates it inside the reader's qualified Windows VM using USB passthrough, the qualified OEM driver and the original Windows user/DPAPI context; native or bare-metal Windows acquisition and cross-reader interchangeability are outside the qualified scope, and a different installed/staged bundle is not silently swapped |
 | One host-pairing write | The first qualifying fingerprint action may perform exactly one logical `E0`, and a Windows pairing replacement causes one qualified restore write. Same-OS reopens write nothing. Recovery from an interrupted post-`E0`/pre-ACTIVE transaction is offline-qualified only |
 | Secure preparation starts with the action | Allow roughly one second after Plasma fingerprint selection before contact |
 | Stock policy controls most consumers | Altered authselect/PAM may not offer fingerprints; the installer does not rewrite global policy |
@@ -1565,10 +1517,9 @@ Include the Fedora version, kernel version, USB identity, reader application if
 known, project revision, exact command or consumer, action being performed,
 first non-secret error, and whether password/desktop access still works.
 
-Do **not** share the state-v2 directory, the legacy material directory, manifest,
-transport material, OEM DLL, FDT cache, configuration payload, raw USB captures,
-fingerprint images, templates, core dumps containing them, or unredacted
-secret-bearing logs.
+Do **not** share the host pairing state directory, its receipts, configuration
+payload, raw USB captures, fingerprint images, templates, core dumps containing
+them, or unredacted secret-bearing logs.
 
 ### 20.3 A0 and enrollment recovery diagnostics
 
@@ -1618,7 +1569,7 @@ boundaries unless it explicitly redesigns and requalifies them:
 10. release/STOP/drain before clean reuse, with poison on uncertainty;
 11. stock fprintd/PAM/KDE ownership and working password fallback;
 12. service quiescence before runtime replacement or removal;
-13. preservation of protected material and fprintd templates; and
+13. preservation of host pairing state and fprintd templates; and
 14. no expansion of qualification claims without matching evidence.
 
 Changes must preserve the invariants above and remain within the qualification
@@ -1645,7 +1596,6 @@ Use these public references for further detail:
 - [Removal and emergency recovery](docs/UNINSTALL.md)
 - [Security and privacy](docs/SECURITY.md)
 - [Validation and limitations](docs/VALIDATION.md)
-- [Protected device-material contract](docs/DEVICE_MATERIALS.md)
 - [Licensing and provenance](docs/LICENSING_AND_PROVENANCE.md)
 - [External references](docs/REFERENCES.md)
 - [Build and validation checks](production/README.md)

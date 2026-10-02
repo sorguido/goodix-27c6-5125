@@ -21,44 +21,31 @@ Qualification is limited to the documented target and one reader; see
 ## Installation
 
 **[Install using the single copy-paste block](docs/INSTALLATION.md).** The root
-`install.sh` automatically selects first installation (`FIRST_INSTALL`), update
-(`UPDATE`) or reinstall (`REINSTALL`), builds the runtime from this source tree,
-and installs the login integration and removal commands. It requests normal
-sudo authentication when needed. The reader may be absent throughout these
-host lifecycle operations.
+`install.sh` automatically selects first installation (`FIRST_INSTALL`) or update
+(`UPDATE`), builds the runtime from this source tree, and installs the login
+integration and removal commands. It requests normal sudo authentication when
+needed. Installation does not access the reader, which may be connected or
+absent.
 
-You need a working password login and administrative access. A fresh installation
-needs no Windows machine, no capture tooling and no private material bundle: it
-creates the empty, root-only state-v2 location without opening USB, and the
-reader may be absent. Fedora prerequisites are included in the installation flow;
-separate build instructions are unnecessary. Git must be available to run the
-bootstrap block.
-
-An existing [five-file device-material bundle](docs/DEVICE_MATERIALS.md) remains
-an optional compatibility source. If you supply one, stage it in
-`$HOME/goodix-5125-materials/`, outside the clone. Its supported acquisition
-environment is a qualified Windows VM with USB passthrough, the qualified Goodix
-OEM driver, and the original Windows user/DPAPI context for that VM; the
-recommended tool is the
-[Goodix 5125 Material Builder](tools/windows_material_builder/README.md), and
-native or bare-metal Windows acquisition is outside the supported workflow. The
-manual acquisition reference remains available for audit and troubleshooting of
-the same VM workflow. The project does not distribute protected material.
+You need a working password login and administrative access. Nothing else has to
+be prepared: no Windows machine, no capture tooling, no private key material and
+no reader-specific file. The installer creates the empty, root-only host pairing
+state directory without opening USB. Fedora prerequisites are included in the
+installation flow; separate build instructions are unnecessary. Git must be
+available to run the bootstrap block.
 
 After a successful installation, the repository clone may be removed; a later run
-of the same bootstrap block clones it again automatically. Ordinary updates and
-reinstalls preserve `/var/lib/fprint/goodix-5125-state-v2/` and any validated
-legacy set in `/var/lib/goodix-5125-poc/`, so the Home staging folder is not
-technically required. Keep an independent secure backup of a legacy bundle while
-that compatibility source is in use.
+of the same bootstrap block clones it again automatically. Updates and
+reinstalls preserve `/var/lib/fprint/goodix-5125-state-v2/`, so ordinary
+reinstallation reuses the existing pairing and does not write to the reader.
 
 ## Using fingerprint authentication
 
 The first fingerprint action initializes the reader by itself. It confirms the
 target identity, derives the configuration from the reader's own OTP, stores a
-locally generated pairing key in root-only state-v2 and records it with a single
-bounded pairing write. Ordinary later use reuses that stored key and writes
-nothing to the reader.
+locally generated pairing key in root-only host pairing state and records it with
+a single bounded pairing write. Ordinary later use reuses that stored key and
+writes nothing to the reader.
 
 Manage enrolled fingers through KDE's fingerprint settings. At Plasma Login,
 a nonempty password uses ordinary password login immediately. Submitting an
@@ -84,26 +71,25 @@ the technical manual remains the canonical specification.
 Run **`goodix-uninstall`** from a working desktop terminal. If graphical login
 is unavailable, follow the [text-console emergency instructions](docs/UNINSTALL.md)
 and run **`goodix-force-remove`**. Both commands request their own sudo
-authentication, preserve pairing state, materials and templates, and work after
+authentication, preserve host pairing state and templates, and work after
 the clone is removed. Removal does not access the reader, which may stay
 connected or be absent.
 
 Removal exposes current Fedora configuration and finishes with a normal restart
 instruction. It cannot repair an independently broken Fedora authentication stack.
 
-## Device material and security
+## Pairing state and security
 
-The installer always creates or preserves root-only state-v2 under
-`/var/lib/fprint/goodix-5125-state-v2/`. If a legacy bundle is supplied, it is
-copied into `/var/lib/goodix-5125-poc/`, protected and retained side by side.
-Subsequent runs validate and preserve an installed legacy set; invalid
-installed material stops the operation without falling back to a Home copy. Keep materials,
-fingerprint images, templates and raw USB captures out of source trees and
-issue reports. [Security and privacy](docs/SECURITY.md) describes the boundary.
+The installer always creates or preserves root-only host pairing state under
+`/var/lib/fprint/goodix-5125-state-v2/`. It holds the locally generated Linux
+pairing key and its authenticated receipts in two crash-safe generations. Keep
+that directory, fingerprint images, templates and raw USB captures out of source
+trees and issue reports. [Security and privacy](docs/SECURITY.md) describes the
+boundary.
 
 Discovery, enumeration, ordinary open, boot and an uninitialized login read no
-protected material and claim no USB; only an explicit fingerprint action does,
-and it runs a bounded read-only preflight before the secure session starts.
+pairing state and claim no USB; only an explicit fingerprint action does, and it
+runs a bounded read-only preflight before the secure session starts.
 
 The supported path never flashes firmware, replaces the reader application,
 writes OTP or factory data, or persistently changes VID:PID or mode. Its single
@@ -120,7 +106,6 @@ VM/OEM configurations, and broader hardware remains outside the qualified scope.
 - [Installation and updates](docs/INSTALLATION.md)
 - [Uninstall and emergency recovery](docs/UNINSTALL.md)
 - [Technical architecture](TECHNICAL_MANUAL.md)
-- [Device-specific material contract](docs/DEVICE_MATERIALS.md)
 - [Security and privacy](docs/SECURITY.md)
 - [Validation scope and known limitations](docs/VALIDATION.md)
 - [Licensing and provenance](docs/LICENSING_AND_PROVENANCE.md)

@@ -7,7 +7,7 @@ This directory contains the target-specific source used by the
 - asynchronous USB routing and transfer ownership;
 - TLS 1.2 PSK server and secure-session state;
 - bounded read-only target preflight and CONFIG90 derivation;
-- self-contained host pairing, crash-safe state-v2 and legacy-material binding;
+- self-contained host pairing and crash-safe persistent pairing state;
 - image record decoding and preprocessing;
 - enrollment, template, matching, and action integration;
 - cancellation, terminal events, cleanup, and bounded retries.

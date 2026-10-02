@@ -9,13 +9,6 @@ __pycache__/
 *.tmp
 *~
 
-# Windows Material Builder local Python environments/build output.
-/tools/windows_material_builder/.venv/
-/tools/windows_material_builder/venv/
-/tools/windows_material_builder/build/
-/tools/windows_material_builder/dist/
-/tools/windows_material_builder/*.egg-info/
-
 # Protected user-supplied material must remain outside this repository.
 /development/
 

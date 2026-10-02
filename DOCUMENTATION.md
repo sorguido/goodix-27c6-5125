@@ -12,8 +12,6 @@ project.
 | Install, update, or reinstall the driver | [Installation and updates](docs/INSTALLATION.md) |
 | Understand what the driver writes to the reader | [Security and privacy](docs/SECURITY.md#factory-preserving-design) |
 | Share the reader with Windows | [Using the reader with Windows](docs/INSTALLATION.md#using-the-reader-with-windows) |
-| Build the optional legacy five-file device-material bundle | [Goodix 5125 Material Builder](tools/windows_material_builder/README.md) |
-| Understand or audit the device-material format | [Device-specific material contract](docs/DEVICE_MATERIALS.md) |
 | Remove the driver normally | [Uninstall and emergency recovery](docs/UNINSTALL.md#normal-uninstall-from-a-working-desktop) |
 | Recover when graphical login is unavailable | [Emergency recovery](docs/UNINSTALL.md#emergency-graphical-login-is-unavailable) |
 | Learn how the whole system works without reading source code | [Goodix Behind the Scenes](docs/learning/README.md) |
@@ -31,36 +29,15 @@ project.
   the main documentation.
 - **[Installation and updates](docs/INSTALLATION.md)** — Supported installation,
   update, and reinstall procedure, prerequisites, first-use initialization,
-  optional legacy device-material staging, installer behavior, and Windows
-  coexistence.
+  installer behavior, and Windows coexistence.
 - **[Login, lock screen, sudo, and PolicyKit](docs/learning/08_desktop_authentication.md)** —
   User-facing explanation of how the same fingerprint stack appears in Plasma
   Login, KScreenLocker, `sudo`, PolicyKit, and KDE enrollment settings.
 - **[What is stored, and where](docs/learning/09_what_is_stored.md)** — Where
-  persistent reader state, host pairing state, optional legacy device material,
-  and enrolled fingerprint templates live.
+  persistent reader state, host pairing state, and enrolled fingerprint
+  templates live.
 
-## 2. Optional legacy device material and Windows acquisition
-
-The Linux runtime is self-contained: it initializes the reader on first use and
-needs no bundle. The five-file bundle remains an optional legacy compatibility
-source tied to the qualified reader and OEM environment. These pages describe its
-supported acquisition path, file contract, and manual reference workflow.
-
-- **[Goodix 5125 Material Builder](tools/windows_material_builder/README.md)** —
-  Optional legacy Windows-VM application for acquiring, deriving, assembling, and
-  validating the canonical five-file bundle.
-- **[Device-specific material contract and acquisition reference](docs/DEVICE_MATERIALS.md)** —
-  Canonical format, validation rules, privacy requirements, reader binding, and
-  detailed acquisition reference for the five files.
-- **[Building your device-material bundle](docs/learning/11_building_your_device_material_bundle.md)** —
-  Beginner-oriented practical walkthrough and manual alternative for assembling
-  the same optional legacy bundle inside the qualified Windows VM.
-- **[Windows Material Builder — technical audit and provenance](tools/windows_material_builder/AUDIT.md)** —
-  Stable safety, provenance, USBPcap, DPAPI, capture, and bundle-contract details
-  for the Windows Material Builder.
-
-## 3. Removal, recovery, and troubleshooting
+## 2. Removal, recovery, and troubleshooting
 
 - **[Uninstall and emergency recovery](docs/UNINSTALL.md)** — Normal removal,
   text-console emergency recovery, preserved data, removal scope, and restart
@@ -76,7 +53,7 @@ supported acquisition path, file contract, and manual reference workflow.
 - **[Security and privacy](docs/SECURITY.md)** — Includes the supported problem
   reporting boundary and what private material must never be attached to reports.
 
-## 4. Goodix Behind the Scenes — beginner learning guide
+## 3. Goodix Behind the Scenes — beginner learning guide
 
 **[Goodix Behind the Scenes](docs/learning/README.md)** is the guided,
 plain-language learning path. It is educational documentation, not the canonical
@@ -100,14 +77,11 @@ technical specification.
 8. **[Login, lock screen, sudo, and PolicyKit](docs/learning/08_desktop_authentication.md)** —
    How different Fedora/KDE authentication consumers use the same fingerprint stack.
 9. **[What is stored, and where](docs/learning/09_what_is_stored.md)** — Reader
-   state, host pairing state, optional legacy material, and Fedora fingerprint
-   templates.
+   state, host pairing state, and Fedora fingerprint templates.
 10. **[Safety and factory preservation](docs/learning/10_safety_and_factory_preservation.md)** —
     Why Linux support does not require flashing, reprovisioning, or persistent
     factory changes.
-11. **[Building your device-material bundle](docs/learning/11_building_your_device_material_bundle.md)** —
-    Practical acquisition and bundle-building walkthrough.
-12. **[Glossary](docs/learning/glossary.md)** — Plain-English definitions of the
+11. **[Glossary](docs/learning/glossary.md)** — Plain-English definitions of the
     main Linux, USB, Goodix, security, and biometric terms.
 
 ### Optional protocol deep dive
@@ -116,7 +90,7 @@ technical specification.
   Plain-English explanation of the `A8`, `E4`, `A2`, `82`, `A6`, `D1`, `D4`,
   `AF`, FDT, and related protocol phases.
 
-## 5. Canonical technical reference
+## 4. Canonical technical reference
 
 **[Goodix USB 27c6:5125 technical manual](TECHNICAL_MANUAL.md)** is the
 authoritative public technical reference for the current implementation.
@@ -127,7 +101,7 @@ authoritative public technical reference for the current implementation.
 - [Hardware and device identity](TECHNICAL_MANUAL.md#2-hardware-and-device-identity)
 - [System architecture and ownership](TECHNICAL_MANUAL.md#3-system-architecture-and-ownership)
 - [libfprint driver architecture](TECHNICAL_MANUAL.md#4-libfprint-driver-architecture)
-- [Protected device material and secure transport](TECHNICAL_MANUAL.md#5-protected-device-material-and-secure-transport)
+- [Host pairing state and secure transport](TECHNICAL_MANUAL.md#5-host-pairing-state-and-secure-transport)
 - [Device initialization and secure-session lifecycle](TECHNICAL_MANUAL.md#6-device-initialization-and-secure-session-lifecycle)
 
 ### Capture and biometrics
@@ -154,7 +128,7 @@ authoritative public technical reference for the current implementation.
 - [Troubleshooting and diagnostic principles](TECHNICAL_MANUAL.md#20-troubleshooting-and-diagnostic-principles)
 - [Developer invariants, licensing, and references](TECHNICAL_MANUAL.md#21-developer-invariants-licensing-and-references)
 
-## 6. Security, qualification, and compatibility boundaries
+## 5. Security, qualification, and compatibility boundaries
 
 - **[Security and privacy](docs/SECURITY.md)** — Factory-preserving design,
   protected inputs, biometric data, host authentication boundary, SELinux
@@ -165,7 +139,7 @@ authoritative public technical reference for the current implementation.
 - **[Safety and factory preservation](docs/learning/10_safety_and_factory_preservation.md)** —
   Beginner-oriented explanation of the same design principles.
 
-## 7. Implementation and maintainer documentation
+## 6. Implementation and maintainer documentation
 
 These pages document individual implementation components. Ordinary users do
 not need them for installation or daily use.
@@ -179,10 +153,6 @@ not need them for installation or daily use.
   and test boundary of the installed normal and emergency removal tools.
 - **[Public source build](production/README.md)** — Build architecture, payload
   composition, source ledger, validation boundary, and maintainer checks.
-- **[Goodix 5125 Material Builder](tools/windows_material_builder/README.md)** —
-  User and implementation documentation for the Windows-VM acquisition tool.
-- **[Windows Material Builder — technical audit and provenance](tools/windows_material_builder/AUDIT.md)** —
-  Detailed audit record for the Windows acquisition tool.
 
 ### Source and build provenance
 
@@ -194,11 +164,11 @@ not need them for installation or daily use.
   Fedora source RPM and upstream archive hashes plus the downstream modification
   boundary.
 
-## 8. Licensing, provenance, acknowledgements, and external references
+## 7. Licensing, provenance, acknowledgements, and external references
 
 - **[Licensing and provenance](docs/LICENSING_AND_PROVENANCE.md)** — Component
   origins, per-file licensing, combined-library terms, source provenance, and
-  excluded private/OEM material.
+  excluded private material.
 - **[Upstream references](docs/REFERENCES.md)** — libfprint, fprintd, Linux-PAM,
   Plasma Login, Rockytkg, TLS RFCs, OpenCV, and related upstream references.
 - **[Acknowledgements](ACKNOWLEDGEMENTS.md)** — Upstream projects, contributors,
@@ -206,7 +176,7 @@ not need them for installation or daily use.
 - **[Repository license](LICENSE)** — Repository-level licensing notice.
 - **[`LICENSES/`](LICENSES/)** — Full license texts distributed with the source.
 
-## 9. Vendored upstream reference documentation
+## 8. Vendored upstream reference documentation
 
 The following Markdown files are part of the vendored libfprint source reference.
 They are **upstream documentation**, not project-specific Goodix instructions.
@@ -229,7 +199,6 @@ canonical documentation above.
 | [`TECHNICAL_MANUAL.md`](TECHNICAL_MANUAL.md) | Canonical technical specification |
 | [`docs/INSTALLATION.md`](docs/INSTALLATION.md) | Canonical installation/update procedure |
 | [`docs/UNINSTALL.md`](docs/UNINSTALL.md) | Canonical removal/recovery procedure |
-| [`docs/DEVICE_MATERIALS.md`](docs/DEVICE_MATERIALS.md) | Canonical device-material contract |
 | [`docs/SECURITY.md`](docs/SECURITY.md) | Security and privacy boundary |
 | [`docs/VALIDATION.md`](docs/VALIDATION.md) | Qualification evidence and limitations |
 | [`docs/LICENSING_AND_PROVENANCE.md`](docs/LICENSING_AND_PROVENANCE.md) | Licensing and source provenance |

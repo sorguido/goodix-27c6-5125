@@ -106,22 +106,19 @@ Finger-detection calibration is learned live from a no-finger baseline, so no
 imported cache file is needed. The Linux pairing key is generated locally and
 stored root-only on the host, never read out of the sensor.
 
-An older five-file bundle remains an optional compatibility source. When one is
-installed it supplies the same kinds of input at a high level:
+Nothing has to be prepared in advance and nothing has to be copied from another
+operating system:
 
-- a manifest describing and binding the set;
-- transport and secure-session material;
-- target runtime configuration;
-- validated input derived from the original equipment manufacturer's (OEM)
-  software, which is parsed, not executed;
-- finger-detection calibration/cache input.
+- the reader's identity and factory data are read during the preflight;
+- the runtime configuration is derived from that OTP data on the host;
+- the pairing key is generated locally and stored under `/var/lib/fprint/`;
+- finger-detection calibration is measured fresh for each action.
 
-The fingerprint flow reads that material from a root-only host directory and
-cross-checks it against the reader before use. It does not extract it from the
-sensor each time and does not write it back into factory storage.
+The driver reads the factory data it needs and cross-checks every reply against
+the reader before use. It does not write that data back into factory storage.
 
-Chapter 9 explains where these files and the host pairing state live and how
-they differ from fingerprint templates.
+Chapter 9 explains where the host pairing state lives and how it differs from
+fingerprint templates.
 
 ## The simple map, without the byte soup
 
@@ -172,14 +169,14 @@ labels, followed by a cautious beginner translation:
 | --- | --- |
 | `REENTRY_RECOVERY_A2` | Run one bounded project re-entry step before identification. This label does not mean a factory reset. |
 | `A8` | Require the exact `GF_ST411SEC_APP_12509` identity expected by this driver. |
-| `E4` | Check the expected validator derived from the stored Linux pairing key, or from legacy bundle material when that source is selected. The validator is not the PSK. |
+| `E4` | Check the expected validator derived from the stored Linux pairing key. The validator is not the PSK. |
 | `OEM_COLD_START_A2_1` | Perform the first known cold-start preparation step. |
 | `CHIP_82` | Read four target-bound bytes and require their saved data fingerprint (cryptographic digest) to match the recorded expected value. The code does not prove that they are an immutable chip ID. |
 | `OTP_A6` | Read and check the expected factory/OTP-related response; do not write factory information. |
 | `OEM_COLD_START_A2_2` | Perform the second known cold-start preparation step. |
 | `MODE_70` | Select the required runtime operating mode. |
 | `DAC_220` through `DAC_23A` | Apply four validated runtime tuning values using command `0x80`. |
-| `CONFIG_90` | Send the validated 224-byte runtime configuration block, derived locally from the live OTP read or taken from legacy bundle material. |
+| `CONFIG_90` | Send the validated 224-byte runtime configuration block, derived locally from the live OTP read. |
 | `D1` | Leave the ordinary pre-TLS request/reply sequence and begin the `B0`-wrapped secure-transport transition. |
 | `TLS` | Complete the TLS 1.2 PSK handshake with the host as server and the reader as client. |
 | `D4` then `AF` | Begin the post-TLS sequence and confirm the reader controller is in the expected state. |

@@ -86,8 +86,7 @@ repair, reinstall, update, or remove the fingerprint software
 ```
 
 The project provides normal and emergency removal commands that remove
-project-owned influence while preserving templates, host pairing state and any
-legacy device material. They
+project-owned influence while preserving templates and host pairing state. They
 cannot repair an independently broken Fedora password or authorization stack.
 
 ## Safety claims have boundaries
@@ -119,7 +118,6 @@ shapes and flows, not secrets or biometric contents.
 - [Technical manual](../../TECHNICAL_MANUAL.md) — current public architecture and engineering boundary.
 - [Security and privacy](../SECURITY.md) — handling rules and host security boundary.
 - [Validation and limitations](../VALIDATION.md) — what was exercised and what was not.
-- [Device material contract](../DEVICE_MATERIALS.md) — exact operational requirements for the optional legacy bundle.
 
 ## ✅ What to remember
 
@@ -129,10 +127,10 @@ shapes and flows, not secrets or biometric contents.
   modification.
 - Unknown or inconsistent protocol state fails closed.
 - Fedora continues to own the general authentication stack and password path.
-- Templates, host pairing state and any legacy device material stay private and
-  are preserved by project removal.
+- Templates and host pairing state stay private and are preserved by project
+  removal.
 - Evidence has a scope; successful use on one setup is not a universal claim.
 
 ---
 
-[← Previous: What is stored](09_what_is_stored.md) | [Up: Learning home](README.md) | [Next: Building your device-material bundle →](11_building_your_device_material_bundle.md)
+[← Previous: What is stored](09_what_is_stored.md) | [Up: Learning home](README.md) | [Next: Glossary →](glossary.md)

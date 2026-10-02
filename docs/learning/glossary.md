@@ -37,9 +37,9 @@ a normal fingerprint photograph.
 
 ## Binary file
 
-A file whose bytes represent structured data rather than ordinary text. The
-legacy material bundle's four binary files must not be opened and saved through a
-text editor or converted to a string of hexadecimal characters.
+A file whose bytes represent structured data rather than ordinary text. A
+protected binary record must not be opened and saved through a text editor or
+converted to a string of hexadecimal characters.
 
 ## Callback
 
@@ -65,8 +65,9 @@ from other parts of Linux.
 ## CRC
 
 Cyclic redundancy check: an arithmetic check that helps detect corrupted
-bytes. The legacy FDT cache file uses CRC-32/MPEG-2; other CRC-32 variants do
-not necessarily produce the same result. A valid CRC is not proof of origin.
+bytes. The image record and the serialized sample envelope use CRC-32/MPEG-2;
+other CRC-32 variants do not necessarily produce the same result. A valid CRC
+is not proof of origin.
 
 ## D-Bus
 
@@ -90,29 +91,10 @@ identical.
 Software that knows how to operate particular hardware. The Goodix driver
 translates `libfprint` actions into the protocol used by USB `27c6:5125`.
 
-## DLL
-
-Dynamic-link library: a Windows library file. In the optional legacy bundle, the
-qualified `gfusb.dll` is copied as OEM material and parsed for producer inputs;
-Linux does not execute it.
-
-## DPAPI
-
-Windows Data Protection API. It protects data using a Windows security context.
-For the optional legacy bundle, recovering the existing Goodix cache requires the
-original Windows user/DPAPI context inside the qualified Windows VM and the exact
-additional entropy; copying the file to another VM is not enough.
-
 ## Endpoint
 
 A numbered USB communication channel. For the qualified Goodix bulk traffic,
 `0x01` carries host-to-reader data and `0x81` carries reader-to-host data.
-
-## Entropy (DPAPI optional entropy)
-
-Additional bytes supplied when protecting and recovering a DPAPI blob. In
-this Goodix format they are calculated by a fixed recipe, not randomly chosen.
-“Optional” is the API parameter's name, not permission to omit required bytes.
 
 ## Enrollment
 
@@ -165,6 +147,13 @@ pairing records untouched. It happens at most once per key generation, is never
 retried automatically, and is proven by readback and an encrypted handshake
 before the key is used.
 
+## Host pairing state
+
+The crash-safe root-only host directory, `/var/lib/fprint/goodix-5125-state-v2/`,
+that holds the Linux PSK and its authenticated pairing receipts. It keeps two
+generations so an interrupted operation can be reconciled by reading, never by
+guessing or by writing to the reader a second time. Project removal preserves it.
+
 ## Hexadecimal / hex / `0x`
 
 A way to write numbers using digits `0`–`9` and letters `A`–`F`. The prefix
@@ -193,12 +182,6 @@ A bounded read-only check the driver runs before it relies on any pairing state.
 It confirms the reader identity and application, reads the factory/OTP data and
 the reader's current pairing record, and derives the session configuration
 locally. It sends no persistent command.
-
-## Manifest
-
-A text packing list describing other material. The legacy Goodix bundle manifest
-has exactly ten string fields: identity/schema information and six digests.
-It is not a place for raw keys, extra notes or a copy of every input.
 
 ## MATCH
 
@@ -241,17 +224,6 @@ State that survives closing a session or removing power. Factory firmware,
 reader key material, and host template files are persistent in different
 places.
 
-## pcapng
-
-A packet-capture file format that stores recorded packets with interface and
-timing metadata. A USB capture may contain sensitive traffic from multiple
-devices; the filename alone does not establish reader identity.
-
-## PE file
-
-Portable Executable: the structured Windows file format used by executables
-and DLLs. Its sections connect relative virtual addresses to on-disk bytes.
-
 ## PolicyKit
 
 A Linux authorization system used when applications request privileged actions.
@@ -262,12 +234,6 @@ PAM fingerprint path.
 
 Preparing decoded image data for feature extraction. The Goodix SIGFM path uses
 the no-finger baseline and current finger frame to produce an 8-bit raster.
-
-## PowerShell
-
-A Windows command shell and scripting environment. This guide uses it to
-copy files, inspect metadata and start local tools; text redirection is not
-an appropriate way to write protected binary records.
 
 ## Probe
 
@@ -309,24 +275,11 @@ MATCH decision was produced, or because enrollment needs different coverage.
 The software and temporary state used while the system is operating. Runtime
 configuration is not the same as rewriting persistent factory state.
 
-## RVA
-
-Relative virtual address: an address relative to a loaded PE image. It is
-not a disk-file offset; a parser uses the file's section table to map it to
-file-backed bytes safely.
-
 ## SIGFM
 
 The feature extraction and matching path used by this project's production
 `libfprint`. It turns a preprocessed image into keypoints and descriptors and
 computes comparison scores.
-
-## State-v2
-
-The crash-safe root-only host directory, `/var/lib/fprint/goodix-5125-state-v2/`,
-that holds the Linux PSK and its authenticated pairing receipts. It keeps two
-generations so an interrupted operation can be reconciled by reading, never by
-guessing or by writing to the reader a second time. Project removal preserves it.
 
 ## Threshold
 
@@ -344,17 +297,6 @@ PSK.
 Universal Serial Bus: the physical and protocol connection used by the host to
 exchange commands, events, and protected image data with the reader.
 
-## USBPcap
-
-A Windows USB capture component used with Wireshark. It records transfers
-on a selected root hub, potentially including devices other than the reader.
-It is different from Npcap, which is used for network capture.
-
-## TShark
-
-Wireshark's command-line capture/analysis tool. It can read a saved capture
-and print selected metadata fields without opening the graphical interface.
-
 ## Verification
 
 Capturing a new probe and comparing it with an enrolled template to produce
@@ -367,4 +309,4 @@ intended as permanent factory or user data.
 
 ---
 
-[← Previous: Building your device-material bundle](11_building_your_device_material_bundle.md) | [Up: Learning home](README.md)
+[← Previous: Safety and factory preservation](10_safety_and_factory_preservation.md) | [Up: Learning home](README.md)

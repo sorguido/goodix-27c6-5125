@@ -29,9 +29,9 @@ Windows 11 virtual machine.
 | Material/template preservation | File inode, size, owner, mode and modification time unchanged across reported normal removal; metadata evidence does not establish a cryptographic comparison of all bytes |
 | Reinstallation | Installation and subsequent Plasma fingerprint login succeeded; corrected reinstallation with the reader continuously present was also reported successful |
 | Complete public installation | Fresh Fedora 44 KDE VM installation passed; installation on the physical Fedora 44 KDE qualification system passed with SELinux Enforcing, followed by working Plasma Login, ordinary sudo, KScreenLocker, PolicyKit and password fallback |
-| Reader-absent host lifecycle | On the clean reader-absent VM, state-v2-only fresh install, update, normal removal, reinstall, controlled transaction rollback and emergency recovery from a missing runtime receipt passed while stock fprintd, vendor PAM, SELinux Enforcing, password access and KDE usability were preserved |
-| Emergency removal | Successful text-console removal was reported with the reader connected; separately, the clean VM force-removal test passed after normal removal rejected a deliberately incomplete project receipt, with project paths removed and the empty state-v2 root preserved across reboot |
-| Self-contained pairing activation | On the qualification reader one authorized action journaled the state-v2 `PREPARED` reservation, performed exactly one logical `E0`, confirmed the current `BB010002` byte-for-byte and the new `BB020003` validator, proved TLS and promoted the record to `ACTIVE`; no second write was requested and the epoch reported zero unexpected persistent writes |
+| Reader-absent host lifecycle | On the clean reader-absent VM, a fresh install with no prior host state, update, normal removal, reinstall, controlled transaction rollback and emergency recovery from a missing runtime receipt passed while stock fprintd, vendor PAM, SELinux Enforcing, password access and KDE usability were preserved |
+| Emergency removal | Successful text-console removal was reported with the reader connected; separately, the clean VM force-removal test passed after normal removal rejected a deliberately incomplete project receipt, with project paths removed and the empty host pairing state root preserved across reboot |
+| Self-contained pairing activation | On the qualification reader one authorized action journaled the host pairing state `PREPARED` reservation, performed exactly one logical `E0`, confirmed the current `BB010002` byte-for-byte and the new `BB020003` validator, proved TLS and promoted the record to `ACTIVE`; no second write was requested and the epoch reported zero unexpected persistent writes |
 | Zero-`E0` ACTIVE reopen | A later ordinary no-finger identify reused the `ACTIVE` record through the read-only preflight and the pairing-activation reuse disposition, with zero `E0`, zero persistent writes, a matching E4 contract, and complete drain and close |
 | Zero-seed FDT bootstrap | With no imported FDT cache, an ordinary no-finger action completed the three-sample zero-seed bootstrap, including a first manual sample carrying a nonzero touch mask, and reached FDT learning; operator-reported against the declared counters, and the sanitized audit line is not retained in the repository |
 | Interrupted-transaction recovery (offline) | The crash-window matrix and the host-shaped superseded-`PREPARED` recovery test show that reopening after an interrupted post-`E0`/pre-ACTIVE transaction reuses the durable reservation, proves TLS and promotes to `ACTIVE` with zero persistent writes and zero `E0`; no live reproduction exists for this boundary |
@@ -47,16 +47,16 @@ Windows 11 virtual machine.
 
 ## Complete installation path
 
-The public root installer builds from current source, optionally validates and
-imports the user's five legacy files, installs the runtime and login integration,
-and installs standalone removal commands. It is independent of clone location and
-private build outputs. These host lifecycle operations do not access the reader,
-which may be connected or absent.
+The public root installer builds from current source, prepares or preserves the
+root-only host pairing state directory, installs the runtime and login
+integration, and installs standalone removal commands. It is independent of clone
+location and private build outputs. These host lifecycle operations do not access
+the reader, which may be connected or absent.
 
-The unified bootstrap and automatic reuse of installed material are covered by
+The unified bootstrap and automatic reuse of preserved host state are covered by
 offline synthetic tests. The clean-VM user lifecycle that follows the published
-instructions end to end - including deletion of the clone and Home staging
-folder - is the remaining qualification step for this release candidate.
+instructions end to end - including deletion of the clone - is the remaining
+qualification step for this release candidate.
 
 The complete public procedure has now been exercised successfully on a freshly
 installed and updated Fedora 44 KDE VM and on the physical Fedora 44 KDE
@@ -69,7 +69,7 @@ distributions or future Fedora changes.
 
 The reader-absent host lifecycle was also exercised on a clean
 SELinux-Enforcing Fedora 44 KDE VM. A fresh installation
-without legacy material created only the empty root-only state-v2 location.
+created only the empty root-only host pairing state location.
 Update, removal, reinstall, injected transaction rollback and emergency recovery
 preserved that location and left Fedora's fprintd service and vendor PAM as the
 service boundary. Password login, ordinary sudo and the KDE desktop remained
@@ -78,15 +78,14 @@ operation occurred in this host-only qualification.
 
 ## Offline evidence
 
-Synthetic checks exercise two distinct valid reader bundles, invalid and missing
-materials, unsafe file types, file binding errors, source/payload validation,
+Synthetic checks exercise host state preparation and preservation, unsafe file
+types, source/payload validation,
 service quiescence and activation inhibition, partial installation rollback,
 project ownership/drift handling and standalone normal/emergency removal.
 They also cover bootstrap clone/pull/conflict behavior, automatic installation
-modes, installed-material precedence without Home staging, explicit bundle
-mismatch rejection, and reinstall after both removal paths.
+modes, and reinstall after both removal paths.
 Tests use temporary filesystem fixtures and substitute privileged host operations;
-they do not read real protected bundles, open USB or authenticate through host PAM.
+they do not read real secrets, open USB or authenticate through host PAM.
 
 Driver checks cover explicit attempts, MATCH termination, processing-error fences
 and cleanup using synthetic inputs. A source-only copy can be checked without
@@ -102,12 +101,6 @@ recognition accuracy, hardware behavior or complete operating-system recovery.
   if both have identical bytes in a later compatible release slot; see the
   [protocol boundary](../TECHNICAL_MANUAL.md#74-enrollment-zero-mask-recovery).
 - No measured universal false-acceptance or false-rejection rate.
-- The optional legacy bundle has no qualified Linux-side acquisition path. The
-  [Windows Material Builder](../tools/windows_material_builder/README.md) runs
-  only inside the qualified Windows VM and is not itself hardware-qualified as
-  part of this release; the detailed
-  [device-material acquisition reference](DEVICE_MATERIALS.md) documents how the
-  five final files are derived.
 - Console/sudo authentication can offer fingerprint before password. The expected
   untouched-reader timeout is about 30 seconds, depending on Fedora policy; no
   immediate method selector is provided. A fully broken password stack cannot
@@ -143,7 +136,7 @@ recognition accuracy, hardware behavior or complete operating-system recovery.
 - Full factory-state readback, exhaustive Windows compatibility, power-loss recovery
   and every future update combination have not been demonstrated.
 - The seven-command read-only target and CONFIG90 preflight is qualified on the
-  real reader, as are the state-v2 one-shot pairing transaction - a single
+  real reader, as are the one-shot host pairing transaction - a single
   logical `E0`, the exact `BB010002` and `BB020003` readbacks, the TLS proof and
   ACTIVE promotion - the ordinary zero-`E0` ACTIVE reopen and the zero-seed FDT
   no-finger bootstrap that follows them. The read-only recovery from an

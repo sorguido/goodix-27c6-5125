@@ -54,10 +54,9 @@ You can stop after any chapter and still keep a useful mental picture.
 6. [Enrollment](06_enrollment.md) — how several touches become a reusable template.
 7. [Verification and matching](07_verification_and_matching.md) — MATCH, NO MATCH, retry, and cancellation.
 8. [Login, lock screen, sudo, and PolicyKit](08_desktop_authentication.md) — one fingerprint stack, different experiences.
-9. [What is stored, and where](09_what_is_stored.md) — sensor state, host pairing state, optional legacy device material, and host templates.
+9. [What is stored, and where](09_what_is_stored.md) — sensor state, host pairing state, and host templates.
 10. [Safety and factory preservation](10_safety_and_factory_preservation.md) — why Linux support does not mean reprogramming the reader.
-11. [Building your device-material bundle](11_building_your_device_material_bundle.md) — optional legacy path: a practical walkthrough for collecting the inputs inside the qualified Windows VM, making the USB capture, deriving the protected transport material, and assembling the final bundle.
-12. [Glossary](glossary.md) — plain-English definitions for the important terms.
+11. [Glossary](glossary.md) — plain-English definitions for the important terms.
 
 ## 🔬 Optional deep dive
 

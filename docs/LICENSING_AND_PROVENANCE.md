@@ -13,18 +13,16 @@ change the original copyright or grant of any source file.
 | APP12509 pairing crypto | Project source; focused refactor of the project-authored D190 implementation and qualified PSK PoC | LGPL-2.1-or-later; pure fixed-profile BB010003/BB020003 derivation, with no USB, persistence, DLL loading or external implementation copied |
 | APP12509 CONFIG90 derivation | Adapted from Rockytkg, commit `227eba219fa9e3fbac5bd59aca79f624f67cd11b`, `src/goodix_init.c` and `src/goodix_otp.c` | GPL-2.0-or-later; pure ChicagoHS type-12 template, OTP patch mapping and finalizer only |
 | APP12509 BB010002 parser | Project source; structure qualified from multiple legitimate opaque Windows values | LGPL-2.1-or-later; validation only, with no decryption, protected-byte synthesis or embedded private fixture |
-| APP12509 state-v2 | Project source | LGPL-2.1-or-later; host-only root-protected PSK/receipt generations, authenticated crash recovery and side-by-side legacy-state import, with no USB or pairing writer |
+| APP12509 host pairing state | Project source | LGPL-2.1-or-later; host-only root-protected PSK/receipt generations and authenticated crash recovery, with no USB or pairing writer |
 | APP12509 live preflight | Project source; independently implemented from the repository's documented command contracts | LGPL-2.1-or-later; bounded A2/A8/E4/chip/OTP read-only discovery and CONFIG90 derivation, with no persistent command or retry |
 | APP12509 pairing provision boundary | Minimal adaptation of the project-authored qualified PSK PoC | GPL-2.0-or-later; fixed E0 construction, one-logical-write guard, exact ACK/completion parser and readback/TLS proof gates; no USB ownership, automatic retry or firmware command |
-| APP12509 pairing activation | Project source | LGPL-2.1-or-later; crash-safe PREPARED reservation, state-v2 reconciliation and bounded orchestration of the separately licensed pairing-provision boundary, readbacks, TLS and ACTIVE promotion |
+| APP12509 pairing activation | Project source | LGPL-2.1-or-later; crash-safe PREPARED reservation, host pairing state reconciliation and bounded orchestration of the separately licensed pairing-provision boundary, readbacks, TLS and ACTIVE promotion |
 | SIGFM | Rockytkg's materialized libfprint fork, commit `7ebe0c809b4d1df3400e84299a4ec4acdea84590` | LGPL-2.1-or-later; feature extraction and matching |
 | Image preprocessing | Adapted from Rockytkg, commit `227eba219fa9e3fbac5bd59aca79f624f67cd11b` | GPL-2.0-or-later; device-independent preprocessing subset |
 | OpenCV | Fedora OpenCV 4 packages (actual installed version recorded at build) | Fedora expression `BSD-3-Clause AND Apache-2.0 AND ISC`; required runtime libraries |
 | libgusb | Fedora system library | LGPL-2.1-or-later; USB dependency, not privately bundled |
 | OpenSSL | Fedora system library | Apache-2.0; TLS dependency |
 | Lifecycle and Plasma selector tools | Project source | GPL-2.0-or-later; ordinary Linux-PAM APIs, Python standard library and Fedora tools |
-| Windows VM Material Builder | Project source; historical finalizer/parser at `fa98461` | GPL-2.0-or-later; Python/Tkinter and existing `cryptography` dependency |
-| USBPcap, separately downloaded by explicit action | Official pinned 1.5.4.0 | Driver GPLv2; CMD BSD-2-Clause; interactive upstream license acceptance; installer not redistributed |
 
 Fedora supplies fprintd, its PAM module, Plasma, sudo and PolicyKit. Their
 implementations are not copied into private replacement consumers by this
@@ -84,12 +82,10 @@ opaque values; no protected value or decryption implementation is included.
 PSK separately from a PSK-authenticated fixed-size receipt, uses two atomic
 generation slots with file and directory synchronization, and binds state to
 the target, application, chip profile, OTP digest and CONFIG90 digest. It has
-no USB transport or pairing-write implementation. Its legacy-import boundary
-accepts only already validated caller-owned material and leaves the original
-bundle untouched for rollback.
+no USB transport or pairing-write implementation.
 
 `libfprint-driver/goodix_runtime_coordinator.[ch]` is project-authored. It
-combines the existing legacy loader, CONFIG90 derivation and state-v2 reader
+combines CONFIG90 derivation and the host pairing state reader
 behind an activation-only selection boundary. It contains no USB transport or
 pairing writer; its only mutation is host-side ACTIVE promotion after a separate
 TLS proof. No third-party implementation is copied.
@@ -104,29 +100,19 @@ project-authored GPL PSK PoC; it therefore retains
 GPL-2.0-or-later. It owns neither USB transport nor state persistence and cannot
 retry a transaction. `libfprint-driver/goodix_pairing_activation.[ch]` is
 project-authored LGPL orchestration. It durably reserves the transaction through
-state-v2, delegates the single E0 frame and proof contract to the GPL provision
-boundary, routes the two exact readbacks, and promotes host state only after TLS.
+the host pairing state, delegates the single E0 frame and proof contract to the
+GPL provision boundary, routes the two exact readbacks, and promotes host state
+only after TLS.
 It introduces no copied external implementation; the combined library remains
 subject to the licensing boundary described above.
 
 ## Excluded material
 
-The Windows builder's [audit](../tools/windows_material_builder/AUDIT.md) records
-its exact reuse, supported qualified-VM boundary, official USBPcap release URL
-and installer SHA-256. No USBPcap source or binary is incorporated into the
-application; the app invokes the separately installed official program.
-Historical PowerShell DPAPI behavior (BSD-2-Clause, copyright 2026 sorguido) was
-inspected as a reference; its C# implementation and transfer-file workflow are
-not copied into the app. The builder source and tests are publishable without
-Git history or private evidence. They are separate from the Linux runtime payload
-and do not add Windows/Python GUI dependencies to `production/build-public.py`.
-
 Open-source licenses in this tree do not grant rights to distribute OEM firmware
 or binaries, reader secrets, private captures, factory data, fingerprint images
 or templates. Those items are excluded from public source and software payloads.
-The optional legacy device-material bundle is separately supplied by the user and
-is not redistributed here; the self-contained pairing path ships no OEM secret
-and generates its Linux PSK locally.
+The driver needs no externally supplied reader secret: it generates its Linux
+pairing key locally and derives its configuration from the reader's own OTP.
 
 Preserve original notices and corresponding source when
 redistributing components. [References](REFERENCES.md) and

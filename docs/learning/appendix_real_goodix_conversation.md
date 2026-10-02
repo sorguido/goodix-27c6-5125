@@ -144,8 +144,7 @@ would make every later assumption less trustworthy.
 ### `E4`: validate the current pairing binding
 
 Before the session starts, the runtime derives an expected **validator** from the
-stored Linux pairing key, or from legacy bundle material when that source is
-selected. At `E4`, the reader's typed
+stored Linux pairing key. At `E4`, the reader's typed
 reply must contain that exact validator and match its stored cryptographic
 digest—a compact fingerprint of the expected bytes.
 
@@ -173,8 +172,7 @@ proves is narrower:
 - it sends the expected `0x82` request at this exact point;
 - it requires a four-byte typed response;
 - it accepts that body only when its cryptographic digest matches the recorded
-  expected value, which comes from the live preflight state or from a legacy
-  bundle manifest.
+  expected value carried by the live preflight state.
 
 That is enough to make the response a useful target-bound check. It is not
 enough to prove the four bytes are an immutable silicon identifier. The guide
@@ -210,7 +208,7 @@ These phases prepare the reader for the current operating path:
   digital-to-analog converter (DAC) is like an electronic adjustment knob,
   although the exact physical effect of each value is not claimed here.
 - `CONFIG_90` sends the validated 224-byte runtime configuration block, derived
-  locally from the live OTP read or taken from legacy bundle material. The
+  locally from the live OTP read. The
   driver has already checked its digest, arithmetic finalizer, and consistency
   with the four tuning values.
 
