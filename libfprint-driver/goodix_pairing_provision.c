@@ -3,7 +3,7 @@
  * Bounded APP12509 pairing-write transaction.
  *
  * The frame layout and response contract are adapted from the project-owned
- * qualified writer in development/psk.  This module deliberately owns no USB
+ * qualified PSK PoC.  This module deliberately owns no USB
  * device and no retry mechanism: its caller may submit exactly the one frame
  * returned by begin_e0(), then must supply independent readback and TLS proof.
  */

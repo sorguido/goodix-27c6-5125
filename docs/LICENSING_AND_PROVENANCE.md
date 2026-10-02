@@ -15,7 +15,7 @@ change the original copyright or grant of any source file.
 | APP12509 BB010002 parser | Project source; structure qualified from multiple legitimate opaque Windows values | LGPL-2.1-or-later; validation only, with no decryption, protected-byte synthesis or embedded private fixture |
 | APP12509 state-v2 | Project source | LGPL-2.1-or-later; host-only root-protected PSK/receipt generations, authenticated crash recovery and side-by-side legacy-state import, with no USB or pairing writer |
 | APP12509 live preflight | Project source; independently implemented from the repository's documented command contracts | LGPL-2.1-or-later; bounded A2/A8/E4/chip/OTP read-only discovery and CONFIG90 derivation, with no persistent command or retry |
-| APP12509 pairing provision boundary | Minimal adaptation of the project-authored qualified writer in `development/psk` | GPL-2.0-or-later; fixed E0 construction, one-logical-write guard, exact ACK/completion parser and readback/TLS proof gates; no USB ownership, automatic retry or firmware command |
+| APP12509 pairing provision boundary | Minimal adaptation of the project-authored qualified PSK PoC | GPL-2.0-or-later; fixed E0 construction, one-logical-write guard, exact ACK/completion parser and readback/TLS proof gates; no USB ownership, automatic retry or firmware command |
 | APP12509 pairing activation | Project source | LGPL-2.1-or-later; crash-safe PREPARED reservation, state-v2 reconciliation and bounded orchestration of the separately licensed pairing-provision boundary, readbacks, TLS and ACTIVE promotion |
 | SIGFM | Rockytkg's materialized libfprint fork, commit `7ebe0c809b4d1df3400e84299a4ec4acdea84590` | LGPL-2.1-or-later; feature extraction and matching |
 | Image preprocessing | Adapted from Rockytkg, commit `227eba219fa9e3fbac5bd59aca79f624f67cd11b` | GPL-2.0-or-later; device-independent preprocessing subset |
@@ -100,7 +100,7 @@ It accepts only the exact application, qualified chip profiles, valid OTP and
 structurally valid live `BB010002`, derives CONFIG90 locally, and contains no
 persistent command. `libfprint-driver/goodix_pairing_provision.[ch]` adapts only
 the fixed E0 layout, response contract and one-write guard from the
-project-authored GPL PoC in `development/psk`; it therefore retains
+project-authored GPL PSK PoC; it therefore retains
 GPL-2.0-or-later. It owns neither USB transport nor state persistence and cannot
 retry a transaction. `libfprint-driver/goodix_pairing_activation.[ch]` is
 project-authored LGPL orchestration. It durably reserves the transaction through
