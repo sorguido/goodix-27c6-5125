@@ -75,6 +75,31 @@ It installs the runtime and login entry, and
 It quiesces fprintd during replacement and does not start a fingerprint test.
 Fedora's daemon, greeter and vendor authentication files remain package-owned.
 
+### Fingerprint temporary suspension
+
+When a temporary password-only session is needed, for example during remote access
+where the physical reader cannot be used, fingerprint authentication can be
+suspended without uninstalling the driver, deleting templates, changing host
+pairing state, or rewriting PAM/authselect policy:
+
+```bash
+sudo systemctl mask --runtime --now fprintd.service
+```
+
+The runtime mask prevents stock fingerprint consumers from activating `fprintd`
+for the current boot, so authentication falls back to the remaining Fedora policy
+instead of waiting for an unavailable fingerprint interaction. Restore fingerprint
+availability at any time, without rebooting, with:
+
+```bash
+sudo systemctl unmask --runtime fprintd.service
+```
+
+There is no need to start `fprintd` manually after the unmask: the next normal
+fingerprint consumer can activate it through the stock D-Bus/systemd path. Because
+the mask is runtime-only, a reboot also clears it automatically; reboot is not
+required for either suspension or restoration.
+
 Expect **`GOODIX_BUILD=PASS`**, a **`GOODIX_INSTALL_MODE`** of **`FIRST_INSTALL`**
 or **`UPDATE`**, then **`GOODIX_PAIRING_STATE=READY`** confirming the
 host pairing state root is ready, followed by
