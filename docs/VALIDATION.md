@@ -55,8 +55,8 @@ the reader, which may be connected or absent.
 
 The unified bootstrap and automatic reuse of preserved host state are covered by
 offline synthetic tests. The clean-VM user lifecycle that follows the published
-instructions end to end - including deletion of the clone - is the remaining
-qualification step for this release candidate.
+instructions end to end is qualified in
+[Release-candidate lifecycle qualification](#release-candidate-lifecycle-qualification).
 
 The complete public procedure has now been exercised successfully on a freshly
 installed and updated Fedora 44 KDE VM and on the physical Fedora 44 KDE
@@ -75,6 +75,36 @@ preserved that location and left Fedora's fprintd service and vendor PAM as the
 service boundary. Password login, ordinary sudo and the KDE desktop remained
 usable after the required reboots. No USB access, pairing write or biometric
 operation occurred in this host-only qualification.
+
+## Release-candidate lifecycle qualification
+
+The complete published user lifecycle was qualified end to end on a clean Fedora
+44 KDE x86_64 VM with SELinux Enforcing, a stock Fedora authentication stack, no
+prior project installation and no legacy Windows material bundle, with the Goodix
+`27c6:5125` reader present through USB passthrough for the whole sequence. Each
+step followed the published instructions for this release candidate literally,
+with no development shortcut, runtime workaround or private knowledge.
+
+| Lifecycle step | Qualified result and boundary |
+| --- | --- |
+| Fresh install | Canonical installation from source completed without Windows Material Builder, USBPcap, DPAPI recovery or any legacy five-file material bundle; the reader self-initialized through the automatic first-use path |
+| Real biometric use | Ordinary representative use after the fresh install confirmed a working biometric system on the stock Fedora/KDE stack: enrollment, password login and fingerprint login all succeeded |
+| Canonical update | The published update path completed with the reader present, preserving the operational state, password access and desktop |
+| Normal removal | `goodix-uninstall` from a normal desktop session removed the project from the authentication path with the reader present, preserved the host pairing state and fingerprint templates and performed no reader write; reboot, password login and desktop remained available |
+| Canonical reinstall | Reinstallation after normal removal reused the preserved host pairing state and the existing fingerprint templates, and fingerprint login worked again without the legacy bundle |
+| Emergency removal | `goodix-force-remove` run from a TTY with the reader present completed, preserved host pairing state and fingerprint templates, performed no reader write, and left password login and the desktop recoverable after reboot |
+
+Across the entire lifecycle password authentication and the KDE desktop stayed
+available and recoverable, and no step introduced a firmware, IAP, ClearApp, OTP
+or factory-data write or any other unexpected persistent reader mutation.
+
+Scope and limitations: this qualifies the published lifecycle for the tested
+configuration only - one reader running `GF_ST411SEC_APP_12509` on Fedora 44 KDE
+x86_64. It is a linear user-lifecycle qualification, not an exhaustive matrix of
+artificial reader-present/reader-absent, rollback or migration combinations, and
+it does not repeat the full biometric qualification reported above. The candidate
+was qualified on the pre-merge release-candidate branch; once `main` is aligned,
+the public bootstrap continues to install the default branch normally.
 
 ## Offline evidence
 
