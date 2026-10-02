@@ -589,7 +589,7 @@ Non riscrivere per gusto personale e non mutilare contenuto ancora corretto.
 
 **PRIMARY_ARTIFACT**
 
-Public documentation set candidata, destinata a essere verificata end-to-end da P9.
+Public documentation set candidata, destinata a essere verificata end-to-end da P12.
 
 **RULES**
 
@@ -624,11 +624,11 @@ Public documentation set candidata, destinata a essere verificata end-to-end da 
 
 **NEXT**
 
-P9.
+P12.
 
 ---
 
-## P9 — Clean-VM user lifecycle and release-candidate closure
+## P12 — Clean-VM user lifecycle and release-candidate closure
 
 **PURPOSE**
 
