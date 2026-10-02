@@ -124,15 +124,18 @@ installation did not complete. Neither runtime nor either removal command needs 
 clone after successful installation. The repository clone may be removed; the
 same bootstrap block clones it again automatically when needed. The Home staging
 copy is not technically required for ordinary updates or reinstalls as long as
-the preserved installed set remains valid. Keep an independent secure backup of
-the original bundle; do not delete your only backup.
+the preserved installed set remains valid. Keep an independent secure backup of a
+legacy bundle while that compatibility source is in use; do not delete your only
+backup.
 
 An invalid installed legacy set stops the operation, even if a valid Home bundle
 exists. If both sources are absent, a fresh install creates only the empty
-state-v2 root. At the current read-only coordinator gate, that state-only runtime
-does not perform self-initialization: an actual fingerprint action fails closed
-before claiming USB until the separately approved live qualification enables the
-initialization path. Password and desktop access remain available.
+state-v2 root and the runtime initializes the reader itself on the first
+fingerprint action: it confirms the target identity, derives the configuration
+from the reader's own OTP, stores a locally generated pairing key in state-v2 and
+records it with a single bounded pairing write. Ordinary later use reuses that
+stored key and writes nothing to the reader. Password and desktop access remain
+available throughout.
 
 Advanced users may clone elsewhere: the installer resolves its own location.
 `./install.sh --materials /some/other/path` allows another first-install staging
@@ -142,8 +145,10 @@ The standard procedure above needs no override.
 
 ## Enrollment and basic verification
 
-After successful installation with an operational material source, use KDE's normal fingerprint settings to manage
-your enrolled fingers. If your finger is already enrolled, keep that enrollment;
+After successful installation, use KDE's normal fingerprint settings to manage
+your enrolled fingers. The first fingerprint action takes slightly longer while
+the reader is initialized; later actions do not repeat that step. If your finger
+is already enrolled, keep that enrollment;
 installation preserves existing templates. Otherwise enroll one finger following
 the normal prompts, without opening simultaneous fingerprint applications.
 
@@ -169,7 +174,7 @@ If project software remains installed or authentication regresses, use
 **`goodix-uninstall`** from the working desktop. If normal removal refuses damaged
 project state or the desktop is unavailable, use **`goodix-force-remove`** according
 to [the emergency instructions](UNINSTALL.md). Follow its final restart instruction
-and verify password login. Keep the reader connected. Do not delete templates or
+and verify password login. Do not delete templates, pairing state or
 materials, change Fedora PAM by hand, disable SELinux or hide the reader.
 
 Report the command, error, failure point and whether password/desktop access works.
@@ -186,3 +191,13 @@ After normal or emergency removal, the block reinstalls the software and
 restores its material labels. Existing templates remain available. Incompatible
 Fedora changes may disable fingerprint functionality; report them or remove the
 project instead of replacing Fedora's own authentication components.
+
+## Using the reader with Windows
+
+The same reader can be shared with Windows. Windows may replace the reader's
+pairing when it initializes the device; Linux classifies that change read-only,
+preserves the Windows record byte-for-byte and restores its own stored key with
+one qualified write on the next fingerprint action. No reinstall, re-enrollment
+or manual key handling is needed, and no key is shared between the two operating
+systems. Coexistence is qualified for one reader and one Windows 11 virtual
+machine; see [validation](VALIDATION.md) for that boundary.

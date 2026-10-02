@@ -69,9 +69,11 @@ the [validation reference](docs/VALIDATION.md) records the release support basis
 ## 2. Hardware and device identity
 
 The driver registers only USB vendor/product ID `27c6:5125`; discovery itself is
-based on that ID. A biometric activation proceeds only after local material has
-passed open-time validation and the live secure bootstrap has confirmed the
-supported `GF_ST411SEC_APP_12509` identity and target binding.
+based on that ID. Opening the device is inert. A biometric activation claims the
+USB interface and proceeds only after the bounded read-only preflight has
+confirmed the supported `GF_ST411SEC_APP_12509` identity and target binding, and
+has either selected validated legacy material or established the state-v2
+pairing source.
 
 Interface 0 supplies the bulk transport used by the implementation:
 
@@ -96,9 +98,11 @@ or final human-facing orientation. The 80 × 64 raster has a stable canonical
 orientation for preprocessing and matching; that is different from a calibrated
 physical orientation claim.
 
-Firmware flashing, application replacement, key provisioning, OTP writes,
-factory-data writes, and persistent identity or mode changes are outside the
-supported path.
+Firmware flashing, application replacement, OTP writes, factory-data writes, and
+persistent identity or mode changes are outside the supported path. The single
+persistent mutation the driver performs is one bounded host-pairing write,
+qualified in
+[Factory-preserving command boundary](#181-factory-preserving-command-boundary).
 
 ### 2.1 USB transport and A0/B0 framing
 
@@ -207,7 +211,7 @@ owns the resources that must agree about an action:
 
 | Context member | Role |
 | --- | --- |
-| Protected-material view | Validated target identity, transport material, configuration, and FDT data |
+| Runtime material view | Validated target identity, transport material, configuration, and FDT data, from legacy material or state-v2 pairing |
 | USB backend | Bounded asynchronous bulk transfers on interface 0 |
 | Frame router | Sole owner of physical bulk-IN reception and A0/B0 demultiplexing |
 | Secure-session machine | Ordered pre-TLS bootstrap and response validation |
@@ -218,10 +222,12 @@ owns the resources that must agree about an action:
 
 ### 4.1 Open and close boundary
 
-Opening the libfprint device validates and binds runtime material, allocates the
-context, and claims USB interface 0. It deliberately submits no USB traffic.
-Activation is the boundary that starts receive synchronization and the secure
-reader preparation for an enroll, verify, or identify action.
+Opening the libfprint device only allocates the context. It deliberately reads no
+protected material, claims no USB interface and submits no USB traffic, so
+enumeration, discovery, boot and an uninitialized login cannot reach the reader.
+Activation is the boundary that selects the runtime material source, claims USB
+interface 0, and starts receive synchronization and the secure reader
+preparation for an enroll, verify, or identify action.
 
 Closing fences new work, invalidates the active generation, drains host-side
 callbacks, releases the USB interface, and clears context and secret state. This
@@ -279,15 +285,17 @@ CRC failures and ambiguous calibration fields. Its output is byte-identical to
 the qualified target configuration. A separate validator accepts the common
 332-byte DPAPI structure of the available legitimate `BB010002` values while
 treating their protected regions as opaque; it neither decrypts nor synthesizes
-them. The production runtime now enters a read-only coordinator only after an
+them. The production runtime enters the read-only coordinator only after an
 explicit libfprint action. Enumeration, ordinary open, installer, boot and an
-uninitialized login do not load material or claim USB. During migration, the
-coordinator uses the legacy owner when no bounded live preflight is available.
-With complete live evidence it derives CONFIG90, constructs the full target
-binding and may select a matching state-v2 generation. A state-only activation
-without that evidence fails before USB claim. If neither the live validator nor
-the host state can establish an already-active Linux pairing, the production
-activation boundary can reserve and execute one qualified pairing transaction.
+uninitialized login do not load material or claim USB. The coordinator may select
+an installed legacy owner or a matching state-v2 generation; every biometric
+capture action then runs the bounded read-only preflight, which derives CONFIG90,
+constructs the full target binding and confirms which source the secure session
+may rely on. An action that has neither validated material nor a coordinator
+decision requiring that preflight fails closed before USB claim. If neither the
+live validator nor the host state can establish an already-active Linux pairing,
+the production activation boundary reserves and executes one qualified pairing
+transaction.
 
 The bounded read-only preflight applies to every biometric capture action:
 enroll, identify (including the identify that stock fprintd uses as its
@@ -315,10 +323,12 @@ derived `BB020003` validator, and only then starts TLS. There is no automatic E0
 retry. TLS proof promotes `PREPARED` to `ACTIVE`; only after that proof does the
 runtime continue into the zero-seed FDT boundary.
 
-**Factory-unpaired readers are currently unsupported.** If the reader has never
-been initialized by a compatible OEM environment and no valid pairing state is
-present, the driver fails closed. Automatic first-time pairing of a
-factory-uninitialized reader has not been hardware-qualified.
+This host-pairing write is the only persistent reader mutation in the supported
+path and is qualified on the target. A reader whose identity, application, chip
+profile, OTP or `BB010002` falls outside that qualified boundary fails closed
+instead of being written; the driver never synthesizes a `BB010002`, never uses
+a null or dummy PSK, and never exports the Linux PSK to another operating
+system.
 
 The host-only state-v2 boundary uses two fixed-size generations. Each generation
 contains a 32-byte PSK record and a receipt authenticated by that PSK. The
@@ -361,8 +371,9 @@ See [Device materials](docs/DEVICE_MATERIALS.md) for the complete public
 contract and acquisition boundary. Do not attach these files, their contents,
 raw USB captures, or derived secrets to a bug report.
 
-The [Windows Material Builder](tools/windows_material_builder/README.md) is the
-supported acquisition path for creating the protected five-file bundle inside
+When the optional legacy bundle is used, the
+[Windows Material Builder](tools/windows_material_builder/README.md) is the
+supported acquisition path for creating it inside
 the reader's qualified Windows VM. That VM uses USB passthrough, the qualified
 Goodix OEM driver, and the original Windows user/DPAPI context. The builder
 validates the captured reader/application identity and required material,
@@ -378,7 +389,9 @@ Windows acquisition tool are documented in the
 ### 5.1 TLS roles and boundaries
 
 The reader is the TLS client and the host driver is the TLS server. The session
-uses TLS 1.2 with the reader's existing PSK. OpenSSL runs over memory BIOs; TLS
+uses TLS 1.2 with the PSK bound to the current pairing: the stored Linux PSK on
+the self-contained path, or the PSK carried by legacy bundle material when that
+source is selected. OpenSSL runs over memory BIOs; TLS
 records are carried inside the validated B0 transport rather than on a socket.
 The implementation pins `PSK-AES128-GCM-SHA256` (TLS codepoint `0x00A8`),
 disables session tickets, and requires the exact client identity
@@ -408,8 +421,9 @@ invokes it.
 
 ```mermaid
 flowchart TD
-    Opened["Open: validate material and claim USB"] --> Syncing["Activate and establish quiet receive boundary"]
-    Syncing --> Bootstrap["Pre-TLS bootstrap and TLS 1.2 PSK"]
+    Opened["Open: inert, no USB traffic"] --> Syncing["Activate: select material source, claim USB,<br/>establish quiet receive boundary"]
+    Syncing --> Preflight["Read-only target preflight<br/>and pairing selection"]
+    Preflight --> Bootstrap["Pre-TLS bootstrap and TLS 1.2 PSK"]
     Bootstrap --> Prepare["FDT readings and baseline preparation"]
     Prepare --> Armed["Finger detection armed"]
     Armed --> Image["Finger down and complete image"]
@@ -428,6 +442,7 @@ flowchart TD
     TerminalGate -- Eligible clean NO_MATCH and explicit next action --> Syncing
     TerminalGate -- Match or error --> Closing
     Syncing -. Cancel or error .-> Closing
+    Preflight -. Cancel or error .-> Closing
     Bootstrap -. Cancel or error .-> Closing
     Prepare -. Cancel or error .-> Closing
     Armed -. Cancel or error .-> Closing
@@ -458,11 +473,15 @@ The secure bootstrap is a strict phase machine. Its durable responsibilities are
 
 1. recover the supported application command context;
 2. confirm the exact application identity;
-3. validate target compatibility against the supplied material;
+3. validate target compatibility against the selected material source;
 4. read and bind the expected chip/factory responses without writing them;
 5. perform the required operations treated as session/runtime mode and register setup;
 6. send the validated configuration record; and
 7. enter the transport state in which the reader initiates TLS.
+
+The bounded read-only preflight and, when no active Linux pairing exists, the
+single pairing transaction run before this bootstrap and are described in
+[Protected device material and secure transport](#5-protected-device-material-and-secure-transport).
 
 The current phase order is:
 
@@ -1287,9 +1306,9 @@ A mask that predates the operation is preserved. A temporary mask created by the
 operation is removed only after its inode and target still prove ownership.
 Unknown ownership is retained and reported rather than deleted by assumption.
 
-The integrated reader remains connected. Lifecycle tools do not enumerate it,
-open USB, send commands, initiate capture, or start any post-install biometric
-action. Stopping an already active daemon may allow that daemon to perform its
+Lifecycle tools do not enumerate the reader, open USB, send commands, initiate
+capture, or start any post-install biometric action, whether or not the reader is
+connected. Stopping an already active daemon may allow that daemon to perform its
 normal cleanup.
 
 ### 16.3 Installed paths
@@ -1368,7 +1387,7 @@ integrity of the project installation.
 | Missing/partial files | Refuses unexplained drift | Tolerates absence and continues safely |
 | Clone/build directory needed | No | No |
 | Fedora vendor PAM shape needed | No | No |
-| Data preservation | Material and templates preserved | Material and templates preserved |
+| Data preservation | State-v2, legacy material and templates preserved | State-v2, legacy material and templates preserved |
 
 Both use the same safety order:
 
@@ -1388,10 +1407,12 @@ project-owned.
 
 Both commands preserve:
 
-- `/var/lib/goodix-5125-poc/` and all five material files;
+- `/var/lib/fprint/goodix-5125-state-v2/` and its host pairing state;
+- `/var/lib/goodix-5125-poc/` and all five legacy material files, when present;
 - `/var/lib/fprint/` and enrolled templates;
 - staging files and the public clone;
-- firmware, existing keys, and persistent reader state.
+- firmware, factory data, the reader's current pairing, and other persistent
+  reader state; neither command writes to the reader.
 
 The owned material file-context mapping can be removed and current Fedora labels
 reapplied without reading or changing file contents. Restart after successful
@@ -1416,21 +1437,33 @@ capture. It excludes:
 - firmware flashing or in-application programming;
 - application clearing or replacement;
 - OTP or factory-data writes;
-- PSK generation, replacement, or provisioning;
+- factory key replacement or provisioning;
 - persistent VID:PID or mode changes; and
 - unknown command families used as speculative recovery.
+
+The one qualified exception is the host-pairing write defined in
+[Protected device material and secure transport](#5-protected-device-material-and-secure-transport).
+The driver may generate one local PSK and record it with exactly one logical
+`E0`, preserving the reader's current `BB010002` byte-for-byte and proving the
+result by readback and TLS. There is no automatic `E0` retry, ordinary same-OS
+reopens write nothing, and the Linux PSK is never shared with or exported to
+another operating system.
 
 Failure at an unknown phase stops the action. The driver does not try arbitrary
 reset/write sequences in the hope of recovering.
 
 This is a code and protocol design property, not proof from an exhaustive
-factory-state readback. Successful Linux use does not establish universal
-Windows interoperability or absolute non-mutation under every device failure.
+factory-state readback. Successful Linux use does not establish Windows
+interoperability beyond the qualified bounded ping-pong, or absolute non-mutation
+under every device failure.
 
 ### 18.2 Secret and biometric handling
 
-Protected material is outside the repository, imported root-only, and never
-printed by the normal tools. The OEM DLL is parsed for bounded compatibility
+Protected material is outside the repository, held root-only, and never printed
+by the normal tools. Optional legacy bundle material lives in
+`/var/lib/goodix-5125-poc/`; the Linux pairing PSK and its authenticated receipt
+live in the two state-v2 generations under
+`/var/lib/fprint/goodix-5125-state-v2/`. The OEM DLL is parsed for bounded compatibility
 data and is never loaded as executable code. Selected project buffers—including
 the PSK/material transfer buffers and specific normalization wrapper buffers—are
 explicitly cleared at their lifetime boundary. This is not a claim that every
@@ -1474,7 +1507,8 @@ threat boundary.
 | Local-account qualification only | Network/LDAP/AD account behavior is not established |
 | No FAR/FRR study | Score 40 is not a universal biometric security calibration |
 | Unknown physical DPI/orientation/polarity | Do not label captures 500 DPI or promise a natural-facing or calibrated-polarity raster |
-| Device material is user-supplied | The Windows Material Builder creates the bundle inside the reader's qualified Windows VM using USB passthrough, the qualified OEM driver and the original Windows user/DPAPI context; native or bare-metal Windows acquisition and cross-reader interchangeability are outside the qualified scope, and a different installed/staged bundle is not silently swapped |
+| Legacy device material is optional | The five-file bundle is a compatibility source, not an installation prerequisite. When used, the Windows Material Builder creates it inside the reader's qualified Windows VM using USB passthrough, the qualified OEM driver and the original Windows user/DPAPI context; native or bare-metal Windows acquisition and cross-reader interchangeability are outside the qualified scope, and a different installed/staged bundle is not silently swapped |
+| One host-pairing write | The first qualifying fingerprint action may perform exactly one logical `E0`, and a Windows pairing replacement causes one qualified restore write. Same-OS reopens write nothing. Recovery from an interrupted post-`E0`/pre-ACTIVE transaction is offline-qualified only |
 | Secure preparation starts with the action | Allow roughly one second after Plasma fingerprint selection before contact |
 | Stock policy controls most consumers | Altered authselect/PAM may not offer fingerprints; the installer does not rewrite global policy |
 | PAM layout evolves | Future Fedora changes may cause the Plasma selector to fall back to password until reviewed |
@@ -1485,7 +1519,7 @@ threat boundary.
 | Late IRQ0200 after zero-mask recovery | One release before the valid new IRQ2 is consumed passively; same-byte stale/current release in a later compatible slot is not distinguishable (section 7.4) |
 | Fault/stale-traffic boundary | Process crashes, injected faults, and exhaustive late-byte or cross-generation behavior are outside the qualified scope |
 | SELinux audit suppression is type-based | The known denied read tuple can be hidden even when caused by a future process path |
-| Factory/Windows boundary | No exhaustive factory-state readback or guarantee across Windows interoperability, power-loss scenarios, or future OS updates |
+| Factory/Windows boundary | Windows coexistence is qualified for a bounded ping-pong on one reader and one VM; there is no exhaustive factory-state readback and no guarantee across other Windows configurations, power-loss scenarios, or future OS updates |
 
 See [Validation scope and known limitations](docs/VALIDATION.md) for the release
 support basis. The protocol limits in this manual apply independently of a
@@ -1522,8 +1556,8 @@ matching.
   device instead of issuing USB resets or replaying commands manually.
 - Use `goodix-uninstall` for intact state and `goodix-force-remove` for a partial
   or damaged project installation.
-- Keep the reader connected and a working password available throughout install
-  and removal.
+- Keep a working password available throughout install and removal; these host
+  operations do not access the reader.
 
 ### 20.2 What to report
 
@@ -1531,9 +1565,10 @@ Include the Fedora version, kernel version, USB identity, reader application if
 known, project revision, exact command or consumer, action being performed,
 first non-secret error, and whether password/desktop access still works.
 
-Do **not** share the material directory, manifest, transport material, OEM DLL,
-FDT cache, configuration payload, raw USB captures, fingerprint images,
-templates, core dumps containing them, or unredacted secret-bearing logs.
+Do **not** share the state-v2 directory, the legacy material directory, manifest,
+transport material, OEM DLL, FDT cache, configuration payload, raw USB captures,
+fingerprint images, templates, core dumps containing them, or unredacted
+secret-bearing logs.
 
 ### 20.3 A0 and enrollment recovery diagnostics
 

@@ -13,8 +13,8 @@
    leave the reader untouched and wait for the password prompt again.
 8. Follow the final restart instruction.
 
-**Keep the integrated reader connected throughout.** Save this page where you
-can read it without your desktop. The command is installed by
+**Removal does not access the reader; it may stay connected or be absent.** Save
+this page where you can read it without your desktop. The command is installed by
 [the installer](INSTALLATION.md), is available in the normal command search path,
 and needs no clone, build directory or extra arguments.
 
@@ -27,8 +27,8 @@ authentication fails, **stop and seek Fedora recovery/support**.
 
 ## Normal uninstall from a working desktop
 
-Finish authentication dialogs and close fingerprint settings. Keep the reader
-connected, with your finger off it. In a normal terminal, run:
+Finish authentication dialogs and close fingerprint settings. Keep your finger
+off the reader. In a normal terminal, run:
 
 ```text
 goodix-uninstall
@@ -75,10 +75,12 @@ this same command while password and administrative access remain available.
 
 Both commands preserve:
 
-- `/var/lib/goodix-5125-poc/` and its five protected material files;
 - `/var/lib/fprint/goodix-5125-state-v2/` and its host pairing state;
+- `/var/lib/goodix-5125-poc/` and its five protected material files, when that
+  legacy source is in use;
 - fingerprint templates under `/var/lib/fprint/`;
-- firmware, existing keys, factory state and persistent device configuration;
+- firmware, factory data and the reader's current pairing; neither command writes
+  to the reader;
 - your staging directory and source clone.
 
 Material labels can return to the current Fedora policy; material contents,

@@ -38,7 +38,7 @@ a normal fingerprint photograph.
 ## Binary file
 
 A file whose bytes represent structured data rather than ordinary text. The
-material bundle's four binary files must not be opened and saved through a
+legacy material bundle's four binary files must not be opened and saved through a
 text editor or converted to a string of hexadecimal characters.
 
 ## Callback
@@ -65,7 +65,7 @@ from other parts of Linux.
 ## CRC
 
 Cyclic redundancy check: an arithmetic check that helps detect corrupted
-bytes. This project's FDT cache uses CRC-32/MPEG-2; other CRC-32 variants do
+bytes. The legacy FDT cache file uses CRC-32/MPEG-2; other CRC-32 variants do
 not necessarily produce the same result. A valid CRC is not proof of origin.
 
 ## D-Bus
@@ -92,14 +92,15 @@ translates `libfprint` actions into the protocol used by USB `27c6:5125`.
 
 ## DLL
 
-Dynamic-link library: a Windows library file. The qualified `gfusb.dll` is
-copied as OEM material and parsed for producer inputs; Linux does not execute it.
+Dynamic-link library: a Windows library file. In the optional legacy bundle, the
+qualified `gfusb.dll` is copied as OEM material and parsed for producer inputs;
+Linux does not execute it.
 
 ## DPAPI
 
 Windows Data Protection API. It protects data using a Windows security context.
-For this project, recovering the existing Goodix cache requires the original
-Windows user/DPAPI context inside the qualified Windows VM and the exact
+For the optional legacy bundle, recovering the existing Goodix cache requires the
+original Windows user/DPAPI context inside the qualified Windows VM and the exact
 additional entropy; copying the file to another VM is not enough.
 
 ## Endpoint
@@ -156,6 +157,14 @@ Per-reader digests can still be private evidence; compare them locally.
 
 The main computer running Linux, as opposed to the fingerprint sensor itself.
 
+## Host pairing
+
+The single bounded write through which Linux registers its own locally generated
+key with the reader, while leaving the reader's existing factory and Windows
+pairing records untouched. It happens at most once per key generation, is never
+retried automatically, and is proven by readback and an encrypted handshake
+before the key is used.
+
 ## Hexadecimal / hex / `0x`
 
 A way to write numbers using digits `0`–`9` and letters `A`–`F`. The prefix
@@ -178,9 +187,16 @@ A byte order in which a number's least significant byte comes first. For
 example, the two-byte number `0x1234` is stored as `34 12`. It describes
 binary storage order, not how to spell a number in JSON.
 
+## Live preflight
+
+A bounded read-only check the driver runs before it relies on any pairing state.
+It confirms the reader identity and application, reads the factory/OTP data and
+the reader's current pairing record, and derives the session configuration
+locally. It sends no persistent command.
+
 ## Manifest
 
-A text packing list describing other material. The production Goodix manifest
+A text packing list describing other material. The legacy Goodix bundle manifest
 has exactly ten string fields: identity/schema information and six digests.
 It is not a place for raw keys, extra notes or a copy of every input.
 
@@ -261,8 +277,10 @@ enrolled template.
 ## PSK
 
 Pre-shared key: secret material already known to both sides of a secure
-conversation. The project uses the reader's existing PSK and does not publish,
-replace, or provision it.
+conversation. The project generates one Linux PSK locally, stores it root-only in
+the host pairing state, and registers it with a single bounded
+[host pairing](#host-pairing) write. It never replaces factory key material and
+never publishes or exports the key.
 
 ## Raster
 
@@ -303,6 +321,13 @@ The feature extraction and matching path used by this project's production
 `libfprint`. It turns a preprocessed image into keypoints and descriptors and
 computes comparison scores.
 
+## State-v2
+
+The crash-safe root-only host directory, `/var/lib/fprint/goodix-5125-state-v2/`,
+that holds the Linux PSK and its authenticated pairing receipts. It keeps two
+generations so an interrupted operation can be reconciled by reading, never by
+guessing or by writing to the reader a second time. Project removal preserves it.
+
 ## Threshold
 
 The score boundary used to turn a similarity measurement into MATCH or NO
@@ -311,7 +336,8 @@ MATCH.
 ## TLS
 
 Transport Layer Security: the protocol used here to create an encrypted,
-integrity-checked conversation between host and reader using the existing PSK.
+integrity-checked conversation between host and reader using the stored Linux
+PSK.
 
 ## USB
 

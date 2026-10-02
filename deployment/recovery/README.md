@@ -11,8 +11,8 @@ Normal removal verifies project-owned software. Emergency removal follows a
 fixed inventory and tolerates missing receipts or partial installation. Both
 remove authentication entry points before runtime files, quiesce fprintd during
 runtime mutation and retain protected materials and fingerprint templates.
-The reader remains connected. Fedora's current configuration is exposed without
-restoring old vendor files.
+Neither command accesses the reader. Fedora's current configuration is exposed
+without restoring old vendor files.
 
 Use [Uninstall and emergency recovery](../../docs/UNINSTALL.md) for the normal
 command, console prompts, removal scope and final restart instruction.

@@ -2,8 +2,9 @@
 # Goodix 5125 Material Builder
 
 The Goodix 5125 Material Builder is a Python/Tkinter application that prepares
-the private five-file device-material bundle required by the Linux driver for a
-Goodix USB fingerprint reader `27c6:5125`.
+the optional legacy five-file device-material bundle for a Goodix USB fingerprint
+reader `27c6:5125`. The Linux driver is self-contained and needs no bundle for a
+fresh installation; this tool serves the legacy compatibility source only.
 
 The supported workflow runs inside the qualified Windows VM and covers embedded
 USBPcap acquisition, target and APP validation, CONFIG90/A2/CHIP82/A6 extraction,

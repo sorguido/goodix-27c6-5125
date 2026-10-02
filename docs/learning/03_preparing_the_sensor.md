@@ -17,23 +17,25 @@ and its own communication rules. Plugged in does not mean ready to capture.
 Before the first image, the driver must:
 
 1. recognize the supported USB device;
-2. load and validate the reader-specific host material;
-3. take temporary ownership of the USB interface;
-4. make sure no stale bytes from an earlier session are being mistaken for a
+2. take temporary ownership of the USB interface;
+3. make sure no stale bytes from an earlier session are being mistaken for a
    new reply;
-5. confirm the expected APP12509 identity and other target-bound replies;
+4. confirm the expected APP12509 identity and other target-bound replies, and
+   read the factory data this session's configuration is built from;
+5. on first use only, agree a Linux pairing key and store it with one bounded
+   write to the reader;
 6. apply the known runtime configuration for this session;
-7. establish an encrypted TLS session using the reader's existing key;
+7. establish an encrypted TLS session using the stored Linux pairing key;
 8. measure a no-finger baseline and prepare finger detection;
 9. arm the sensor and wait for a finger-down event.
 
 ```mermaid
 flowchart TD
-    A["USB device 27c6:5125 found"] --> B["Load and validate five host-side material files"]
-    B --> C["Claim USB interface"]
+    A["USB device 27c6:5125 found"] --> C["Claim USB interface"]
     C --> D["Bounded pre-session receive synchronization"]
     D --> E["Confirm APP12509 identity and target-bound replies"]
-    E --> F["Apply volatile runtime setup"]
+    E --> P["First use only: store one Linux pairing key<br/>with a single bounded write"]
+    P --> F["Apply volatile runtime setup"]
     F --> G["TLS 1.2 PSK handshake"]
     G --> H["Collect no-finger baseline information"]
     H --> I["Prepare finger-detection tables"]
@@ -48,7 +50,7 @@ rather than improvising.
 Think of opening a secure workshop:
 
 - check the sign on the door;
-- use the existing key—do not replace the lock;
+- cut one key of your own for the existing lock—never change the lock;
 - set the workbench for today's job;
 - take a photo of the empty bench so later changes are visible;
 - switch on the doorbell and wait.
@@ -69,8 +71,10 @@ TLS server and the reader acts as the client.
 The important safety point is what the project does **not** do:
 
 ```text
-use existing reader PSK ✓
-replace or provision a PSK ✗
+factory key and factory data left untouched ✓
+one bounded Linux host pairing, stored root-only ✓
+repeated, automatic or retried pairing writes ✗
+sharing the Linux key with Windows ✗
 ```
 
 No secret value belongs in this guide, the repository, logs, or bug reports.
@@ -89,13 +93,21 @@ persistent:  rebuild the desk or change its serial number
 ```
 
 The supported project path excludes firmware-update and device-reset
-operations, one-time-programmable (OTP) memory writes, PSK replacement, and
-persistent identity changes.
+operations, one-time-programmable (OTP) memory writes, factory key replacement,
+and persistent identity changes. The single exception is the one bounded
+host-pairing write described above; ordinary later use repeats no write at all.
 
-## The five host-side material files
+## Where the session inputs come from
 
-Normal operation uses a validated five-file bundle already prepared for the
-reader. At a high level it supplies:
+The driver builds what it needs from the reader itself. A bounded read-only
+preflight confirms the identity, reads the factory/OTP data and the reader's
+current pairing record, and derives the exact runtime configuration locally.
+Finger-detection calibration is learned live from a no-finger baseline, so no
+imported cache file is needed. The Linux pairing key is generated locally and
+stored root-only on the host, never read out of the sensor.
+
+An older five-file bundle remains an optional compatibility source. When one is
+installed it supplies the same kinds of input at a high level:
 
 - a manifest describing and binding the set;
 - transport and secure-session material;
@@ -104,12 +116,12 @@ reader. At a high level it supplies:
   software, which is parsed, not executed;
 - finger-detection calibration/cache input.
 
-The normal fingerprint flow reads this material from a root-only host
-directory. It does not extract it from the sensor each time and does not write
-it back into factory storage.
+The fingerprint flow reads that material from a root-only host directory and
+cross-checks it against the reader before use. It does not extract it from the
+sensor each time and does not write it back into factory storage.
 
-Chapter 9 explains where these files live and how they differ from fingerprint
-templates.
+Chapter 9 explains where these files and the host pairing state live and how
+they differ from fingerprint templates.
 
 ## The simple map, without the byte soup
 
@@ -136,7 +148,7 @@ enter the project's checked re-entry path
         ↓
 confirm the expected firmware target
         ↓
-validate reader-specific compatibility material and replies
+validate the target-bound replies and read the factory data
         ↓
 perform the known cold-start preparation
         ↓
@@ -160,18 +172,23 @@ labels, followed by a cautious beginner translation:
 | --- | --- |
 | `REENTRY_RECOVERY_A2` | Run one bounded project re-entry step before identification. This label does not mean a factory reset. |
 | `A8` | Require the exact `GF_ST411SEC_APP_12509` identity expected by this driver. |
-| `E4` | Check the expected validator derived from the existing protected compatibility material. The validator is not the PSK. |
+| `E4` | Check the expected validator derived from the stored Linux pairing key, or from legacy bundle material when that source is selected. The validator is not the PSK. |
 | `OEM_COLD_START_A2_1` | Perform the first known cold-start preparation step. |
-| `CHIP_82` | Read four target-bound bytes and require their saved data fingerprint (cryptographic digest) to match the manifest. The code does not prove that they are an immutable chip ID. |
+| `CHIP_82` | Read four target-bound bytes and require their saved data fingerprint (cryptographic digest) to match the recorded expected value. The code does not prove that they are an immutable chip ID. |
 | `OTP_A6` | Read and check the expected factory/OTP-related response; do not write factory information. |
 | `OEM_COLD_START_A2_2` | Perform the second known cold-start preparation step. |
 | `MODE_70` | Select the required runtime operating mode. |
 | `DAC_220` through `DAC_23A` | Apply four validated runtime tuning values using command `0x80`. |
-| `CONFIG_90` | Send the validated 224-byte runtime configuration block. |
+| `CONFIG_90` | Send the validated 224-byte runtime configuration block, derived locally from the live OTP read or taken from legacy bundle material. |
 | `D1` | Leave the ordinary pre-TLS request/reply sequence and begin the `B0`-wrapped secure-transport transition. |
 | `TLS` | Complete the TLS 1.2 PSK handshake with the host as server and the reader as client. |
 | `D4` then `AF` | Begin the post-TLS sequence and confirm the reader controller is in the expected state. |
 | FDT bootstrap | Gather fresh detection readings, obtain the no-finger baseline, derive or validate tables, and send the first `0x32` arm command. |
+
+That sequence is what an ordinary reopen runs. On first use - or after Windows
+has replaced the pairing - a bounded read-only preflight runs first and exactly
+one pairing write may occur before TLS. Every later Linux session reuses the
+stored key and writes nothing.
 
 In exact phase order, the secure-session portion is:
 
@@ -200,7 +217,13 @@ session instead of guessing what the reader meant.
 > 🔎 **Want to see this in the repository?**
 > The high-level secure-session sequence is in
 > [`goodix_secure_session.c`](../../libfprint-driver/goodix_secure_session.c).
-> Runtime material loading is in
+> The read-only preflight is in
+> [`goodix_live_preflight.c`](../../libfprint-driver/goodix_live_preflight.c),
+> the single bounded pairing write is in
+> [`goodix_pairing_activation.c`](../../libfprint-driver/goodix_pairing_activation.c),
+> and the root-only host state is in
+> [`goodix_self_state.c`](../../libfprint-driver/goodix_self_state.c).
+> Legacy material loading is in
 > [`goodix_runtime_material.c`](../../libfprint-driver/goodix_runtime_material.c),
 > and post-TLS preparation is in
 > [`goodix_post_tls_lifecycle.c`](../../libfprint-driver/goodix_post_tls_lifecycle.c).
@@ -210,7 +233,9 @@ session instead of guessing what the reader meant.
 - The sensor is a small computer, not a passive button.
 - It must be identified, validated, configured, secured, and calibrated before
   capture.
-- TLS protects the conversation using the existing reader PSK.
+- TLS protects the conversation using the stored Linux pairing key.
+- First use performs one bounded pairing write; ordinary later use writes
+  nothing.
 - Runtime setup is temporary; it is not permission to alter factory state.
 - The simple lifecycle maps to a real, ordered, fail-closed protocol state
   machine.

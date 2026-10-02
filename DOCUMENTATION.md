@@ -10,7 +10,9 @@ project.
 | --- | --- |
 | Understand what this project supports | [Project overview](README.md) |
 | Install, update, or reinstall the driver | [Installation and updates](docs/INSTALLATION.md) |
-| Build the required five-file device-material bundle | [Goodix 5125 Material Builder](tools/windows_material_builder/README.md) |
+| Understand what the driver writes to the reader | [Security and privacy](docs/SECURITY.md#factory-preserving-design) |
+| Share the reader with Windows | [Using the reader with Windows](docs/INSTALLATION.md#using-the-reader-with-windows) |
+| Build the optional legacy five-file device-material bundle | [Goodix 5125 Material Builder](tools/windows_material_builder/README.md) |
 | Understand or audit the device-material format | [Device-specific material contract](docs/DEVICE_MATERIALS.md) |
 | Remove the driver normally | [Uninstall and emergency recovery](docs/UNINSTALL.md#normal-uninstall-from-a-working-desktop) |
 | Recover when graphical login is unavailable | [Emergency recovery](docs/UNINSTALL.md#emergency-graphical-login-is-unavailable) |
@@ -28,30 +30,32 @@ project.
   entry point, authentication behavior, removal, security boundaries, and links to
   the main documentation.
 - **[Installation and updates](docs/INSTALLATION.md)** — Supported installation,
-  update, and reinstall procedure, prerequisites, device-material staging, and
-  installer behavior.
+  update, and reinstall procedure, prerequisites, first-use initialization,
+  optional legacy device-material staging, installer behavior, and Windows
+  coexistence.
 - **[Login, lock screen, sudo, and PolicyKit](docs/learning/08_desktop_authentication.md)** —
   User-facing explanation of how the same fingerprint stack appears in Plasma
   Login, KScreenLocker, `sudo`, PolicyKit, and KDE enrollment settings.
 - **[What is stored, and where](docs/learning/09_what_is_stored.md)** — Where
-  persistent reader state, protected device material, and enrolled fingerprint
-  templates live.
+  persistent reader state, host pairing state, optional legacy device material,
+  and enrolled fingerprint templates live.
 
-## 2. Device material and Windows acquisition
+## 2. Optional legacy device material and Windows acquisition
 
-The Linux runtime requires a private five-file bundle tied to the qualified
-reader and OEM environment. These pages describe the supported acquisition path,
-the file contract, and the manual reference workflow.
+The Linux runtime is self-contained: it initializes the reader on first use and
+needs no bundle. The five-file bundle remains an optional legacy compatibility
+source tied to the qualified reader and OEM environment. These pages describe its
+supported acquisition path, file contract, and manual reference workflow.
 
 - **[Goodix 5125 Material Builder](tools/windows_material_builder/README.md)** —
-  Recommended Windows-VM application for acquiring, deriving, assembling, and
+  Optional legacy Windows-VM application for acquiring, deriving, assembling, and
   validating the canonical five-file bundle.
 - **[Device-specific material contract and acquisition reference](docs/DEVICE_MATERIALS.md)** —
   Canonical format, validation rules, privacy requirements, reader binding, and
   detailed acquisition reference for the five files.
 - **[Building your device-material bundle](docs/learning/11_building_your_device_material_bundle.md)** —
   Beginner-oriented practical walkthrough and manual alternative for assembling
-  the same bundle inside the qualified Windows VM.
+  the same optional legacy bundle inside the qualified Windows VM.
 - **[Windows Material Builder — technical audit and provenance](tools/windows_material_builder/AUDIT.md)** —
   Stable safety, provenance, USBPcap, DPAPI, capture, and bundle-contract details
   for the Windows Material Builder.
@@ -83,7 +87,8 @@ technical specification.
 2. **[From Fedora to the sensor](docs/learning/02_from_fedora_to_the_sensor.md)** —
    KDE, PAM, D-Bus, fprintd, libfprint, the driver, USB, and the physical reader.
 3. **[Preparing a tiny computer](docs/learning/03_preparing_the_sensor.md)** —
-   Device preparation, identity checks, runtime setup, TLS, and finger detection.
+   Device preparation, identity checks, first-use pairing, runtime setup, TLS,
+   and finger detection.
 4. **[From finger detection to image](docs/learning/04_from_finger_to_image.md)** —
    Finger detection, capture, TLS-protected image transport, decoding, and release.
 5. **[From image to fingerprint template](docs/learning/05_from_image_to_template.md)** —
@@ -95,7 +100,8 @@ technical specification.
 8. **[Login, lock screen, sudo, and PolicyKit](docs/learning/08_desktop_authentication.md)** —
    How different Fedora/KDE authentication consumers use the same fingerprint stack.
 9. **[What is stored, and where](docs/learning/09_what_is_stored.md)** — Reader
-   state, protected material, and Fedora fingerprint templates.
+   state, host pairing state, optional legacy material, and Fedora fingerprint
+   templates.
 10. **[Safety and factory preservation](docs/learning/10_safety_and_factory_preservation.md)** —
     Why Linux support does not require flashing, reprovisioning, or persistent
     factory changes.

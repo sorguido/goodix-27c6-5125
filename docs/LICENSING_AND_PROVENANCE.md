@@ -124,7 +124,9 @@ and do not add Windows/Python GUI dependencies to `production/build-public.py`.
 Open-source licenses in this tree do not grant rights to distribute OEM firmware
 or binaries, reader secrets, private captures, factory data, fingerprint images
 or templates. Those items are excluded from public source and software payloads.
-The runtime consumes a separately supplied legitimate device-material bundle.
+The optional legacy device-material bundle is separately supplied by the user and
+is not redistributed here; the self-contained pairing path ships no OEM secret
+and generates its Linux PSK locally.
 
 Preserve original notices and corresponding source when
 redistributing components. [References](REFERENCES.md) and

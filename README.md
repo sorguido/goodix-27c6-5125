@@ -3,8 +3,8 @@
 
 A userspace fingerprint driver for the Goodix USB reader `27c6:5125` running
 `GF_ST411SEC_APP_12509`. It connects a Goodix-enabled libfprint library to Fedora's
-fprintd service and desktop authentication, preserving factory firmware, existing
-keys and persistent reader state.
+fprintd service and desktop authentication, initializing the reader by itself on
+first use while preserving factory firmware and factory data.
 
 ## Supported configuration
 
@@ -28,35 +28,43 @@ sudo authentication when needed. The reader may be absent throughout these
 host lifecycle operations.
 
 You need a working password login and administrative access. A fresh installation
-does not require a reader or a legacy material bundle: it creates the empty,
-root-only state-v2 location without opening USB. During the migration window, an
-existing [five-file device-material bundle](docs/DEVICE_MATERIALS.md) remains a
-supported compatibility source. If you need that legacy source, its supported
-acquisition environment is a qualified
-Windows VM with USB passthrough, the qualified Goodix OEM driver, and the original
-Windows user/DPAPI context for that VM. Place the finished files in
-`$HOME/goodix-5125-materials/`, outside the clone. The project does not distribute
-protected material. The recommended acquisition tool is the
-[Goodix 5125 Material Builder](tools/windows_material_builder/README.md), which
-runs inside that VM and prepares the canonical five-file bundle. Native or
-bare-metal Windows acquisition is outside the supported workflow. The manual
-acquisition reference remains available for audit and troubleshooting of the same
-VM workflow. Fedora prerequisites are included in the installation flow; separate
-build instructions are unnecessary. Git must be available to run the bootstrap
-block.
+needs no Windows machine, no capture tooling and no private material bundle: it
+creates the empty, root-only state-v2 location without opening USB, and the
+reader may be absent. Fedora prerequisites are included in the installation flow;
+separate build instructions are unnecessary. Git must be available to run the
+bootstrap block.
+
+An existing [five-file device-material bundle](docs/DEVICE_MATERIALS.md) remains
+an optional compatibility source. If you supply one, stage it in
+`$HOME/goodix-5125-materials/`, outside the clone. Its supported acquisition
+environment is a qualified Windows VM with USB passthrough, the qualified Goodix
+OEM driver, and the original Windows user/DPAPI context for that VM; the
+recommended tool is the
+[Goodix 5125 Material Builder](tools/windows_material_builder/README.md), and
+native or bare-metal Windows acquisition is outside the supported workflow. The
+manual acquisition reference remains available for audit and troubleshooting of
+the same VM workflow. The project does not distribute protected material.
 
 After a successful installation, the repository clone may be removed; a later run
 of the same bootstrap block clones it again automatically. Ordinary updates and
-reinstalls reuse the validated protected set in `/var/lib/goodix-5125-poc/`, so
-the Home staging folder is not technically required. Keep an independent secure
-backup of the original bundle for material loss, reformatting or a new machine.
+reinstalls preserve `/var/lib/fprint/goodix-5125-state-v2/` and any validated
+legacy set in `/var/lib/goodix-5125-poc/`, so the Home staging folder is not
+technically required. Keep an independent secure backup of a legacy bundle while
+that compatibility source is in use.
 
 ## Using fingerprint authentication
+
+The first fingerprint action initializes the reader by itself. It confirms the
+target identity, derives the configuration from the reader's own OTP, stores a
+locally generated pairing key in root-only state-v2 and records it with a single
+bounded pairing write. Ordinary later use reuses that stored key and writes
+nothing to the reader.
 
 Manage enrolled fingers through KDE's fingerprint settings. At Plasma Login,
 a nonempty password uses ordinary password login immediately. Submitting an
 empty password field explicitly selects fingerprint authentication, with at
-most three attempts and a stop on the first match. Other consumers follow
+most three attempts and a stop on the first match. After selecting fingerprint,
+allow roughly one second before touching the reader. Other consumers follow
 Fedora's normal prompts where its current policy enables fingerprints; the
 installer does not modify authselect or global PAM policy.
 
@@ -76,8 +84,9 @@ the technical manual remains the canonical specification.
 Run **`goodix-uninstall`** from a working desktop terminal. If graphical login
 is unavailable, follow the [text-console emergency instructions](docs/UNINSTALL.md)
 and run **`goodix-force-remove`**. Both commands request their own sudo
-authentication, preserve materials and templates, and work after the clone is
-removed. Leave the reader connected.
+authentication, preserve pairing state, materials and templates, and work after
+the clone is removed. Removal does not access the reader, which may stay
+connected or be absent.
 
 Removal exposes current Fedora configuration and finishes with a normal restart
 instruction. It cannot repair an independently broken Fedora authentication stack.
@@ -86,24 +95,24 @@ instruction. It cannot repair an independently broken Fedora authentication stac
 
 The installer always creates or preserves root-only state-v2 under
 `/var/lib/fprint/goodix-5125-state-v2/`. If a legacy bundle is supplied, it is
-copied into `/var/lib/goodix-5125-poc/`, protected and retained as a migration
-source. Subsequent runs validate and preserve an installed legacy set; invalid
+copied into `/var/lib/goodix-5125-poc/`, protected and retained side by side.
+Subsequent runs validate and preserve an installed legacy set; invalid
 installed material stops the operation without falling back to a Home copy. Keep materials,
 fingerprint images, templates and raw USB captures out of source trees and
 issue reports. [Security and privacy](docs/SECURITY.md) describes the boundary.
 
-The production coordinator is read-only with respect to pairing at the current
-host/VM gate: ordinary open/discovery performs no material read or USB claim,
-and a state-only activation fails closed pending the separately gated live
-preflight. The supported path excludes flashing, firmware replacement, OTP
-writes and persistent factory changes. Compatibility with future Fedora
-releases, other Windows VM/OEM configurations, and broader hardware remains
-outside the qualified scope.
+Discovery, enumeration, ordinary open, boot and an uninitialized login read no
+protected material and claim no USB; only an explicit fingerprint action does,
+and it runs a bounded read-only preflight before the secure session starts.
 
-**Factory-unpaired readers are currently unsupported.** If the reader has never
-been initialized by a compatible OEM environment and no valid pairing state is
-present, the driver fails closed. Automatic first-time pairing of a
-factory-uninitialized reader has not been hardware-qualified.
+The supported path never flashes firmware, replaces the reader application,
+writes OTP or factory data, or persistently changes VID:PID or mode. Its single
+persistent reader mutation is the one host-pairing write above, which preserves
+the reader's current `BB010002` byte-for-byte and is proven by readback and TLS
+before use. Windows keeps working alongside Linux: when Windows replaces the
+pairing, Linux restores the same stored key with one qualified write instead of
+generating a new one. Compatibility with future Fedora releases, other Windows
+VM/OEM configurations, and broader hardware remains outside the qualified scope.
 
 ## Documentation
 

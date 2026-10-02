@@ -6,7 +6,8 @@ This directory contains the target-specific source used by the
 
 - asynchronous USB routing and transfer ownership;
 - TLS 1.2 PSK server and secure-session state;
-- protected-material validation and binding;
+- bounded read-only target preflight and CONFIG90 derivation;
+- self-contained host pairing, crash-safe state-v2 and legacy-material binding;
 - image record decoding and preprocessing;
 - enrollment, template, matching, and action integration;
 - cancellation, terminal events, cleanup, and bounded retries.
@@ -31,7 +32,15 @@ normal and ASan/UBSan builds without a reader or real materials. Enrollment
 coverage includes primary ownership, zero-mask continuation, omitted auxiliary
 commands, bounded late releases, raw bounds, cancellation and terminal cleanup.
 The low-level binding suite also checks diagnostic fallback when recovery is not
-enabled. Runtime semantics and qualification limits are described in the
+enabled. The self-contained boundaries have their own runners in the same
+directory: `tests/run_goodix_pairing_crypto_test.sh`,
+`tests/run_goodix_config90_bb010002_test.sh`,
+`tests/run_goodix_self_state_test.sh`,
+`tests/run_goodix_live_preflight_test.sh`,
+`tests/run_goodix_pairing_provision_test.sh` and
+`tests/run_goodix_pairing_activation_test.sh`. All of them run without a reader,
+real material or USB access. Runtime semantics and qualification limits are
+described in the
 [technical manual](../TECHNICAL_MANUAL.md#74-enrollment-zero-mask-recovery).
 
 The image-device integration runner accepts the source root and a fresh build

@@ -82,6 +82,12 @@ This is an ordered state machine, not a bag of independent commands. The same
 number can appear in different contexts, and a correct reply for one phase is
 not automatically valid in another.
 
+What you see above is an ordinary reopen. On first use, or after Windows has
+replaced the pairing, a bounded read-only preflight runs first: it confirms the
+identity, reads the factory/OTP data and the reader's current pairing record, and
+derives the configuration locally. Exactly one pairing write may then register
+the host's own Linux key before TLS. Later Linux sessions repeat no write.
+
 ## How one checked step works
 
 Most pre-TLS commands travel in an `A0` message. That message contains a
@@ -135,10 +141,11 @@ Think of this as checking the model and firmware label before following a
 device-specific instruction book. Continuing with a merely similar reader
 would make every later assumption less trustworthy.
 
-### `E4`: validate an existing compatibility binding
+### `E4`: validate the current pairing binding
 
-Before the session starts, the runtime derives an expected **validator** from
-the user's already validated protected material. At `E4`, the reader's typed
+Before the session starts, the runtime derives an expected **validator** from the
+stored Linux pairing key, or from legacy bundle material when that source is
+selected. At `E4`, the reader's typed
 reply must contain that exact validator and match its stored cryptographic
 digest—a compact fingerprint of the expected bytes.
 
@@ -146,15 +153,17 @@ Two distinctions matter:
 
 ```text
 validator ≠ PSK
-checking existing protected material ≠ replacing or provisioning it
+reading factory material ≠ rewriting it
 ```
 
-The validator is evidence that the current inputs fit the expected reader/OEM
-compatibility path. The PSK is the pre-existing secret later used by TLS. The
-project publishes neither value and changes neither one.
+The validator is evidence that the current inputs fit the reader's present
+pairing. The PSK is the secret later used by TLS: on the self-contained path the
+host generated it once locally and registered it with a single bounded pairing
+write, while the reader's factory key material and its Windows pairing record are
+never replaced. The project publishes neither value.
 
-An everyday analogy is checking that an existing key fits the expected lock
-without copying the key into the manual or replacing the lock.
+An everyday analogy is checking that your own key fits the expected lock without
+copying the key into the manual or changing the lock.
 
 ### Pre-TLS `0x82`: a target-bound read, not a proven chip ID
 
@@ -163,8 +172,9 @@ proves is narrower:
 
 - it sends the expected `0x82` request at this exact point;
 - it requires a four-byte typed response;
-- it accepts that body only when its cryptographic digest matches the expected
-  value stored in the reader-specific manifest.
+- it accepts that body only when its cryptographic digest matches the recorded
+  expected value, which comes from the live preflight state or from a legacy
+  bundle manifest.
 
 That is enough to make the response a useful target-bound check. It is not
 enough to prove the four bytes are an immutable silicon identifier. The guide
@@ -178,7 +188,9 @@ does not make the two phases interchangeable.
 
 OTP means **one-time programmable** memory: factory information designed for
 restricted or one-time programming. The `OTP_A6` phase reads a 64-byte typed
-response and requires its digest to match the manifest.
+response and requires its digest to match the recorded expected value. On the
+self-contained path those same 64 bytes are also the input from which the driver
+derives the 224-byte runtime configuration locally.
 
 The public evidence supports the careful description "factory/OTP-related
 response." It does not require guessing the meaning of every byte.
@@ -197,7 +209,8 @@ These phases prepare the reader for the current operating path:
   `0x0238`, and `0x023A`. The source calls them DAC tuning phases. A
   digital-to-analog converter (DAC) is like an electronic adjustment knob,
   although the exact physical effect of each value is not claimed here.
-- `CONFIG_90` sends the validated 224-byte runtime configuration block. The
+- `CONFIG_90` sends the validated 224-byte runtime configuration block, derived
+  locally from the live OTP read or taken from legacy bundle material. The
   driver has already checked its digest, arithmetic finalizer, and consistency
   with the four tuning values.
 
@@ -218,8 +231,8 @@ For this target:
 - PSK means pre-shared key;
 - the host acts as the TLS server;
 - the reader acts as the TLS client;
-- the project uses the existing PSK rather than generating or provisioning a
-  replacement.
+- the project uses the stored Linux PSK established by the single first-use
+  pairing; factory key material is never provisioned or replaced.
 
 The driver advances from `D1` only after the TLS engine has processed enough
 of that ClientHello to produce the server's first handshake response. It then
@@ -273,7 +286,7 @@ compare readings     → require the second delta to pass its check
 0x32                 → arm finger-down detection
 ```
 
-The initial table comes from validated host material, but the driver gathers
+The initial table is seeded from zero and learned live: the driver gathers
 fresh readings for the current session. It derives detection tables, checks
 the measured differences against the returned threshold, decodes the baseline
 through the normal protected image path, and arms only after those gates pass.
@@ -333,7 +346,7 @@ The project distinguishes four levels:
 | Level | Beginner meaning | Pre-TLS `0x82` example |
 | --- | --- | --- |
 | Observed | What appeared in the protocol conversation | A four-byte typed response appears at the expected point. |
-| Verified | What current code enforces | Its shape and cryptographic digest must match the expected manifest value. |
+| Verified | What current code enforces | Its shape and cryptographic digest must match the recorded expected value. |
 | Inferred | A useful interpretation supported by context | It is a target-bound compatibility check. |
 | Unknown | A stronger meaning the evidence does not establish | Whether those bytes are an immutable silicon chip ID. |
 
@@ -354,7 +367,7 @@ fact.
 | `0x80 × 4` | "Apply four validated runtime tuning values." |
 | `0x90` | "Send the validated runtime configuration block." |
 | `D1` | "Begin the transition into `B0`-wrapped secure transport." |
-| TLS | "Build the protected host↔reader conversation using the existing PSK." |
+| TLS | "Build the protected host↔reader conversation using the stored Linux PSK." |
 | `D4` | "Begin the checked post-TLS working sequence." |
 | `AF` | "Query and validate the reader controller's current state." |
 | FDT | "Gather fresh detection data, decode a baseline, and arm finger detection." |

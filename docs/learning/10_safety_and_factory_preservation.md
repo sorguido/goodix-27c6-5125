@@ -14,30 +14,35 @@ That shapes both the driver and the project around it.
 
 ## Use what already exists
 
-The supported path uses the reader's existing firmware, identity, secure key,
-and persistent state. It prepares temporary runtime state, communicates through
-the established secure protocol, captures images, and closes the session.
+The supported path uses the reader's existing firmware, identity and factory
+state. It prepares temporary runtime state, communicates through the established
+secure protocol, captures images, and closes the session.
 
 It deliberately excludes destructive shortcuts such as:
 
 - firmware flashing;
 - firmware-update or device-reset operations;
 - one-time-programmable (OTP) memory writes;
-- PSK generation, replacement, or provisioning;
-- factory-data writes;
+- factory key replacement or factory-data writes;
 - persistent mode or USB identity changes;
 - unknown wire commands that might have persistent effects.
 
 These are not missing tutorial steps. They are outside the supported design.
 
+There is exactly one persistent change the driver makes: a single bounded
+host-pairing write that registers its own locally generated Linux key. It keeps
+the reader's existing pairing record byte-for-byte, proves the result by readback
+and by completing an encrypted handshake before the key is used, is never retried
+automatically, and is not repeated by ordinary later use.
+
 ## 🏠 A simple analogy
 
 Suppose you rent a furnished apartment.
 
-You may move a chair while you work, use the existing key, and return the room
-to its normal state when you leave. You do not replace the locks, rewrite the
-building registry, or knock down a wall just because it makes today's task
-easier.
+You may move a chair while you work, add your own key to the existing lock, and
+return the room to its normal state when you leave. You do not replace the locks,
+rewrite the building registry, or knock down a wall just because it makes today's
+task easier.
 
 Runtime configuration is moving the chair. Factory reprogramming is changing
 the building.
@@ -81,7 +86,8 @@ repair, reinstall, update, or remove the fingerprint software
 ```
 
 The project provides normal and emergency removal commands that remove
-project-owned influence while preserving templates and device material. They
+project-owned influence while preserving templates, host pairing state and any
+legacy device material. They
 cannot repair an independently broken Fedora password or authorization stack.
 
 ## Safety claims have boundaries
@@ -91,7 +97,8 @@ A successful fingerprint match does not prove every safety property.
 The project has evidence on one qualified reader and Fedora setup. That does
 not establish:
 
-- exhaustive Windows compatibility after every possible event;
+- exhaustive Windows compatibility after every possible event, beyond the
+  qualified bounded ping-pong;
 - a complete byte-for-byte factory-state readback;
 - universal support for other Goodix firmware or devices;
 - a universal false-acceptance or false-rejection rate;
@@ -103,27 +110,27 @@ Good engineering says what was observed and what remains unproven.
 ## Protected material stays protected
 
 Factory preservation and privacy reinforce each other. The project does not
-publish the reader PSK, fingerprint data, private captures, or OEM-proprietary
-material. Normal logs and educational documents should describe shapes and
-flows, not secrets or biometric contents.
+publish the Linux pairing key, fingerprint data, private captures, or
+OEM-proprietary material. Normal logs and educational documents should describe
+shapes and flows, not secrets or biometric contents.
 
 ## Where to go next
 
 - [Technical manual](../../TECHNICAL_MANUAL.md) — current public architecture and engineering boundary.
 - [Security and privacy](../SECURITY.md) — handling rules and host security boundary.
 - [Validation and limitations](../VALIDATION.md) — what was exercised and what was not.
-- [Device material contract](../DEVICE_MATERIALS.md) — exact operational requirements for the protected bundle.
+- [Device material contract](../DEVICE_MATERIALS.md) — exact operational requirements for the optional legacy bundle.
 
 ## ✅ What to remember
 
-- Linux support uses the existing reader state; it does not require
-  reprovisioning the sensor.
+- Linux support does not reprogram firmware, OTP or factory data; its only
+  persistent change is one bounded host-pairing write.
 - Runtime configuration is temporary and different from persistent factory
   modification.
 - Unknown or inconsistent protocol state fails closed.
 - Fedora continues to own the general authentication stack and password path.
-- Templates and protected device material stay private and are preserved by
-  project removal.
+- Templates, host pairing state and any legacy device material stay private and
+  are preserved by project removal.
 - Evidence has a scope; successful use on one setup is not a universal claim.
 
 ---

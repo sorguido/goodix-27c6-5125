@@ -48,15 +48,15 @@ You can stop after any chapter and still keep a useful mental picture.
 
 1. [A two-minute tour](01_what_are_we_building.md) — the complete journey on one page.
 2. [From Fedora to the sensor](02_from_fedora_to_the_sensor.md) — the Linux layers and why they are separate.
-3. [Preparing a tiny computer](03_preparing_the_sensor.md) — identity, runtime setup, and the secure channel.
+3. [Preparing a tiny computer](03_preparing_the_sensor.md) — identity, first-use pairing, runtime setup, and the secure channel.
 4. [From finger detection to image](04_from_finger_to_image.md) — the doorbell, the camera, and the image bytes.
 5. [From image to fingerprint template](05_from_image_to_template.md) — preprocessing, features, and SIGFM.
 6. [Enrollment](06_enrollment.md) — how several touches become a reusable template.
 7. [Verification and matching](07_verification_and_matching.md) — MATCH, NO MATCH, retry, and cancellation.
 8. [Login, lock screen, sudo, and PolicyKit](08_desktop_authentication.md) — one fingerprint stack, different experiences.
-9. [What is stored, and where](09_what_is_stored.md) — sensor state, device material, and host templates.
+9. [What is stored, and where](09_what_is_stored.md) — sensor state, host pairing state, optional legacy device material, and host templates.
 10. [Safety and factory preservation](10_safety_and_factory_preservation.md) — why Linux support does not mean reprogramming the reader.
-11. [Building your device-material bundle](11_building_your_device_material_bundle.md) — a practical, from-zero walkthrough for collecting the inputs inside the qualified Windows VM, making the USB capture, deriving the protected transport material, and assembling the final bundle.
+11. [Building your device-material bundle](11_building_your_device_material_bundle.md) — optional legacy path: a practical walkthrough for collecting the inputs inside the qualified Windows VM, making the USB capture, deriving the protected transport material, and assembling the final bundle.
 12. [Glossary](glossary.md) — plain-English definitions for the important terms.
 
 ## 🔬 Optional deep dive

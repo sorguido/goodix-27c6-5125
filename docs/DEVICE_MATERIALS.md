@@ -22,13 +22,21 @@ those files there and continue with [Installation](INSTALLATION.md). Without one
 the installer prepares an empty root-only state-v2 location and does not access
 the reader.
 
+> [!NOTE]
+> **You do not need this bundle to install the driver.** A fresh installation
+> creates an empty root-only state-v2 location, and the first fingerprint action
+> initializes the reader by itself: it derives the configuration from the
+> reader's own OTP, stores a locally generated Linux pairing key and records it
+> with a single bounded write. See [Installation](INSTALLATION.md). This page
+> documents the optional legacy compatibility source only.
+
 > [!TIP]
-> **Starting from zero? Use the Windows Material Builder.** The supported
+> **Using the legacy path? Use the Windows Material Builder.** Its supported
 > acquisition environment is a qualified Windows VM with USB passthrough, the
 > qualified Goodix OEM driver, and the original Windows user/DPAPI context for
 > that VM. Use the
 > [Goodix 5125 Windows Material Builder](../tools/windows_material_builder/README.md)
-> inside that VM to capture and prepare the complete five-file bundle used by
+> inside that VM to capture and prepare the complete five-file bundle consumed by
 > the legacy Linux path. Native or bare-metal Windows acquisition is outside the
 > supported workflow.
 >
@@ -745,7 +753,9 @@ from different reader states/devices. Recollect from the same physical reader.
 # Safety boundary
 
 Nothing in this acquisition reference authorizes firmware flashing, IAP,
-ClearApp, OTP writes, PSK replacement/provisioning, VID:PID changes, or any other
-persistent device-state modification. The supported runtime remains
-factory-preserving and expects the Windows factory path to remain usable.
-See [Security and privacy](SECURITY.md) for the release safety boundary.
+ClearApp, OTP writes, factory key replacement, VID:PID changes, or any other
+persistent device-state modification: acquisition is read-only against the
+Windows OEM path. The Linux runtime is factory-preserving, and its single
+persistent reader mutation is the one bounded host-pairing write described in
+[Security and privacy](SECURITY.md), which keeps the reader's current
+`BB010002` byte-for-byte so the Windows path remains usable.

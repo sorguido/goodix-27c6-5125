@@ -1,7 +1,8 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 
 > [!TIP]
-> The supported acquisition environment is a qualified Windows VM with USB
+> The supported acquisition environment for this optional bundle is a qualified
+> Windows VM with USB
 > passthrough, the qualified Goodix OEM driver, and the original Windows
 > user/DPAPI context for that VM. The recommended acquisition path is the
 > [Goodix 5125 Material Builder](../../tools/windows_material_builder/README.md).
@@ -13,14 +14,22 @@
 > Native or bare-metal Windows acquisition is outside the supported workflow.
 # 11. 🧰 Building your device-material bundle
 
-You have the right fingerprint reader. Linux still needs a small, private
+> [!NOTE]
+> **This chapter is optional.** The driver is self-contained: a fresh
+> installation needs no bundle, and the first fingerprint action initializes the
+> reader by itself. Follow this chapter only if you want the legacy compatibility
+> source, or need to audit or troubleshoot it.
+
+You have the right fingerprint reader. The legacy path uses a small, private
 folder of information obtained from that reader inside its qualified Windows VM.
 This chapter explains how to assemble it using ordinary Windows tools inside
 that VM.
 
 This is a practical companion to the [device-material contract](../DEVICE_MATERIALS.md),
-not a replacement for it. The release **consumes and validates** a finished
-bundle. The Windows Material Builder is the recommended acquisition tool; the
+not a replacement for it. When a bundle is supplied, the installer **imports and
+validates** it side by side with the host pairing state; it never synthesizes a
+bundle from that state. The Windows Material Builder is the recommended
+acquisition tool; the
 helper prompts below document an independent manual alternative using locally
 run code inside the same qualified Windows VM. A helper reporting PASS is not a
 certification of that code or a promise that installation will succeed. The
@@ -1423,9 +1432,10 @@ it does not install software or start a fingerprint test for you.
 
 ## 🗄️ 23. What can you remove afterwards?
 
-Keep a private encrypted backup of the **final five-file bundle** for future
-reinstallation with the same reader. It is neither a biometric-template
-backup nor a portable bundle for another reader.
+Keep a private encrypted backup of the **final five-file bundle** if you want to
+retain the legacy compatibility source. It is neither a biometric-template
+backup nor a portable bundle for another reader. Ordinary reinstallation does not
+need it: both removal paths preserve the host pairing state.
 
 The Linux runtime does not need your original capture, `Goodix_Cache.bin`,
 original `goodix.dat`, helper scripts or intermediate evidence after the final

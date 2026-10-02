@@ -29,7 +29,7 @@ Windows 11 virtual machine.
 | Material/template preservation | File inode, size, owner, mode and modification time unchanged across reported normal removal; metadata evidence does not establish a cryptographic comparison of all bytes |
 | Reinstallation | Installation and subsequent Plasma fingerprint login succeeded; corrected reinstallation with the reader continuously present was also reported successful |
 | Complete public installation | Fresh Fedora 44 KDE VM installation passed; installation on the physical Fedora 44 KDE qualification system passed with SELinux Enforcing, followed by working Plasma Login, ordinary sudo, KScreenLocker, PolicyKit and password fallback |
-| Read-only coordinator host lifecycle | On the clean reader-absent VM, state-v2-only fresh install, update, normal removal, reinstall, controlled transaction rollback and emergency recovery from a missing runtime receipt passed while stock fprintd, vendor PAM, SELinux Enforcing, password access and KDE usability were preserved |
+| Reader-absent host lifecycle | On the clean reader-absent VM, state-v2-only fresh install, update, normal removal, reinstall, controlled transaction rollback and emergency recovery from a missing runtime receipt passed while stock fprintd, vendor PAM, SELinux Enforcing, password access and KDE usability were preserved |
 | Emergency removal | Successful text-console removal was reported with the reader connected; separately, the clean VM force-removal test passed after normal removal rejected a deliberately incomplete project receipt, with project paths removed and the empty state-v2 root preserved across reboot |
 | Self-contained pairing activation | On the qualification reader one authorized action journaled the state-v2 `PREPARED` reservation, performed exactly one logical `E0`, confirmed the current `BB010002` byte-for-byte and the new `BB020003` validator, proved TLS and promoted the record to `ACTIVE`; no second write was requested and the epoch reported zero unexpected persistent writes |
 | Zero-`E0` ACTIVE reopen | A later ordinary no-finger identify reused the `ACTIVE` record through the read-only preflight and the pairing-activation reuse disposition, with zero `E0`, zero persistent writes, a matching E4 contract, and complete drain and close |
@@ -47,14 +47,16 @@ Windows 11 virtual machine.
 
 ## Complete installation path
 
-The public root installer builds from current source, validates and imports the
-user's five files, installs the runtime and login integration, and installs
-standalone removal commands. It is independent of clone location and private
-build outputs. The reader remains connected throughout the lifecycle.
+The public root installer builds from current source, optionally validates and
+imports the user's five legacy files, installs the runtime and login integration,
+and installs standalone removal commands. It is independent of clone location and
+private build outputs. These host lifecycle operations do not access the reader,
+which may be connected or absent.
 
 The unified bootstrap and automatic reuse of installed material are covered by
-offline synthetic tests. Live validation of that new flow, including deletion of
-the clone and Home staging folder, remains pending human testing.
+offline synthetic tests. The clean-VM user lifecycle that follows the published
+instructions end to end - including deletion of the clone and Home staging
+folder - is the remaining qualification step for this release candidate.
 
 The complete public procedure has now been exercised successfully on a freshly
 installed and updated Fedora 44 KDE VM and on the physical Fedora 44 KDE
@@ -65,8 +67,8 @@ results qualify the combined build/import/install transaction for the tested
 configuration; they do not extend qualification to other readers, firmware,
 distributions or future Fedora changes.
 
-The current read-only coordinator host lifecycle was also exercised on a clean
-SELinux-Enforcing Fedora 44 KDE VM with the reader absent. A fresh installation
+The reader-absent host lifecycle was also exercised on a clean
+SELinux-Enforcing Fedora 44 KDE VM. A fresh installation
 without legacy material created only the empty root-only state-v2 location.
 Update, removal, reinstall, injected transaction rollback and emergency recovery
 preserved that location and left Fedora's fprintd service and vendor PAM as the
@@ -100,9 +102,12 @@ recognition accuracy, hardware behavior or complete operating-system recovery.
   if both have identical bytes in a later compatible release slot; see the
   [protocol boundary](../TECHNICAL_MANUAL.md#74-enrollment-zero-mask-recovery).
 - No measured universal false-acceptance or false-rejection rate.
-- No automated acquisition/extraction tooling is shipped or qualified as part
-  of the release; the detailed [device-material acquisition reference](DEVICE_MATERIALS.md)
-  documents how the five final files are derived.
+- The optional legacy bundle has no qualified Linux-side acquisition path. The
+  [Windows Material Builder](../tools/windows_material_builder/README.md) runs
+  only inside the qualified Windows VM and is not itself hardware-qualified as
+  part of this release; the detailed
+  [device-material acquisition reference](DEVICE_MATERIALS.md) documents how the
+  five final files are derived.
 - Console/sudo authentication can offer fingerprint before password. The expected
   untouched-reader timeout is about 30 seconds, depending on Fedora policy; no
   immediate method selector is provided. A fully broken password stack cannot
