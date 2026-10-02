@@ -103,8 +103,19 @@ recognition accuracy, hardware behavior or complete operating-system recovery.
 - No measured universal false-acceptance or false-rejection rate.
 - Console/sudo authentication can offer fingerprint before password. The expected
   untouched-reader timeout is about 30 seconds, depending on Fedora policy; no
-  immediate method selector is provided. A fully broken password stack cannot
-  be repaired by the removal command.
+  immediate method selector is provided. A consumer with a shorter application
+  timeout can therefore abandon its authorization request before PAM reaches the
+  password fallback. That timing interaction belongs to the stock Fedora
+  PAM/fprintd/consumer path rather than the Goodix protocol or biometric driver.
+  When a temporary password-only session is required, such as remote access with
+  no physical access to the reader, the supported operational mitigation is to
+  runtime-mask `fprintd.service` with
+  `sudo systemctl mask --runtime --now fprintd.service` and later restore it,
+  without rebooting, with
+  `sudo systemctl unmask --runtime fprintd.service`. This does not delete
+  templates, alter host pairing state, or rewrite PAM/authselect configuration.
+  The runtime mask is also cleared automatically by a reboot. A fully broken
+  password stack cannot be repaired by this mechanism or by the removal command.
 - At Plasma Login on the tested system, after explicitly selecting fingerprint
   authentication by submitting the empty password field - including at a cold
   login - allow roughly one second before placing the finger. This is not an
