@@ -557,13 +557,19 @@ OBSOLETE
 - si controlla esplicitamente se materiale git-ignored oggi contiene invece
   codice o documentazione che deve essere pubblicata;
 - il diff `development -> main candidate` non contiene materiale estraneo;
+- tutti i file canonici di gestione/orchestrazione presenti nella root restano
+  nella root locale, sono coperti da `.gitignore` e non risultano più tracked
+  nella main-candidate;
 - se materiale sensibile/nonredistribuibile è già presente nella storia Git,
   non si riscrive la history autonomamente: si termina con un Human Gate
   specifico per la bonifica della history.
 
-Governance interna (`AGENTS.md`, `START.md`, roadmap/state cache e decision
-artifact) deve essere classificata esplicitamente; non deve finire in `main`
-per inerzia né essere cancellata per inerzia.
+I file canonici di gestione e orchestrazione presenti nella root del workspace,
+inclusi `AGENTS.md`, `START.md` e tutti gli altri file root con la stessa funzione
+canonica, devono restare fisicamente dove sono. P9 deve aggiungerli a `.gitignore`
+e rimuoverli dal main-candidate tracking senza spostarli, cancellarli o raccoglierli
+sotto `development/`. Devono restare disponibili nella root locale per la governance
+e l'orchestrazione successive, ma non devono essere pubblicati nel futuro `main`.
 
 **STOP_IF**
 
