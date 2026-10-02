@@ -14,8 +14,8 @@ It does not require Git history, a branch name, a particular clone directory or
 pre-existing build output.
 
 The generated payload contains the Goodix-enabled libfprint runtime, the required
-OpenCV libraries, the Plasma Login selector and PAM entry, the offline material
-checker, license notices and source/build provenance. Fedora supplies fprintd,
+OpenCV libraries, the Plasma Login selector and PAM entry, the offline validation
+helper, license notices and source/build provenance. Fedora supplies fprintd,
 libgusb, OpenSSL, PAM, Plasma and the ordinary authentication consumers.
 
 The builder verifies the library ABI, dependency resolution, payload inventory

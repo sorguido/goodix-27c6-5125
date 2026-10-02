@@ -206,7 +206,7 @@ class Installer(unittest.TestCase):
                 patch.object(m.materials, 'install_materials',
                              side_effect=AssertionError('legacy bundle unexpectedly imported')):
             self.apply()
-        self.assertIn('GOODIX_MATERIALS=NONE_STATE_V2_READY', self.stdout.getvalue())
+        self.assertIn('GOODIX_PAIRING_STATE=READY', self.stdout.getvalue())
         self.assertFalse(m.r.MATERIAL.exists())
         self.assertTrue(m.r.STATE.is_dir())
         self.assertEqual(stat.S_IMODE(m.r.STATE.stat().st_mode), 0o700)
@@ -479,7 +479,9 @@ class Installer(unittest.TestCase):
     def test_root_shell_entry_resolves_alternate_clone_and_foreign_cwd(self):
         result = subprocess.run([str(self.clone / 'install.sh'), '--help'], cwd='/tmp', capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('--materials', result.stdout)
+        self.assertNotIn('--materials', result.stdout)
+        self.assertNotIn('five-file', result.stdout.lower())
+        self.assertNotIn('state-v2', result.stdout.lower())
         self.assertNotIn('--apply', result.stdout)
 
     def test_default_material_path_and_sudo_arguments_in_public_main(self):

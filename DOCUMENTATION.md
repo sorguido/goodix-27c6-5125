@@ -145,7 +145,7 @@ These pages document individual implementation components. Ordinary users do
 not need them for installation or daily use.
 
 - **[Goodix libfprint driver sources](libfprint-driver/README.md)** — Scope of
-  the target-specific driver source, USB/TLS/material/image/enrollment pieces,
+  the target-specific driver source, USB/TLS/pairing-state/image/enrollment pieces,
   licensing notes, and synthetic test entry points.
 - **[Plasma Login fingerprint selection](deployment/plasma-login-opt-in/README.md)** —
   Minimal PAM selector used by Plasma Login and its synthetic dispatch tests.

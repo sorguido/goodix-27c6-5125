@@ -76,7 +76,7 @@ It quiesces fprintd during replacement and does not start a fingerprint test.
 Fedora's daemon, greeter and vendor authentication files remain package-owned.
 
 Expect **`GOODIX_BUILD=PASS`**, a **`GOODIX_INSTALL_MODE`** of **`FIRST_INSTALL`**
-or **`UPDATE`**, then **`GOODIX_MATERIALS=NONE_STATE_V2_READY`** confirming the
+or **`UPDATE`**, then **`GOODIX_PAIRING_STATE=READY`** confirming the
 host pairing state root is ready, followed by
 **`GOODIX_INSTALL=PASS`** with **`READER_PRESENT_ALLOWED=true`**, and finally
 **`GOODIX_INSTALL_BLOCK=PASS`**. Any error or missing final success marker means

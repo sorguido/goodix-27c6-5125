@@ -61,7 +61,7 @@ configuration is incompatible.
 
 ### 1.2 Support boundary
 
-The implementation enforces parser, material, lifecycle and ownership checks.
+The implementation enforces parser, state, lifecycle and ownership checks.
 These checks do not establish statistical recognition accuracy or compatibility
 with unlisted systems. Support is limited to the hardware/software scope above;
 the [validation reference](docs/VALIDATION.md) records the release support basis.
@@ -162,7 +162,7 @@ delivers a frame only after its complete bounded logical length is present.
 
 The public runtime keeps the normal Fedora ownership boundaries. Only the
 device-specific `libfprint` implementation, its narrowly required private
-libraries, protected reader material, and a small Plasma Login selector are
+libraries, host pairing state, and a small Plasma Login selector are
 project-owned.
 
 ```mermaid
@@ -188,7 +188,7 @@ flowchart LR
 | Reader | Sensing, Goodix command protocol, TLS client role | Linux user identity and host template storage |
 | Goodix driver | USB framing, secure session, capture, preprocessing, SIGFM extraction/matching, cancellation fences | D-Bus authorization, PAM policy, account lifecycle |
 | `libfprint` | Device/action abstraction and print serialization | System user authorization |
-| Fedora `fprintd` | D-Bus API, exclusive client claim, action orchestration, per-user template files | Goodix protected-material acquisition |
+| Fedora `fprintd` | D-Bus API, exclusive client claim, action orchestration, per-user template files | Goodix pairing-state or USB-protocol management |
 | Fedora PAM and KDE | Authentication policy and user interaction | USB or biometric algorithm implementation |
 | Installer/recovery tools | Build, validation, system integration, safe replacement/removal | Biometric authentication and reader reprogramming |
 
@@ -210,7 +210,7 @@ owns the resources that must agree about an action:
 
 | Context member | Role |
 | --- | --- |
-| Runtime state view | Validated target identity, transport material, configuration, and FDT data derived from host pairing state |
+| Runtime state view | Validated target identity, TLS/session inputs, configuration, and FDT data derived from host pairing state |
 | USB backend | Bounded asynchronous bulk transfers on interface 0 |
 | Frame router | Sole owner of physical bulk-IN reception and A0/B0 demultiplexing |
 | Secure-session machine | Ordered pre-TLS bootstrap and response validation |
@@ -373,7 +373,7 @@ The implementation:
 - clears temporary secret buffers after the TLS engine has copied them;
 - retains one TLS engine for post-handshake control and image records;
 - rejects unexpected record types, lengths, phase changes, and extra bytes; and
-- fails closed rather than downgrading or manufacturing replacement material.
+- fails closed rather than downgrading or inventing replacement pairing state.
 
 The pre-TLS compatibility validator and the PSK have different roles. A valid
 compatibility response does not reveal or replace the secret, and no externally
@@ -390,7 +390,7 @@ invokes it.
 
 ```mermaid
 flowchart TD
-    Opened["Open: inert, no USB traffic"] --> Syncing["Activate: select material source, claim USB,<br/>establish quiet receive boundary"]
+    Opened["Open: inert, no USB traffic"] --> Syncing["Activate: load host pairing state, claim USB,<br/>establish quiet receive boundary"]
     Syncing --> Preflight["Read-only target preflight<br/>and pairing selection"]
     Preflight --> Bootstrap["Pre-TLS bootstrap and TLS 1.2 PSK"]
     Bootstrap --> Prepare["FDT readings and baseline preparation"]
@@ -442,7 +442,7 @@ The secure bootstrap is a strict phase machine. Its durable responsibilities are
 
 1. recover the supported application command context;
 2. confirm the exact application identity;
-3. validate target compatibility against the selected material source;
+3. validate target compatibility against the selected host pairing state;
 4. read and bind the expected chip/factory responses without writing them;
 5. perform the required operations treated as session/runtime mode and register setup;
 6. send the validated configuration record; and
@@ -475,7 +475,7 @@ The phase contracts are deliberately narrower than informal command names:
 | --- | --- | --- | --- |
 | Re-entry `A2` | Establish the bounded project re-entry state before identification | ACK plus the target-pinned three-byte typed A2 response | Temporary session preparation; not a USB reset, retry loop, or factory reset |
 | `A8` | Return and confirm the supported application identity | ACK plus exact typed `GF_ST411SEC_APP_12509` response | Read/check only |
-| `E4` | Validate the existing target/material compatibility binding | ACK plus the expected typed validator response | Does not expose, replace, or provision the PSK |
+| `E4` | Validate the existing target/pairing compatibility binding | ACK plus the expected typed validator response | Does not expose, replace, or provision the PSK |
 | Cold-start `A2` #1 | First supported sensor-reset step in the known cold-start path | ACK plus the target-pinned three-byte typed A2 response | Exact request resets the sensor side in current evidence; classified as volatile, not absolute NVM readback proof |
 | `0x82` | Read and bind a four-byte target response | ACK plus a four-byte digest-pinned typed response | Read/check; not claimed to be an immutable chip identifier |
 | `A6` | Read and bind factory/OTP-related data | ACK plus a 64-byte digest-pinned typed response | Read/check, never an OTP write |
@@ -700,7 +700,7 @@ boundary is safe. The zero-mask alternative is described in
 Verify and identify perform one physical capture for each explicit client
 action. The driver does not hide an automatic loop behind one `VerifyStart`.
 A clean `NO_MATCH` may be followed by a new explicit action after full release,
-STOP, drain, material reacquisition, and a fresh transport epoch.
+STOP, drain, pairing-state reacquisition, and a fresh transport epoch.
 
 A `MATCH` or processing error terminates the current claim's reusable series.
 Errors after the transport becomes uncertain also poison the device context.
@@ -1163,7 +1163,7 @@ service sandbox. Its only current setting is the private runtime
 The builder runs as the invoking unprivileged user and requires Fedora 44
 x86_64. It constructs a source inventory by content, so a source-only copy does
 not depend on Git history. It builds the Goodix-enabled libfprint, selector, and
-native material checker; verifies ABI and stock-fprintd symbol resolution;
+native validation helper; verifies ABI and stock-fprintd symbol resolution;
 performs validation checks; and records relevant package versions and source
 digests.
 
@@ -1316,7 +1316,7 @@ removal commands are independent of it.
 ### 16.5 Rollback boundary
 
 Before replacement, the installer snapshots project-owned software and records
-the material-label state and whether the SELinux module was already present. On
+the SELinux label state and whether the SELinux module was already present. On
 a failure inside the replacement body it attempts to restore the previous
 project runtime, integration, labels, and prior module presence. Recovery tools
 are retained where possible if rollback is incomplete.
@@ -1352,13 +1352,13 @@ Both use the same safety order:
 2. remove the fprintd runtime drop-in and reload service configuration;
 3. inhibit activation and prove fprintd quiescent;
 4. remove the project SELinux module;
-5. remove the selector and owned material-label effect;
+5. remove the selector and owned SELinux label effect;
 6. remove the private runtime only when quiescence is proven; and
 7. remove recovery commands last, only after complete success.
 
 If activation inhibition or service quiescence cannot be proven, the private
 fprintd runtime that an old daemon might still have loaded is retained and the
-operation reports failure. Material labels are likewise not changed under an
+operation reports failure. SELinux labels are likewise not changed under an
 uncertain live runtime. A pre-existing service mask is never claimed as
 project-owned.
 
@@ -1487,7 +1487,7 @@ matching.
 | --- | --- | --- |
 | Reader absent | USB identity/hardware | `lsusb -d 27c6:5125` (from `usbutils`) and non-secret kernel messages |
 | Service fails before opening reader | Runtime linking/systemd | `systemctl status fprintd`, service journal, exact loader error |
-| Material rejected | Staging/import contract | Exact validator error and file metadata, never file contents |
+| Host pairing state rejected | State integrity or target binding | Exact state/validator error and non-secret metadata, never secret contents |
 | TLS/bootstrap failure | Target binding or protocol phase | Exact phase/error name with protected bytes redacted |
 | Capture but processing error | Image bounds/preprocessing/template parser | Error class and action, never image/template data |
 | Enrollment A0 mismatch after accepted contacts | Expected enrollment event and contextual FDT flags | Exact mismatch, contact/stage counters and cleanup state; see section 20.3 |
@@ -1501,7 +1501,7 @@ matching.
 - Stop at the first meaningful error and preserve its exact non-secret text.
 - Treat a missing final success marker or an incomplete rollback as failure.
 - Do not disable SELinux, bypass a preflight check, hide/disconnect the reader,
-  edit Fedora PAM manually, or delete material/templates as a diagnostic shortcut.
+  edit Fedora PAM manually, or delete host pairing state or templates as a diagnostic shortcut.
 - Do not run KDE enrollment, `fprintd-enroll`, and verification clients
   concurrently; fprintd intentionally serializes its device claim.
 - After a cancellation or transport error, allow fprintd to close/reopen the
@@ -1557,7 +1557,7 @@ factory-state readback.
 A change to the driver, builder, or integration should preserve all of these
 boundaries unless it explicitly redesigns and requalifies them:
 
-1. exact USB/application targeting and fail-closed material binding;
+1. exact USB/application targeting and fail-closed target/pairing binding;
 2. no firmware, OTP, key, factory-data, or persistent-mode writes;
 3. one owner for bulk-IN routing and strict A0/B0 phase validation;
 4. TLS 1.2 PSK with reader as client and host as server;

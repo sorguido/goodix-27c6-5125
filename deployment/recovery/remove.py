@@ -340,7 +340,7 @@ def remove(force=False):
         print('Leave the reader connected. Report this final output before continuing.', file=sys.stderr)
         return 1
     print('GOODIX_REMOVAL=PASS GOODIX_PROJECT_IN_CRITICAL_AUTH_PATH=false FEDORA_CURRENT_STATE_EXPOSED=true')
-    print('Legacy materials, state-v2 and fingerprint templates preserved. No Fedora files restored.')
+    print('Host pairing state and fingerprint templates preserved. No Fedora files restored.')
     print('Restart the computer normally to close any old authentication sessions.')
     return 0
 
@@ -349,7 +349,7 @@ def main():
     name = Path(sys.argv[0]).name
     require(name in (NORMAL.name, FORCE.name), 'use the installed goodix-uninstall or goodix-force-remove command')
     if sys.argv[1:] == ['--help']:
-        print(name + ': remove Goodix software; preserve device materials and fingerprint templates. Requests sudo when needed.')
+        print(name + ': remove Goodix software; preserve host pairing state and fingerprint templates. Requests sudo when needed.')
         return 0
     require(len(sys.argv) == 1, 'this command takes no arguments')
     if os.geteuid() != 0:

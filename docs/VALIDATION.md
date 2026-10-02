@@ -26,7 +26,7 @@ Windows 11 virtual machine.
 | PolicyKit | Correct password and fingerprint authentication succeeded through the KDE agent |
 | Plasma Login | Nonempty password reached the desktop without forced fingerprint wait; explicit fingerprint selection reached the desktop after one contact without a password |
 | Normal removal | Software paths removed, Fedora fprintd exposed without private library environment, password login and KDE desktop remained usable |
-| Material/template preservation | File inode, size, owner, mode and modification time unchanged across reported normal removal; metadata evidence does not establish a cryptographic comparison of all bytes |
+| Preserved-state/template metadata | File inode, size, owner, mode and modification time unchanged across reported normal removal; metadata evidence does not establish a cryptographic comparison of all bytes |
 | Reinstallation | Installation and subsequent Plasma fingerprint login succeeded; corrected reinstallation with the reader continuously present was also reported successful |
 | Complete public installation | Fresh Fedora 44 KDE VM installation passed; installation on the physical Fedora 44 KDE qualification system passed with SELinux Enforcing, followed by working Plasma Login, ordinary sudo, KScreenLocker, PolicyKit and password fallback |
 | Reader-absent host lifecycle | On the clean reader-absent VM, a fresh install with no prior host state, update, normal removal, reinstall, controlled transaction rollback and emergency recovery from a missing runtime receipt passed while stock fprintd, vendor PAM, SELinux Enforcing, password access and KDE usability were preserved |

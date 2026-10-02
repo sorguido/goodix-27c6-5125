@@ -10,7 +10,7 @@ or needs a build directory after installation.
 Normal removal verifies project-owned software. Emergency removal follows a
 fixed inventory and tolerates missing receipts or partial installation. Both
 remove authentication entry points before runtime files, quiesce fprintd during
-runtime mutation and retain protected materials and fingerprint templates.
+runtime mutation and retain host pairing state and fingerprint templates.
 Neither command accesses the reader. Fedora's current configuration is exposed
 without restoring old vendor files.
 

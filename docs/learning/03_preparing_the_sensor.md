@@ -220,9 +220,7 @@ session instead of guessing what the reader meant.
 > [`goodix_pairing_activation.c`](../../libfprint-driver/goodix_pairing_activation.c),
 > and the root-only host state is in
 > [`goodix_self_state.c`](../../libfprint-driver/goodix_self_state.c).
-> Legacy material loading is in
-> [`goodix_runtime_material.c`](../../libfprint-driver/goodix_runtime_material.c),
-> and post-TLS preparation is in
+> Post-TLS preparation is in
 > [`goodix_post_tls_lifecycle.c`](../../libfprint-driver/goodix_post_tls_lifecycle.c).
 
 ## ✅ What to remember

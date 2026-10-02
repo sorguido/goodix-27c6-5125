@@ -125,7 +125,7 @@ def create_state_root():
         r.STATE.mkdir(mode=0o700)
     r.trusted(r.STATE, directory=True)
     require(stat.S_IMODE(r.STATE.lstat().st_mode) == 0o700,
-            'state-v2 root must be root-only mode 0700')
+            'host pairing state root must be root-only mode 0700')
 
 
 def label_materials():
@@ -452,7 +452,7 @@ def apply(payload, material_directory, owner_uid, *, explicit=False):
                 if legacy_present and not preexisting:
                     command('semanage', 'fcontext', '-a', '-f', 'a', '-t', 'fprintd_var_lib_t', '-r', 's0', r.RULE)
                 label_materials()
-                print('GOODIX_MATERIALS=' + ('LEGACY_VALID' if legacy_present else 'NONE_STATE_V2_READY'))
+                print('GOODIX_PAIRING_STATE=READY')
                 install_runtime(staged_payload, manifest, preexisting, legacy_present)
                 install_login(staged_payload, manifest['source_id'])
                 command('systemctl', 'daemon-reload')
@@ -469,11 +469,9 @@ def apply(payload, material_directory, owner_uid, *, explicit=False):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--materials', type=Path,
-                        help='explicit five-file bundle; must match any installed set exactly '
-                             '(otherwise automatically reuse installed material or ~/goodix-5125-materials)')
+    parser.add_argument('--materials', type=Path, help=argparse.SUPPRESS)
     parser.add_argument('--check', action='store_true',
-                        help='unprivileged prerequisite/structure check; installed material validation is deferred')
+                        help='unprivileged prerequisite/structure check; privileged host-state validation is deferred')
     parser.add_argument('--apply', type=Path, help=argparse.SUPPRESS)
     parser.add_argument('--owner-uid', type=int, help=argparse.SUPPRESS)
     parser.add_argument('--default-materials', type=Path, help=argparse.SUPPRESS)
