@@ -636,7 +636,7 @@ Qualificare come ultimo passaggio la release candidate dal punto di vista di un 
 utente Fedora, usando una VM Fedora 44 KDE pulita e il reader fisico presente
 per l'intera sequenza.
 
-P9 non è una matrice esaustiva di combinazioni artificiali: deve verificare in
+P12 non è una matrice esaustiva di combinazioni artificiali: deve verificare in
 ordine il lifecycle realmente documentato e utilizzabile dall'utente, senza
 ripetere P8 e senza introdurre scenari non necessari.
 
@@ -644,7 +644,7 @@ La prova deve seguire alla lettera le istruzioni pubbliche della release candida
 come risultano dopo P10 e P11. Non sostituire i comandi documentati con scorciatoie,
 comandi di sviluppo o procedure ad hoc: eventuali failure di istruzioni, riferimenti,
 sequenza o aspettative documentate sono failure reali della candidate e vanno corrette
-prima di riprendere P9.
+prima di riprendere P12.
 
 **PRIMARY_ARTIFACT**
 
@@ -704,7 +704,7 @@ Eseguire in questo ordine e fermarsi alla prima failure non spiegata:
      state-v2 e fingerprint templates, non scrivere sul reader e lasciare
      password/desktop recuperabili secondo il normale percorso Fedora.
 
-Non aggiungere a P9 una matrice reader-presente/reader-assente, rollback verso
+Non aggiungere a P12 una matrice reader-presente/reader-assente, rollback verso
 uno schema precedente, migration matrix separata o prove artificiali
 preserve/purge: non fanno parte di questa qualificazione lineare salvo che una
 failure reale renda necessaria un'analisi specifica.
