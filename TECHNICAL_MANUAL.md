@@ -1113,6 +1113,26 @@ PolicyKit action/agent combinations are outside the stated support scope.
 Password-encrypted KWallet is independent and may still ask for a password after
 fingerprint login.
 
+Because these consumers use Fedora's serial PAM stack, `pam_fprintd` may occupy
+the authentication path until its fingerprint timeout expires before password
+processing continues. A consumer with a shorter application-level authorization
+timeout can therefore abandon the request before the password fallback is
+reached. This is a timing interaction between the stock PAM/fprintd path and the
+consumer; it is not a Goodix transport, matching, or secure-session failure.
+
+For temporary password-only operation, `fprintd` can be suspended for the
+current boot without changing PAM/authselect policy or removing driver state:
+
+```bash
+sudo systemctl mask --runtime --now fprintd.service
+sudo systemctl unmask --runtime fprintd.service
+```
+
+The first command prevents stock fingerprint consumers from activating
+`fprintd`; the second restores normal activation immediately and does not
+require a reboot. Templates and host pairing state remain untouched. Because the
+mask is runtime-only, a reboot also removes it automatically.
+
 ## 14. SELinux and host integration
 
 SELinux remains Enforcing. The installation adds one narrow SELinux effect:
@@ -1463,6 +1483,7 @@ threat boundary.
 | One host-pairing write | The first qualifying fingerprint action may perform exactly one logical `E0`, and a Windows pairing replacement causes one qualified restore write. Same-OS reopens write nothing. Recovery from an interrupted post-`E0`/pre-ACTIVE transaction is offline-qualified only |
 | Secure preparation starts with the action | Allow roughly one second after Plasma fingerprint selection before contact |
 | Stock policy controls most consumers | Altered authselect/PAM may not offer fingerprints; the installer does not rewrite global policy |
+| Serial fingerprint-first PAM timing | Stock consumers can wait for the fingerprint timeout before password fallback; a consumer with a shorter application timeout may abandon the request first. Runtime masking of `fprintd.service` provides temporary password-only operation without uninstalling the driver or changing PAM |
 | PAM layout evolves | Future Fedora changes may cause the Plasma selector to fall back to password until reviewed |
 | KWallet is separate | A password-encrypted wallet may prompt after fingerprint login |
 | Account cleanup is not automated | Username rename/delete/reuse requires deliberate template management |
