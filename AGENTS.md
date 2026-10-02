@@ -418,14 +418,14 @@ L'autorizzazione a una fase **non autorizza mai quella successiva**.
 Per la sequenza corrente dopo P8 il comportamento tassativo è:
 
 ```text
+P9 completes  -> HUMAN_REQUIRED -> STOP
 P10 completes -> HUMAN_REQUIRED -> STOP
 P11 completes -> HUMAN_REQUIRED -> STOP
-P9 completes  -> HUMAN_REQUIRED -> STOP
 ```
 
-Dopo P10 AI PM non può iniziare P11 senza una nuova istruzione esplicita
-dell'Utente. Dopo P11 non può iniziare P9 senza una nuova istruzione esplicita.
-Dopo P9 non può eseguire merge, pubblicazione, release, tag, cleanup finale o
+Dopo P9 AI PM non può iniziare P10 senza una nuova istruzione esplicita
+dell'Utente. Dopo P10 non può iniziare P11 senza una nuova istruzione esplicita.
+Dopo P11 non può eseguire merge, pubblicazione, release, tag, cleanup finale o
 altre attività post-milestone senza una nuova istruzione esplicita dell'Utente.
 
 I task interni devono descrivere soltanto il delta necessario: obiettivo, stato rilevante, scope, lavoro richiesto, verifica e stop condition. Non reidratare questa governance nei prompt intermedi.
