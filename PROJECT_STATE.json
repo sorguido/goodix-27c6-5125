@@ -9,7 +9,7 @@
   },
   "execution_path": "PRIMARY",
   "phase": "ENROLLMENT_ROBUSTNESS_V2",
-  "phase_status": "IN_PROGRESS",
+  "phase_status": "NOT_STARTED",
   "completed_gates": [
     "SELF_CONTAINED_ARCHITECTURE_APPROVAL",
     "ARTIFACT_INDEX_BASELINE_RECONCILED",
@@ -132,8 +132,7 @@
     "initial_blockers": []
   },
   "current_blockers": [
-    "ENROLLMENT_TEMPLATE_COVERAGE_POLICY_TOO_WEAK",
-    "TARGET_ENROLLMENT_METRICS_REQUIRED_BEFORE_POLICY_THRESHOLDS"
+    "ENROLLMENT_TEMPLATE_COVERAGE_POLICY_TOO_WEAK"
   ],
   "host_modified": false,
   "relevant_artifacts": [
@@ -185,9 +184,9 @@
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "At the live biometric Human Gate, collect a bounded current-policy baseline on the target with deliberately varied placements, near-identical contacts and wrong-finger controls. Use the existing GOODIX_SIGFM_EXTRACT_AUDIT and GOODIX_SIGFM_MATCH_AUDIT records to ground the integrated adaptive-policy design; do not select new biometric thresholds from synthetic fixtures alone.",
-  "last_verified_head": "2fcd8cdca0ef46cd85f4382693c333410c96c113",
-  "state_note": "On 2026-10-04 bootstrap/recovery verified a clean development worktree at 2fcd8cdca0ef46cd85f4382693c333410c96c113. ENROLLMENT_ROBUSTNESS_V2 is active. The repository still implements the Rockytkg-derived 3..8, MAD<8 and two-duplicate convergence policy. Current code exposes per-contact SIGFM keypoint counts and per-template comparison scores, but no target evidence yet justifies replacement quality, near-duplicate or coverage thresholds; live baseline evidence is therefore required before implementing those thresholds.",
+  "next_action": "Implement the single ROADMAP.md enrollment candidate exactly as specified: >=12 accepted minimum, 16 normal target, 20 template maximum, 36 bounded physical contacts, no duplicate-streak early convergence, duplicate/near-duplicate and poor samples retry without progress, diversity based on coverage + SIGFM + quality. Complete offline tests before any live sensor qualification.",
+  "last_verified_head": "09e00a02a08aed700d75a0c123213d170647f3ec",
+  "state_note": "ENROLLMENT_ROBUSTNESS_V2 reset to one implementation task matching ROADMAP.md. Previous live-baseline blocker removed; implementation and offline tests come first.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }
