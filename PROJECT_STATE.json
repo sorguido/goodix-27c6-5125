@@ -8,7 +8,7 @@
     "qualified_host": "Fedora 44 KDE x86_64"
   },
   "execution_path": "PRIMARY",
-  "phase": "1",
+  "phase": "ENROLLMENT_ROBUSTNESS_V2",
   "phase_status": "NOT_STARTED",
   "completed_gates": [
     "SELF_CONTAINED_ARCHITECTURE_APPROVAL",
@@ -184,9 +184,9 @@
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "Roadmap items 1–5: preserve verification strictness; remove Rockytkg-derived premature convergence; build Diversity v2; make enrollment richness adaptive; then perform real-user biometric requalification. Treat APP12509>8-stage capability as a starting assumption grounded in Windows/OEM evidence, not as a separate gate.",
+  "next_action": "Execute ENROLLMENT_ROBUSTNESS_V2 as one integrated task. Consider all five development observations jointly; do not treat them as sequential gates or independent milestones. Close only on the single final ENROLLMENT_ROBUSTNESS_V2 exit gate.",
   "last_verified_head": "c3918892c91b3b208b12e1167e14e864eeb2b4ca",
-  "state_note": "Development roadmap simplified on 2026-10-04 to five active enrollment-robustness items. APP12509 is not assumed to have an 8-stage enrollment limit; Windows/OEM evidence on the same target is the starting basis, so no separate boundary or multi-epoch gate is planned unless new evidence later creates a concrete blocker.",
+  "state_note": "On 2026-10-04 the active roadmap was normalized to one narrowly scoped enrollment-robustness task. Its five development observations are simultaneous design/qualification concerns, with no per-item PASS/NEXT state and one final exit gate only.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }
