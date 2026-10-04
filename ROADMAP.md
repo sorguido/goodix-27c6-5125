@@ -1,93 +1,149 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# ROADMAP.md — Enrollment robustness v2
+# ROADMAP.md — Enrollment fixed-21 candidate
 
-## Task unico
+## Obiettivo unico
 
-Modificare la policy di enrollment del Goodix `27c6:5125 / GF_ST411SEC_APP_12509`
-portando il comportamento attuale alla seguente candidate empirica.
+Sostituire la current enrollment-v2 candidate del Goodix
+`27c6:5125 / GF_ST411SEC_APP_12509` con una candidate sperimentale
+**fixed-21 valid captures**, derivata dall'osservazione empirica ripetuta del
+comportamento Windows sullo stesso sensore.
 
-| Parametro | Attuale | Candidate empirico |
-| --- | --- | --- |
-| Minimo utile | 3 distinti | **>=12 accettati** |
-| Target normale | 4–8 | **16** |
-| Massimo template | 8 | **20** |
-| Contatti fisici max | 20 | **36, bounded** |
-| Early convergence | 3 + 2 duplicati | **eliminata** |
-| Diversità | MAD raster | **coverage + SIGFM + qualità** |
-| Campione quasi duplicato | può concludere enrollment | **retry, non avanza** |
-| Campione povero | può entrare | **retry, non avanza** |
+Questa roadmap riguarda esclusivamente la policy di enrollment. Non modifica
+matcher, threshold VERIFY, pairing, secure session, firmware, CONFIG90, FDT o
+persistenza.
 
-## Comportamento atteso
+## Specifica vincolante
 
-- Un enrollment non può concludersi prima di avere almeno **12 sample accettati**.
-- **16 sample accettati** è il target normale della candidate.
-- La policy può proseguire oltre 16 quando necessario, fino a un massimo di
-  **20 sample accettati** nel template.
-- Il numero massimo di contatti fisici è **36** e resta un limite bounded.
-- La vecchia early convergence basata su `3 distinti + 2 duplicati` deve essere
-  eliminata.
-- Un campione duplicate o near-duplicate deve produrre **retry** e non deve
-  avanzare l'enrollment.
-- Un campione povero deve produrre **retry** e non deve avanzare l'enrollment.
-- La decisione di accettare un sample deve usare una combinazione semplice e
-  osservabile di **coverage, informazioni SIGFM e qualità**, al posto del solo
-  MAD raster.
-- Il raggiungimento del massimo di 20 sample o 36 contatti fisici non deve
-  trasformare automaticamente un enrollment insufficiente in successo.
+1. minimo **21 sample accettati**;
+2. **nessuna early completion**: la completion avviene esattamente al
+   **21° sample valido accettato**;
+3. target normale **21**;
+4. massimo sample accettati **21**; massimo **contatti fisici non definito**;
+5. poor capture → **retry, non conta**;
+6. duplicate/near-duplicate → **accettato e conta**, se il sample è altrimenti
+   valido;
+7. duplicate/near-duplicate **non determina, non anticipa e non impedisce la
+   completion**;
+8. matcher SIGFM e threshold **40 invariati**.
 
-## Implementazione
+## Regola decisionale
 
-Partire dalla policy di enrollment esistente e modificarla solo quanto serve per
-ottenere il comportamento sopra descritto.
+La decisione production-candidate deve essere concettualmente:
 
-La logica deve distinguere almeno:
+```text
+capture
+  |
+  +-- unusable / poor --> RETRY, accepted_count invariato
+  |
+  +-- valid -----------> ACCEPT, accepted_count++
+                          |
+                          +-- accepted_count < 21 --> continua
+                          |
+                          +-- accepted_count = 21 --> SUCCESS
+```
 
-- contatti fisici;
-- sample accettati;
-- retry per duplicate/near-duplicate;
-- retry per campione povero;
-- completion;
-- esaurimento bounded.
+Non deve esistere alcun percorso di successo prima del 21° sample accettato.
 
-Il matcher di verifica e la relativa threshold non fanno parte di questo task e
-devono restare invariati.
+Non deve esistere alcun percorso che richieda più di 21 sample **accettati**.
+I contatti fisici possono invece superare 21 quando uno o più contatti producono
+retry.
 
-## Verifica offline
+## Diversity e telemetria
 
-Prima del test sul sensore reale, dimostrare almeno che:
+Le metriche già disponibili possono continuare a essere calcolate e registrate,
+incluse almeno:
 
-- con meno di 12 sample accettati non può avvenire completion;
-- duplicate e near-duplicate producono retry senza avanzamento;
-- un campione povero produce retry senza avanzamento;
-- la vecchia early convergence non esiste più;
-- il target normale è 16;
-- la policy può continuare oltre 16 fino a 20 sample;
-- il template non supera 20 sample;
-- i contatti fisici non superano 36;
-- l'esaurimento dei limiti bounded non viene interpretato come successo;
-- il matcher e la threshold VERIFY restano invariati.
+- SIGFM keypoints;
+- SIGFM coverage mask / aggregate coverage;
+- raster range e contrast;
+- MAD;
+- duplicate / near-duplicate classification.
 
-## Verifica reale
+Per questa candidate tali metriche sono **osservative** rispetto alla diversity:
+non devono decidere la completion e duplicate/near-duplicate non devono causare
+retry.
 
-Dopo il PASS offline, eseguire una prova empirica sul target reale confrontando
-la candidate con il comportamento attuale, con particolare attenzione a:
+Resta invece consentito usare i criteri strettamente necessari a stabilire che
+una cattura sia realmente **poor/unusable** e quindi non idonea a diventare un
+sample SIGFM valido.
 
-- completamento dell'enrollment;
-- numero di contatti fisici;
-- numero di sample accettati;
-- first-touch recognition;
-- posizioni diverse dello stesso dito;
-- incidenza di `score=0` / NO_MATCH legittimi;
-- duplicate volontarie;
-- campioni volutamente poveri;
-- wrong-finger rejection;
-- VERIFY e IDENTIFY.
+## Vincoli
+
+- Nessuna early completion basata su coverage, keypoint, contrasto, MAD,
+  duplicate streak o altre metriche di sufficienza.
+- Nessun limite artificiale al numero totale di contatti fisici introdotto da
+  questa policy.
+- Nessun riuso del vecchio `GOODIX_TARGET_LOCAL_ENROLL_STAGES 21u` come
+  giustificazione della nuova policy: il nuovo 21 deriva da evidenza empirica
+  indipendente sul comportamento Windows.
+- Nessuna modifica al matcher SIGFM.
+- Nessuna modifica alla threshold VERIFY, che resta **40**.
+- Nessuna modifica alla pipeline di preprocessing già qualificata.
+- Nessuna modifica a pairing, PSK, TLS, firmware, OTP, CONFIG90, FDT o altri
+  percorsi persistenti/device-state.
+
+## Verifica offline obbligatoria
+
+Dimostrare almeno che:
+
+- 0..20 sample validi accettati non possono produrre completion;
+- il 21° sample valido produce completion;
+- il 22° sample accettato non è raggiungibile perché l'enrollment è già
+  terminato;
+- poor/unusable capture produce retry e non incrementa `accepted_count`;
+- duplicate e near-duplicate validi vengono accettati e incrementano
+  `accepted_count`;
+- duplicate e near-duplicate non possono né anticipare né bloccare la
+  completion;
+- non esiste più alcun `max_physical_attempts` policy-bound per questa
+  candidate;
+- le metriche di diversity restano disponibili come telemetria ma non
+  governano la completion;
+- matcher SIGFM e threshold VERIFY=40 risultano invariati.
+
+Eseguire i test offline normali e ASan/UBSan applicabili, senza accesso USB al
+sensore reale.
+
+## Verifica live
+
+Solo dopo PASS offline, eseguire sul target reale almeno:
+
+1. enrollment naturale fino a 21 sample validi;
+2. enrollment volutamente quasi a posizione costante, verificando che
+   duplicate/near-duplicate validi continuino ad avanzare fino a 21;
+3. contatti volutamente poor/unusable, verificando che producano retry e che il
+   numero di contatti fisici possa superare 21 senza alterare il target di 21
+   sample accettati;
+4. VERIFY same-finger su più placement, con raccolta dei punteggi SIGFM;
+5. VERIFY wrong-finger;
+6. IDENTIFY;
+7. confronto con i risultati enrollment-v2 precedenti, con particolare
+   attenzione a first-touch recognition e incidenza di `score=0`.
+
+## Interpretazione dell'esperimento
+
+Questa candidate non assume che Windows memorizzi 21 sample indipendenti né che
+il suo Engine Adapter costruisca il template nello stesso modo del nostro
+SIGFM. Verifica una sola ipotesi:
+
+> se la nostra architettura host-side conserva 21 acquisizioni valide senza
+> early completion e senza scartare sample per sola ridondanza, la robustezza
+> same-finger migliora sensibilmente rispetto alla candidate enrollment-v2?
+
+Se il problema degli `score=0` si riduce nettamente, la ridondanza fixed-21
+diventa una spiegazione plausibile del miglioramento. Se persiste, la quantità
+da sola non basta e il passo successivo sarà studiare più a fondo la costruzione
+del template nel percorso Windows/Goodix.
 
 ## Exit gate
 
-`ENROLLMENT_ROBUSTNESS_V2=PASS` quando la candidate sopra descritta è
-implementata, passa i test offline e la prova reale mostra un miglioramento
-sensibile della robustezza senza regressioni evidenti nella rejection di dita
-errate.
+`ENROLLMENT_FIXED_21=PASS` quando:
 
-`MILESTONE_COMPLETE: ENROLLMENT_ROBUSTNESS_V2`
+- la specifica fixed-21 è implementata esattamente;
+- i test offline e sanitizer applicabili passano;
+- la prova live completa è stata eseguita;
+- matcher e threshold VERIFY risultano invariati;
+- i risultati same-finger e wrong-finger sono documentati senza alterare la
+  policy durante il test.
+
+`MILESTONE_COMPLETE: ENROLLMENT_FIXED_21`
