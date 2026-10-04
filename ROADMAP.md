@@ -48,6 +48,7 @@ criterio di convergenza.
 Questa è una premessa di progetto, non un gate da riqualificare.
 
 ---
+### PUNTI DA OSSERVARE IN FASE DI SVILUPPO 
 
 ## 1 — Preservare la severità della verifica
 
