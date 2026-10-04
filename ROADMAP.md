@@ -118,14 +118,21 @@ test offline dimostrano che:
 
 Non sostituire semplicemente `8` con un altro numero fisso arbitrario.
 
-La conclusione dell'enrollment deve dipendere da qualità e coverage sufficienti,
-con un minimo prudenziale e un limite di sicurezza bounded.
+La conclusione dell'enrollment deve essere determinata da criteri biometrici
+misurabili di qualità e diversità dei campioni.
 
-Non predefinire una scala di conteggi come obiettivo biometrico. Il numero
-finale di sample utili deve emergere dal comportamento adattivo della policy:
-un enrollment può terminare prima quando qualità e coverage sono realmente
-sufficienti, oppure continuare più a lungo quando il dito è presentato male,
-la coverage resta incompleta o i nuovi contatti non aggiungono informazione.
+Tali criteri devono essere derivati e qualificati mediante evidenza sperimentale;
+non devono essere scelti arbitrariamente e non devono essere sostituiti da un
+nuovo numero fisso di sample.
+
+Non predefinire una scala di conteggi come obiettivo biometrico. Il numero finale
+di sample utili deve emergere dall'applicazione dei criteri qualificati: un
+enrollment può terminare prima quando l'evidenza soddisfa tali criteri oppure
+continuare quando i nuovi contatti non aggiungono sufficiente informazione.
+
+Un eventuale limite massimo deve avere esclusivamente funzione di safety bound
+tecnico contro enrollment non terminanti o patologici. Non deve essere usato
+come criterio di successo biometrico.
 
 Gli eventuali limiti strutturali del contenitore SIGFM/libfprint devono essere
 ispezionati e, se necessario, estesi come vincoli implementativi separati. Non
