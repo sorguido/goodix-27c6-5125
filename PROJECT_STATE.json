@@ -8,7 +8,7 @@
     "qualified_host": "Fedora 44 KDE x86_64"
   },
   "execution_path": "PRIMARY",
-  "phase": "ENROLLMENT_ROBUSTNESS_V2",
+  "phase": "ENROLLMENT_FIXED_21",
   "phase_status": "IN_PROGRESS",
   "completed_gates": [
     "SELF_CONTAINED_ARCHITECTURE_APPROVAL",
@@ -29,7 +29,7 @@
     "FINAL_DOCUMENTATION_AND_RELEASE_READINESS"
   ],
   "pending_gates": [
-    "ENROLLMENT_ROBUSTNESS_V2"
+    "ENROLLMENT_FIXED_21"
   ],
   "goal": "Self-contained Goodix 27c6:5125 driver for Fedora 44 KDE with automatic first-use initialization, Windows interoperability, factory-preserving safety, stock fprintd/PAM/KDE integration, rollback and update survivability.",
   "safety_invariants": [
@@ -130,14 +130,15 @@
       "ENROLLMENT_V2_12_16_20_36_POLICY_OFFLINE",
       "ENROLLMENT_V2_POOR_DUPLICATE_AND_NEAR_DUPLICATE_RETRY_OFFLINE",
       "ENROLLMENT_V2_BOUNDED_EXHAUSTION_OFFLINE",
-      "ENROLLMENT_V2_PRODUCTION_BUILD_AND_INTEGRATED_SANITIZER_PASS"
+      "ENROLLMENT_V2_PRODUCTION_BUILD_AND_INTEGRATED_SANITIZER_PASS",
+      "ENROLLMENT_FIXED_21_POLICY_OFFLINE",
+      "ENROLLMENT_FIXED_21_IMAGE_DEVICE_INTEGRATION_NORMAL_AND_SANITIZER_OFFLINE",
+      "ENROLLMENT_FIXED_21_PRODUCTION_BUILD_AND_SOURCE_LEDGER_PASS"
     ],
     "inferred": [],
     "initial_blockers": []
   },
-  "current_blockers": [
-    "ENROLLMENT_ROBUSTNESS_V2_TARGET_LIVE_QUALIFICATION_REQUIRED"
-  ],
+  "current_blockers": [],
   "host_modified": false,
   "relevant_artifacts": [
     "START.md",
@@ -195,9 +196,9 @@
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "After explicit Human Gate execution by the User, install the offline-qualified candidate through the existing transactional installer and run the bounded target-real comparison required by ROADMAP.md. Stop on installer error, authentication regression, unexpected persistent behavior or the 36-contact bound; use goodix-uninstall after failure.",
-  "last_verified_head": "6c04711699a7de94bc9d56855646c379ef32964c",
-  "state_note": "ENROLLMENT_ROBUSTNESS_V2 implementation is offline-qualified at the recorded commit: deterministic normal and sanitizer policy tests, 63-test normal and sanitizer image-device integration runs, source-manifest verification, public-builder tests and the production build all pass without USB access. The phase remains open pending the required target-live empirical comparison.",
+  "next_action": "Live verification of the fixed-21 policy on the real target per ROADMAP.md 'Verifica live' points 1-7. This is a Human Gate: the User installs the offline-qualified candidate through the existing transactional installer and performs the live enrollment/verify/identify sequence; stop on installer error, authentication regression or unexpected persistent behavior and use goodix-uninstall after failure.",
+  "last_verified_head": "c4a55565489cc6b8e0dba318e1f16ee28b8a7ce8",
+  "state_note": "Fixed-21 policy implemented and offline-qualified at the recorded commit: completion exactly at the 21st accepted valid sample, poor/unusable retry gate only, duplicate/near-duplicate accepted and diagnostic-only, no policy-side physical-contact cap (model structural counter pinned to G_MAXUINT), nr_enroll_stages=21, SIGFM matcher/VERIFY threshold 40/preprocessing untouched. PM independently re-ran: diversity suite 9/9 normal+ASan/UBSan with source audits, fpimage-device 63/63 normal+sanitizer in Freedesktop SDK 25.08, enrollment-a0 and post-tls suites, public-builder tests 16/16, full production build GOODIX_BUILD=PASS SOURCE_ID=3dd3fbaa7e5f5cc2599476110b4b3bc1506e3c24efcb76b2a724857544d8cc46, ledger sha256sum -c clean. Phase open pending live verification.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }
