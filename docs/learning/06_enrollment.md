@@ -33,10 +33,10 @@ flowchart TD
     D --> E["Wait for finger"]
     E --> F["Detect, capture, decode, preprocess"]
     F --> G["Extract one SIGFM sample"]
-    G --> H{"Coverage, SIGFM and quality decision"}
-    H -->|New useful coverage| I["Add accepted sample"]
-    H -->|Poor or duplicate| J["Ask for another touch"]
-    I --> K{"At least 12 and sufficient?"}
+    G --> H{"Quality gate pass?"}
+    H -->|Poor or unusable| J["Ask for another touch<br/>(no contact limit)"]
+    H -->|Valid| I["Add accepted sample<br/>(duplicates count too)"]
+    I --> K{"21 accepted samples?"}
     J --> E
     K -->|Not yet| E
     K -->|Yes| L["Finish after the contact boundary is accepted"]
@@ -46,21 +46,24 @@ flowchart TD
 
 ## How many touches?
 
-The current source contains an empirical enrollment-v2 candidate:
+The current source implements the fixed-21 enrollment policy:
 
-- It cannot complete before 12 accepted samples.
-- Its normal target is 16 accepted samples.
-- It can continue when coverage is insufficient, up to 20 template samples.
-- Poor, duplicate and near-duplicate contacts request a retry without progress.
-- A hard ceiling of 36 physical contacts prevents endless retries.
-- Reaching either hard ceiling does not turn an insufficient template into
-  success.
+- Enrollment completes exactly at the 21st accepted valid sample.
+- There is no early completion: 20 accepted samples never finish enrollment.
+- A 22nd accepted sample is unreachable.
+- Poor or unusable contacts request a retry without progress; they never count
+  toward the 21.
+- Physical contacts are not capped: retries may push the contact count beyond
+  21 without ending enrollment.
+- Valid duplicate and near-duplicate contacts are accepted and count like any
+  other valid sample; their detection is diagnostic only and never completes,
+  delays or blocks enrollment.
 
-The candidate combines SIGFM keypoint count and spatial coverage with simple
-raster quality and duplicate signals. Its exact thresholds are experimental
-and have passed offline policy tests, but the 12/16/20/36 behavior has not yet
-been qualified on the real reader. The earlier target qualification reached
-eight accepted stages under the superseded policy.
+The policy combines the SIGFM keypoint/coverage and raster quality gate for
+poor-sample retries with per-contact diversity diagnostics. It has passed
+offline policy tests, but the fixed-21 behavior has not yet been qualified on
+the real reader. The earlier target qualification reached eight accepted
+stages under the superseded policy.
 
 ## Why lifting the finger matters
 
@@ -84,7 +87,7 @@ unlimited pictures while you hold the finger in place.
 | KDE settings | Shows the user interface and progress. |
 | `fprintd` | Checks permission, claims the reader, starts/stops enrollment, labels the finger, and saves the completed record. |
 | `libfprint` | Builds the host template, reports progress, serializes the result, and coordinates image processing. |
-| Goodix driver | Prepares the reader and performs bounded finger detection, image capture, release, and diversity decisions for this sensor. |
+| Goodix driver | Prepares the reader and performs bounded finger detection, image capture, release, and fixed-21 acceptance decisions for this sensor. |
 | SIGFM | Extracts one feature sample from each accepted preprocessed image. |
 | Sensor | Measures the finger and returns device data; it does not save the Linux user's final template in this project. |
 
@@ -92,9 +95,11 @@ unlimited pictures while you hold the finger in place.
 
 Three outcomes are easy to confuse:
 
-- **accepted:** the sample advances the template;
-- **retry:** the physical contact was consumed, but the sample did not add
-  useful new coverage;
+- **accepted:** the sample advances the template; a valid duplicate or
+  near-duplicate is also accepted and counts toward the 21, and its detection
+  is only a diagnostic;
+- **retry:** the physical contact was consumed, but the sample was poor or
+  unusable and did not enter the template;
 - **fatal processing or protocol error:** enrollment stops safely rather than
   hiding another sensor acquisition.
 
@@ -113,7 +118,7 @@ That division becomes important during uninstall: removing the driver can
 preserve the user's templates for later reinstallation.
 
 > 🔎 **Want to see this in the repository?**
-> The diversity policy and its bounds are in
+> The fixed-21 acceptance policy and its diagnostics are in
 > [`goodix_enrollment_diversity.c`](../../libfprint-driver/goodix_enrollment_diversity.c).
 > The protocol-stage model is in
 > [`goodix_enrollment_model.c`](../../libfprint-driver/goodix_enrollment_model.c).
@@ -122,8 +127,9 @@ preserve the user's templates for later reinstallation.
 
 - Enrollment teaches the host using several views of one finger.
 - Accepted images become separate SIGFM feature samples in one template.
-- The current candidate stores 12 to 20 accepted samples and bounds physical
-  contacts at 36; target-live qualification is still pending.
+- The current policy stores exactly 21 accepted samples, with no early
+  completion and no policy-side cap on physical contacts; target-live
+  qualification is still pending.
 - Each stage follows its contact-completion rules before requesting another touch.
 - `fprintd` saves the completed host template; the sensor does not become a
   database of Linux users.

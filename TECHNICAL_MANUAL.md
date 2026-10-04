@@ -740,8 +740,9 @@ preprocessing, quality, diversity and SIGFM/template processing. Optional
 image-choice `0x20`, auxiliary B0 and final auxiliary `0x34` are skipped. The
 software finger-down state is cleared; a zero mask itself does not count as a
 quality pass. An accepted sample advances at most one stage. Extraction/quality
-failure keeps the existing terminal policy, while a diversity rejection can
-produce the existing visible retry within the 36-contact bound.
+failure keeps the existing terminal policy, while a poor-sample rejection can
+produce the existing visible retry; the fixed-21 policy defines no policy-side
+physical-contact bound.
 
 For a nonterminal zero, the graph waits for the ordinary host next-sample
 request. A new `0x32` requires completed host evaluation, libfprint awaiting a
@@ -903,7 +904,7 @@ the supported reader/application scope.
 | Action | Candidate print set | Physical acquisitions | Terminal behavior |
 | --- | --- | --- | --- |
 | Enroll duplicate precheck | Existing prints in the user's gallery | One identify acquisition | Existing match stops as duplicate; clean no-match permits enrollment to begin |
-| Enroll | New finger | Repeated explicit contacts, bounded at 36 | Completes with 12–20 stored samples when candidate sufficiency is reached, or terminates with an error by a hard bound |
+| Enroll | New finger | Repeated explicit contacts, with no policy-side maximum | Completes exactly at the 21st accepted valid sample; poor captures retry and do not count |
 | Verify | One selected print | One per explicit action | Match, no-match, or processing error |
 | Identify | A gallery of prints | One per explicit action | First score meeting cutoff, clean no-match after all samples, or error |
 
@@ -911,40 +912,40 @@ When fprintd verifies one known template it uses verify. When it verifies `any`
 against multiple enrolled fingers, or checks enrollment for an existing print,
 the driver advertises and uses identify.
 
-### 10.2 Dynamic enrollment policy
+### 10.2 Fixed-21 enrollment policy
 
-The active source implements the empirical enrollment-v2 candidate. It is
+The active source implements the fixed-21 enrollment policy. It is
 offline-qualified but remains pending target-live biometric qualification.
-Its bounds and thresholds are candidate parameters, not universal biometric
-constants.
 
 | Rule | Value |
 | --- | --- |
-| Minimum accepted samples | 12 |
-| Normal completion target | 16 |
-| Maximum stored samples | 20 |
-| Maximum physical contacts, including retries | 36 |
+| Required accepted samples | 21 |
+| Normal completion target | 21 |
+| Maximum stored samples | 21 |
+| Physical contacts, including retries | No policy-side maximum |
 | Poor-sample inputs | SIGFM keypoint count and 8×8 keypoint coverage, plus raster range and mean absolute contrast |
-| Duplicate inputs | Exact/near raster MAD together with SIGFM coverage overlap and keypoint-count proximity |
+| Duplicate inputs (diagnostic only) | Exact/near raster MAD together with SIGFM coverage overlap and keypoint-count proximity |
 
 Every contact first receives a local SIGFM metric pass. A sample is poor when
 it has fewer than 25 keypoints, fewer than four occupied coverage cells, raster
 range below 48, or mean absolute contrast below 12. These values are visibly
-named experimental thresholds. A poor sample produces a retry and advances
-only the physical-contact counter.
+named experimental thresholds. A poor sample produces a retry, stores nothing
+and advances only the physical-contact counter. There is no bound on how many
+retries or physical contacts may occur, and no contact count can terminate
+enrollment.
 
-An exact duplicate has raster MAD below 4. A near duplicate has MAD below 24,
-at least 75% coverage-mask overlap and keypoint counts within 25%. Either result
-produces a retry, stores nothing and can never complete enrollment. There is no
-duplicate streak and no duplicate-driven convergence.
+A valid duplicate or near-duplicate is accepted and counts exactly like any
+other valid sample. An exact duplicate has raster MAD below 4. A near duplicate
+has MAD below 24, at least 75% coverage-mask overlap and keypoint counts within
+25%. These classifications, together with SIGFM keypoints, coverage, aggregate
+coverage, raster range/contrast and MAD, remain available as per-contact
+diagnostics; they do not govern acceptance or completion and can never
+anticipate, block or determine completion.
 
-Completion before 16 is possible only from sample 12 onward when aggregate
-coverage reaches 56 of 64 cells and average keypoint/contrast values reach
-80/24. The normal target from sample 16 onward requires at least 32 aggregate
-coverage cells and average keypoint/contrast values of 40/16. Insufficient
-coverage can therefore continue beyond 16. After accepting the twentieth sample
-or reaching the thirty-sixth contact, residual insufficiency is a terminal
-bounded error rather than success; a twenty-first sample is never accepted.
+Completion occurs exactly at the 21st accepted valid sample. Zero through 20
+accepted samples cannot complete enrollment, and a 22nd accepted sample is
+unreachable. The poor/unusable gate is the only quality barrier and is never a
+diversity or completion criterion.
 
 The metric extraction does not alter the template format or matcher. Libfprint
 still performs its ordinary asynchronous SIGFM extraction for an accepted
@@ -957,21 +958,18 @@ back.
 flowchart TD
     Contact["Physical contact"] --> Process["Capture and preprocess"]
     Process --> Quality{"SIGFM coverage and<br/>raster quality pass?"}
-    Quality -- No --> Retry["Retry without progress"]
-    Quality -- Yes --> Compare{"Duplicate or near-duplicate?"}
-    Compare -- Yes --> Retry
-    Compare -- No --> Sufficient{"At least 12 and<br/>candidate sufficient?"}
-    Sufficient -- Yes --> Done["Store sample and complete"]
-    Sufficient -- No --> Limit{"20th sample or<br/>36th contact?"}
-    Limit -- No --> More
-    Limit -- Yes --> Fail["Enrollment exhausted"]
-    Retry --> Limit
+    Quality -- No --> Retry["Retry without progress<br/>(unbounded contacts)"]
+    Quality -- Yes --> Store["Accept and store sample<br/>(duplicate flags are diagnostic only)"]
+    Store --> Count{"21 accepted samples?"}
+    Count -- No --> More
+    Count -- Yes --> Done["Complete enrollment"]
+    Retry --> Contact
     More --> Contact
 ```
 
-The structural libfprint SIGFM container permits up to 21 sample envelopes, but
-the active enrollment policy stores at most 20. Container capacity does not
-change the enrollment rule.
+The structural libfprint SIGFM container permits up to 21 sample envelopes, and
+the fixed-21 policy stores exactly 21. Container capacity is independent of the
+enrollment rule; under this policy the two coincide.
 
 ### 10.3 Match outcomes and retry ownership
 
@@ -1602,7 +1600,8 @@ boundaries unless it explicitly redesigns and requalifies them:
 6. baseline-aware active preprocessing before SIGFM;
 7. strict `GSF1` parsing and sensitive template handling;
 8. one acquisition per explicit verify/identify action;
-9. bounded 12–20-sample enrollment candidate and 36-contact ceiling;
+9. fixed-21 enrollment completing exactly at the 21st accepted sample, with
+   unbounded poor-capture retries and no policy-side physical-contact cap;
 10. release/STOP/drain before clean reuse, with poison on uncertainty;
 11. stock fprintd/PAM/KDE ownership and working password fallback;
 12. service quiescence before runtime replacement or removal;

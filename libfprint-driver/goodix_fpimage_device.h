@@ -53,10 +53,19 @@ typedef struct _GUsbDevice GUsbDevice;
  * target, convergence criterion, protocol ceiling or biometric-policy input. */
 #define GOODIX_TARGET_LOCAL_ENROLL_STAGES 21u
 
-/* Structural host-side ceiling for the empirical enrollment-v2 candidate.
- * Completion is selected dynamically between 12 and 20 accepted samples;
- * this maximum is not a sensor or protocol constant. */
-#define GOODIX_SIGFM_ENROLL_MAX_STAGES 20u
+/* Normative fixed-21 enrollment policy: enrollment completes exactly at the
+ * 21st accepted valid sample, with no early completion and no reachable 22nd
+ * accepted sample.  This constant is dedicated policy wiring; it is not
+ * derived from the historical GOODIX_TARGET_LOCAL_ENROLL_STAGES wire-fixture
+ * metadata above, which remains non-normative. */
+#define GOODIX_SIGFM_ENROLL_REQUIRED_STAGES 21u
+
+/* The fixed-21 policy defines no policy-side physical-contact maximum: poor
+ * captures retry and physical contacts may exceed 21 without bound.  The
+ * host enrollment model's structural contact counter is pinned to the widest
+ * representable value so it can never terminate enrollment early or reject a
+ * contact; completion is driven solely by the 21st accepted sample. */
+#define GOODIX_SIGFM_ENROLL_PHYSICAL_CONTACTS_UNBOUNDED G_MAXUINT
 
 typedef enum
 {

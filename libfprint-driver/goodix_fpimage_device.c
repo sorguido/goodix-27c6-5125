@@ -434,10 +434,12 @@ production_activation_start_secure_graph (GoodixDeviceContext *ctx)
 {
   GoodixPostTlsMaterial post_material = { 0 };
   GoodixEnrollmentModelConfig enrollment_config = {
-    .required_stage_count = GOODIX_SIGFM_ENROLL_MAX_STAGES,
+    .required_stage_count = GOODIX_SIGFM_ENROLL_REQUIRED_STAGES,
 #ifdef GOODIX_LIBFPRINT_SIGFM
+    /* Fixed-21 policy: the accepted-sample count alone completes enrollment,
+     * so the structural physical-contact counter must never bound retries. */
     .max_physical_stage_count =
-      GOODIX_ENROLLMENT_DIVERSITY_MAX_PHYSICAL_ATTEMPTS,
+      GOODIX_SIGFM_ENROLL_PHYSICAL_CONTACTS_UNBOUNDED,
 #endif
     .defer_terminal_stage_delivery_until_release_ready = TRUE,
     .defer_intermediate_stage_delivery_until_release_ready = TRUE,
@@ -2813,7 +2815,7 @@ goodix_fpimage_device_class_init (GoodixFpImageDeviceClass *klass)
   device_class->full_name = "Goodix 27c6:5125 host-only shell";
   device_class->type      = FP_DEVICE_TYPE_VIRTUAL;
   device_class->scan_type = FP_SCAN_TYPE_PRESS;
-  device_class->nr_enroll_stages = GOODIX_SIGFM_ENROLL_MAX_STAGES;
+  device_class->nr_enroll_stages = GOODIX_SIGFM_ENROLL_REQUIRED_STAGES;
 
   img_class->img_open     = goodix_fpimage_device_img_open;
   img_class->img_close    = goodix_fpimage_device_img_close;
@@ -2864,9 +2866,10 @@ goodix_usb_fpimage_device_class_init (GoodixUsbFpImageDeviceClass *klass)
   device_class->features |= FP_DEVICE_FEATURE_IDENTIFY;
 #endif
 
-  /* The enrollment-v2 candidate permits at most 36 physical contacts and 20
-   * stored samples. Once an accepted image has been delivered, host-side
-   * SIGFM failure is terminal and must not become an implicit extra contact. */
+  /* The fixed-21 enrollment policy stores exactly 21 accepted samples and
+   * places no policy-side bound on physical contacts.  Once an accepted image
+   * has been delivered, host-side SIGFM failure is terminal and must not
+   * become an implicit extra contact. */
   img_class->enroll_processing_fail_closed = TRUE;
 }
 
@@ -3327,9 +3330,7 @@ context_enrollment_image (GoodixEnrollmentPipeline *pipeline,
         diversity_observation.raster_contrast,
         diversity_observation.nearest_mad,
         diversity_observation.nearest_coverage_percent);
-      if (diversity_decision ==
-            GOODIX_ENROLLMENT_DIVERSITY_RETRY_DUPLICATE ||
-          diversity_decision == GOODIX_ENROLLMENT_DIVERSITY_RETRY_POOR)
+      if (diversity_decision == GOODIX_ENROLLMENT_DIVERSITY_RETRY_POOR)
         {
           if (!goodix_enrollment_pipeline_retry_current_stage (pipeline,
                                                                 error))
@@ -3337,22 +3338,19 @@ context_enrollment_image (GoodixEnrollmentPipeline *pipeline,
               goodix_fpimage_pipeline_free (sigfm_pipeline);
               return FALSE;
             }
-          g_debug ("enrollment contact %u rejected as %s; retry",
-                   stage_index,
-                   diversity_decision ==
-                     GOODIX_ENROLLMENT_DIVERSITY_RETRY_DUPLICATE ?
-                     "duplicate/near-duplicate" : "poor sample");
+          g_debug ("enrollment contact %u rejected as poor sample; retry",
+                   stage_index);
           fpi_image_device_retry_scan (FP_IMAGE_DEVICE (ctx->device),
                                        FP_DEVICE_RETRY_GENERAL);
           goodix_fpimage_pipeline_free (sigfm_pipeline);
           return TRUE;
         }
-      if (diversity_decision == GOODIX_ENROLLMENT_DIVERSITY_EXHAUSTED)
+      if (diversity_decision == GOODIX_ENROLLMENT_DIVERSITY_FAILED)
         {
           goodix_fpimage_pipeline_free (sigfm_pipeline);
           g_set_error_literal (
-            error, G_IO_ERROR, G_IO_ERROR_NO_SPACE,
-            "SIGFM enrollment exhausted its 20-sample/36-contact bounds without sufficient coverage");
+            error, G_IO_ERROR, G_IO_ERROR_FAILED,
+            "SIGFM enrollment fixed-21 policy failed; no physical-contact bound exists");
           return FALSE;
         }
       if (diversity_decision ==
@@ -3394,7 +3392,7 @@ context_enrollment_image (GoodixEnrollmentPipeline *pipeline,
         g_object_ref (goodix_fpimage_pipeline_get_image (sigfm_pipeline)));
       goodix_fpimage_pipeline_free (sigfm_pipeline);
 #else
-      if (stage_index == GOODIX_SIGFM_ENROLL_MAX_STAGES &&
+      if (stage_index == GOODIX_SIGFM_ENROLL_REQUIRED_STAGES &&
           ctx->terminal_delivery_at_release_ready)
         {
           fpi_image_device_hold_enroll_completion (

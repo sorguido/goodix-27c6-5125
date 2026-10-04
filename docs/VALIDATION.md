@@ -123,12 +123,13 @@ Git history. [Build and offline checks](../production/README.md) identifies the
 relevant suites. These checks support implementation review; they do not establish
 recognition accuracy, hardware behavior or complete operating-system recovery.
 
-The enrollment-v2 source candidate has deterministic normal and sanitizer
-coverage for its 12/16/20 accepted-sample policy, 36-contact bound, poor-sample
-retry, duplicate/near-duplicate retry and insufficient-template failure. This
-is offline implementation evidence only. The live results in the table above
-belong to the earlier eight-sample policy; no target-live robustness claim is
-made for the v2 candidate yet.
+The fixed-21 enrollment policy has deterministic normal and sanitizer
+coverage for completion exactly at the 21st accepted sample, the absence of a
+22nd accepted sample, poor-sample retry without progress, unbounded physical
+contacts, duplicate/near-duplicate acceptance and non-decisional diversity
+diagnostics. This is offline implementation evidence only. The live results in
+the table above belong to the earlier eight-sample policy; no target-live
+robustness claim is made for the fixed-21 policy yet.
 
 ## Known limitations
 

@@ -6,28 +6,30 @@
 
 G_BEGIN_DECLS
 
-/* Empirical APP12509 enrollment-v2 candidate bounds. These values are not
- * universal biometric constants and require target-live qualification. */
-#define GOODIX_ENROLLMENT_DIVERSITY_MIN_ACCEPTED 12u
-#define GOODIX_ENROLLMENT_DIVERSITY_NORMAL_TARGET 16u
-#define GOODIX_ENROLLMENT_DIVERSITY_MAX_SAMPLES 20u
-#define GOODIX_ENROLLMENT_DIVERSITY_MAX_PHYSICAL_ATTEMPTS 36u
+/* Normative fixed-21 enrollment policy for the APP12509 target: enrollment
+ * completes exactly at the 21st accepted valid sample.  There is no early
+ * completion, a 22nd accepted sample is unreachable, and no policy-side
+ * physical-contact maximum exists (poor/unusable captures retry and physical
+ * contacts may exceed 21 without bound).  This constant is the dedicated
+ * policy source; the historical GOODIX_TARGET_LOCAL_ENROLL_STAGES wire-fixture
+ * metadata in goodix_fpimage_device.h is not a policy input. */
+#define GOODIX_ENROLLMENT_DIVERSITY_REQUIRED_ACCEPTED_SAMPLES 21u
 
-/* Experimental quality/diversity thresholds for the first v2 candidate. */
+/* Poor/unusable quality gate.  This gate is separate from the fixed-21
+ * completion rule and is never a diversity or completion criterion; it only
+ * keeps an unusable capture out of the template. */
 #define GOODIX_ENROLLMENT_DIVERSITY_MIN_SIGFM_KEYPOINTS 25u
 #define GOODIX_ENROLLMENT_DIVERSITY_MIN_COVERAGE_CELLS 4u
 #define GOODIX_ENROLLMENT_DIVERSITY_MIN_RASTER_RANGE 48u
 #define GOODIX_ENROLLMENT_DIVERSITY_MIN_RASTER_CONTRAST 12u
+
+/* Duplicate/near-duplicate detection thresholds.  Detection is diagnostic
+ * only: a valid duplicate or near-duplicate is accepted, counts toward the
+ * required samples, and never anticipates, blocks or determines completion. */
 #define GOODIX_ENROLLMENT_DIVERSITY_EXACT_MAD_LIMIT 4u
 #define GOODIX_ENROLLMENT_DIVERSITY_NEAR_MAD_LIMIT 24u
 #define GOODIX_ENROLLMENT_DIVERSITY_NEAR_COVERAGE_PERCENT 75u
 #define GOODIX_ENROLLMENT_DIVERSITY_NEAR_KEYPOINT_DELTA_PERCENT 25u
-#define GOODIX_ENROLLMENT_DIVERSITY_EARLY_COVERAGE_CELLS 56u
-#define GOODIX_ENROLLMENT_DIVERSITY_EARLY_AVG_KEYPOINTS 80u
-#define GOODIX_ENROLLMENT_DIVERSITY_EARLY_AVG_CONTRAST 24u
-#define GOODIX_ENROLLMENT_DIVERSITY_NORMAL_COVERAGE_CELLS 32u
-#define GOODIX_ENROLLMENT_DIVERSITY_NORMAL_AVG_KEYPOINTS 40u
-#define GOODIX_ENROLLMENT_DIVERSITY_NORMAL_AVG_CONTRAST 16u
 
 typedef struct
 {
@@ -38,11 +40,15 @@ typedef struct
 
 typedef enum
 {
+  /* Valid sample accepted; it counts toward the fixed 21. */
   GOODIX_ENROLLMENT_DIVERSITY_ACCEPT,
-  GOODIX_ENROLLMENT_DIVERSITY_RETRY_DUPLICATE,
+  /* Poor/unusable sample; retry without advancing the accepted count. */
   GOODIX_ENROLLMENT_DIVERSITY_RETRY_POOR,
+  /* The 21st accepted valid sample; enrollment is complete. */
   GOODIX_ENROLLMENT_DIVERSITY_ACCEPT_TERMINAL,
-  GOODIX_ENROLLMENT_DIVERSITY_EXHAUSTED,
+  /* Internal policy failure (invalid input, observation after completion or
+   * allocation failure).  This is never a physical-contact bound. */
+  GOODIX_ENROLLMENT_DIVERSITY_FAILED,
 } GoodixEnrollmentDiversityDecision;
 
 typedef struct

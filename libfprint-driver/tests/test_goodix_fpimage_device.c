@@ -595,7 +595,7 @@ test_enroll_finger_off_before_minutiae_done (void)
 }
 
 static void
-test_enrollment_v2_structural_max_policy (void)
+test_enrollment_fixed_21_stage_policy (void)
 {
   g_autoptr(GCancellable) cancellable = g_cancellable_new ();
   g_autoptr(FpPrint) template = NULL;
@@ -604,7 +604,7 @@ test_enrollment_v2_structural_max_policy (void)
 
   fixture_open (f);
   g_assert_cmpint (fp_device_get_nr_enroll_stages (FP_DEVICE (f->device)), ==,
-                   (gint) GOODIX_SIGFM_ENROLL_MAX_STAGES);
+                   (gint) GOODIX_SIGFM_ENROLL_REQUIRED_STAGES);
   template = fp_print_new (FP_DEVICE (f->device));
   fill_gradient_samples (samples);
   f->done = FALSE;
@@ -615,10 +615,10 @@ test_enrollment_v2_structural_max_policy (void)
                     (GAsyncReadyCallback) enroll_cb, f);
   goodix_device_context_emit_arm_complete (f->ctx, NULL);
 
-  for (guint stage = 1u; stage <= GOODIX_SIGFM_ENROLL_MAX_STAGES; stage++)
+  for (guint stage = 1u; stage <= GOODIX_SIGFM_ENROLL_REQUIRED_STAGES; stage++)
     {
       gint64 deadline;
-      gboolean final_stage = stage == GOODIX_SIGFM_ENROLL_MAX_STAGES;
+      gboolean final_stage = stage == GOODIX_SIGFM_ENROLL_REQUIRED_STAGES;
 
       g_assert_cmpint (f->last_state, ==,
                        FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_ON);
@@ -660,7 +660,7 @@ test_enrollment_v2_structural_max_policy (void)
   g_assert_nonnull (f->enroll_print);
   g_assert_cmpuint (f->completion_count, ==, 1u);
   g_assert_cmpuint (f->enroll_progress_count, ==,
-                    GOODIX_SIGFM_ENROLL_MAX_STAGES);
+                    GOODIX_SIGFM_ENROLL_REQUIRED_STAGES);
   g_assert_cmpint (goodix_device_context_get_state (f->ctx), ==,
                    GOODIX_DEVICE_CONTEXT_STATE_INACTIVE);
 
@@ -3666,7 +3666,7 @@ static void
 test_d279_24_context_first_arm_enrollment_handoff (gconstpointer scenario)
 {
   GoodixEnrollmentModelConfig config = {
-    .required_stage_count = GOODIX_SIGFM_ENROLL_MAX_STAGES,
+    .required_stage_count = GOODIX_SIGFM_ENROLL_REQUIRED_STAGES,
     .defer_terminal_stage_delivery = TRUE,
     .defer_intermediate_stage_delivery_until_release_ready = TRUE,
   };
@@ -3804,7 +3804,7 @@ test_d279_24_context_first_arm_enrollment_handoff (gconstpointer scenario)
                    GOODIX_USB_RECEIVE_PROTOCOL_RX);
 
   for (guint stage = 1u;
-       stage <= GOODIX_SIGFM_ENROLL_MAX_STAGES;
+       stage <= GOODIX_SIGFM_ENROLL_REQUIRED_STAGES;
        stage++)
     {
       g_autoptr(GBytes) primary = d279_25_build_primary_plaintext (stage);
@@ -3889,7 +3889,7 @@ test_d279_24_context_first_arm_enrollment_handoff (gconstpointer scenario)
                          g_get_monotonic_time () < deadline)
                     g_main_context_iteration (NULL, FALSE);
                   g_assert_cmpuint (f->enroll_progress_count, ==, stage);
-                  if (stage < GOODIX_SIGFM_ENROLL_MAX_STAGES)
+                  if (stage < GOODIX_SIGFM_ENROLL_REQUIRED_STAGES)
                     {
                       g_assert_cmpuint (goodix_fpi_usb_backend_get_out_submit_count (backend), ==, out_before + 1u);
                       g_assert_cmpuint (goodix_fpi_usb_backend_get_out_outstanding (backend), ==, 1u);
@@ -3983,7 +3983,7 @@ test_d279_24_context_first_arm_enrollment_handoff (gconstpointer scenario)
           d279_25_feed_plaintext (f->ctx, generation, auxiliary);
           d279_25_complete_and_ack (f->ctx, generation, 0x34);
           d279_25_feed_context_frame (f->ctx, generation, irq0200);
-          if (stage < GOODIX_SIGFM_ENROLL_MAX_STAGES)
+          if (stage < GOODIX_SIGFM_ENROLL_REQUIRED_STAGES)
             d279_25_complete_and_ack (f->ctx, generation, 0x32);
         }
 stage_done:
@@ -3994,7 +3994,7 @@ stage_done:
                g_get_monotonic_time () < deadline)
           g_main_context_iteration (NULL, FALSE);
         g_assert_cmpuint (f->enroll_progress_count, ==, stage);
-        if (stage < GOODIX_SIGFM_ENROLL_MAX_STAGES)
+        if (stage < GOODIX_SIGFM_ENROLL_REQUIRED_STAGES)
           g_assert_cmpint (f->last_state, ==,
                            FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_ON);
       }
@@ -4003,31 +4003,31 @@ stage_done:
   g_assert_true (events_audit.lifecycle.plan.pipeline.protocol.complete);
   g_assert_cmpuint (
     events_audit.lifecycle.plan.pipeline.protocol.configured_required_stage_count,
-    ==, GOODIX_SIGFM_ENROLL_MAX_STAGES);
+    ==, GOODIX_SIGFM_ENROLL_REQUIRED_STAGES);
   guint case_kind = GPOINTER_TO_UINT (scenario) / 100u;
   guint recovered = (case_kind == 1u || case_kind == 8u || case_kind == 9u) ? 1u : 0u;
   guint late = case_kind == 8u || case_kind == 9u ? 1u : 0u;
   g_assert_cmpuint (events_audit.parsed_a0_count, ==,
-                    9u * GOODIX_SIGFM_ENROLL_MAX_STAGES - 1u -
+                    9u * GOODIX_SIGFM_ENROLL_REQUIRED_STAGES - 1u -
                     3u * recovered + late);
   g_assert_cmpuint (events_audit.primary_b0_count, ==,
-                    GOODIX_SIGFM_ENROLL_MAX_STAGES);
+                    GOODIX_SIGFM_ENROLL_REQUIRED_STAGES);
   g_assert_cmpuint (events_audit.auxiliary_b0_count, ==,
-                    GOODIX_SIGFM_ENROLL_MAX_STAGES - recovered);
+                    GOODIX_SIGFM_ENROLL_REQUIRED_STAGES - recovered);
   g_assert_cmpuint (events_audit.lifecycle.plan.pipeline.fpimage_delivery_count,
-                    ==, GOODIX_SIGFM_ENROLL_MAX_STAGES);
+                    ==, GOODIX_SIGFM_ENROLL_REQUIRED_STAGES);
   g_assert_cmpuint (events_audit.finger_down_delivery_count, ==,
-                    GOODIX_SIGFM_ENROLL_MAX_STAGES);
+                    GOODIX_SIGFM_ENROLL_REQUIRED_STAGES);
   g_assert_cmpuint (events_audit.finger_up_delivery_count, ==,
-                    GOODIX_SIGFM_ENROLL_MAX_STAGES);
+                    GOODIX_SIGFM_ENROLL_REQUIRED_STAGES);
   g_assert_cmpuint (events_audit.auxiliary_b0_delivery_count, ==,
-                    GOODIX_SIGFM_ENROLL_MAX_STAGES - recovered);
-  g_assert_cmpuint (auxiliary_count, ==, GOODIX_SIGFM_ENROLL_MAX_STAGES - recovered);
+                    GOODIX_SIGFM_ENROLL_REQUIRED_STAGES - recovered);
+  g_assert_cmpuint (auxiliary_count, ==, GOODIX_SIGFM_ENROLL_REQUIRED_STAGES - recovered);
   g_assert_cmpuint (binding_audit.graph_ready_submit_count, ==,
-                    6u * GOODIX_SIGFM_ENROLL_MAX_STAGES - 1u -
+                    6u * GOODIX_SIGFM_ENROLL_REQUIRED_STAGES - 1u -
                     2u * recovered);
   g_assert_cmpuint (binding_audit.transaction.committed_after_completion_count,
-                    ==, 6u * GOODIX_SIGFM_ENROLL_MAX_STAGES - 1u -
+                    ==, 6u * GOODIX_SIGFM_ENROLL_REQUIRED_STAGES - 1u -
                     2u * recovered);
   g_assert_cmpuint (binding_audit.retry_count, ==, 0u);
   g_assert_cmpuint (goodix_fpi_usb_backend_get_outstanding (backend), ==, 0u);
@@ -4045,8 +4045,7 @@ stage_done:
   fixture_close (f);
   test_fixture_free (f);
   g_print ("D279_24_CONTEXT_FIRST_ARM_ENROLLMENT_HANDOFF=PASS\n");
-  g_print ("ENROLLMENT_V2_STRUCTURAL_MAX20_CONTEXT_TRANSCRIPT=PASS\n");
-  g_print ("ENROLLMENT_V2_LEGACY_21_STAGE_FIXTURE_RETIRED=PASS\n");
+  g_print ("ENROLLMENT_FIXED_21_CONTEXT_TRANSCRIPT=PASS\n");
 }
 
 static void
@@ -4405,8 +4404,8 @@ main (int argc, char **argv)
                    test_terminal_hold_release_before_sigfm_completion);
   g_test_add_func ("/goodix-fpimage-device/d279-57-terminal-release-before-sigfm-failure-fail-closed",
                    test_terminal_release_before_sigfm_failure_is_fail_closed);
-  g_test_add_func ("/goodix-fpimage-device/enrollment-v2-structural-max-policy",
-                   test_enrollment_v2_structural_max_policy);
+  g_test_add_func ("/goodix-fpimage-device/enrollment-fixed-21-stage-policy",
+                   test_enrollment_fixed_21_stage_policy);
   g_test_add_func ("/goodix-fpimage-device/no-rearm-before-both-gates",
                    test_no_rearm_before_both_gates);
   g_test_add_func ("/goodix-fpimage-device/no-command-after-deactivate-fence",
