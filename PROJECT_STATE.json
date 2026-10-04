@@ -184,9 +184,9 @@
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "Roadmap item 1: preserve verification strictness, then remove the Rockytkg-derived premature enrollment convergence before redesigning Diversity v2. Any sensor-reaching work stops at HUMAN_REQUIRED.",
+  "next_action": "Roadmap items 1–5: preserve verification strictness; remove Rockytkg-derived premature convergence; build Diversity v2; make enrollment richness adaptive; then perform real-user biometric requalification. Treat APP12509>8-stage capability as a starting assumption grounded in Windows/OEM evidence, not as a separate gate.",
   "last_verified_head": "c3918892c91b3b208b12e1167e14e864eeb2b4ca",
-  "state_note": "Development roadmap reset on 2026-10-04 to the active enrollment-robustness work only. ROADMAP.md now starts at item 1 and contains no closed historical phases. Historical completed gates remain evidence/cache only.",
+  "state_note": "Development roadmap simplified on 2026-10-04 to five active enrollment-robustness items. APP12509 is not assumed to have an 8-stage enrollment limit; Windows/OEM evidence on the same target is the starting basis, so no separate boundary or multi-epoch gate is planned unless new evidence later creates a concrete blocker.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }

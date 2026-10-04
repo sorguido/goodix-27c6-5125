@@ -230,7 +230,7 @@
       "note": "Compare against main and edit only documentation made obsolete or incomplete by the qualified self-contained driver."
     },
     "ENROLLMENT_V2": {
-      "purpose": "Route the active enrollment-robustness roadmap items 1–7 only.",
+      "purpose": "Route the active enrollment-robustness roadmap items 1–5 only.",
       "load": [
         "ROADMAP.md",
         "PROJECT_STATE.json",
@@ -246,9 +246,9 @@
         "Rockytkg/libfprint/libfprint/sigfm/sigfm.cpp",
         "docs/VALIDATION.md"
       ],
-      "note": "ROADMAP.md restarts at item 1. Begin offline; do not lower verification threshold to mask score=0. Any target-live stage-boundary experiment stops at HUMAN_REQUIRED before sensor access."
+      "note": "Treat APP12509 >8-stage enrollment capability as a starting assumption grounded in Windows/OEM evidence. Begin offline; do not lower verification threshold to mask score=0. Live requalification remains HUMAN_REQUIRED."
     }
   },
   "routing_rule": "Cold-start routing is canonical files -> PROJECT_STATE.json -> ARTIFACT_INDEX.json -> only artifacts relevant to the active phase/task.",
-  "state_note": "Context router aligned to the reset enrollment-robustness roadmap. Historical phase routes may remain for provenance, but the active route is ENROLLMENT_V2 and ROADMAP.md starts at item 1."
+  "state_note": "Context router aligned to the simplified five-item enrollment-robustness roadmap. APP12509's ability to continue beyond eight acquisitions is a starting premise from Windows/OEM evidence, not a separate qualification phase."
 }

@@ -31,8 +31,8 @@ che viene appreso durante l'enrollment.
 - la diversity policy corrente deriva esplicitamente dal selector Rockytkg:
   minimo 3, massimo 8, MAD raster < 8 e convergenza dopo due contatti
   duplicate-like;
-- questi valori sono una scelta host-side e non costituiscono prova di un
-  limite APP12509;
+- questi valori sono una scelta host-side e non costituiscono un limite
+  APP12509;
 - Windows Biometric Framework supporta enrollment adattivo e può richiedere
   ulteriori campioni finché l'engine non ritiene il template sufficiente;
 - sull'hardware reale Windows Hello può richiedere molte più di 8 acquisizioni,
@@ -43,6 +43,20 @@ che viene appreso durante l'enrollment.
   un enrollment completo con un numero elevato di cicli di acquisizione; quel
   conteggio appartiene esclusivamente a quella singola run e non costituisce
   minimo, massimo, target o limite progettuale.
+
+
+### Assunzione di partenza sul numero di stage
+
+Non assumere che APP12509 abbia un limite di 8 stage per enrollment.
+
+L'evidenza osservata su Windows Hello/OEM sullo stesso target dimostra che il
+sensore e il relativo protocollo possono proseguire oltre otto acquisizioni
+all'interno di un singolo enrollment quando l'engine lo richiede. Il valore 8
+appartiene alla precedente policy host-side derivata da Rockytkg e non deve
+essere usato come limite hardware, limite protocollare, target biometrico o
+criterio di convergenza.
+
+Questa è una premessa di progetto, non un gate da riqualificare.
 
 ---
 
@@ -137,57 +151,7 @@ dall'eredità Rockytkg.
 
 ---
 
-## 5 — Determinare il vero boundary APP12509
-
-Non assumere che APP12509 abbia un limite di 8 stage per enrollment.
-
-Verificare sul target reale che il protocollo attuale possa sostenere un
-enrollment adattivo per tutto il tempo necessario alla policy di qualità e
-coverage, senza assumere in anticipo un numero minimo o massimo derivato da una
-precedente run Windows.
-
-La prova deve essere preparata e validata offline prima di qualsiasi accesso
-al sensore.
-
-**HUMAN_REQUIRED prima di ogni esperimento live.**
-
-**PASS quando**
-
-il boundary reale è OBSERVED/PROVEN sul target e non inferito da Rockytkg,
-Windows o altri dispositivi Goodix.
-
-**NEXT:** 6.
-
----
-
-## 6 — Multi-epoch solo se realmente necessario
-
-Il multi-epoch non è la soluzione primaria.
-
-Implementarlo soltanto se il punto 5 dimostra un vero limite per singola epoch
-inferiore alla ricchezza necessaria del template host-side.
-
-In quel caso una singola enrollment action fprintd potrà, se tecnicamente
-corretto:
-
-1. raccogliere una epoch bounded;
-2. completare release/STOP/drain;
-3. aprire una nuova epoch pulita;
-4. continuare ad accumulare coverage SIGFM host-side;
-5. serializzare un unico template finale.
-
-Non devono essere introdotte nuove scritture persistenti o nuovi pairing.
-
-**PASS quando**
-
-o la singola epoch è sufficiente, oppure necessità e sicurezza del multi-epoch
-sono dimostrate.
-
-**NEXT:** 7.
-
----
-
-## 7 — Riqualificazione biometrica reale
+## 5 — Riqualificazione biometrica reale
 
 Dopo la chiusura offline, ripetere enrollment e verifica sul target reale con
 posizionamenti deliberatamente vari.
@@ -220,7 +184,6 @@ Dove praticabile, confrontare i risultati con il comportamento attuale a
 - `score=0` e NO_MATCH legittimi diminuiscono in modo sostanziale;
 - la rejection di dita errate non peggiora;
 - tutti i consumer Fedora continuano a funzionare;
-- il boundary reale APP12509 è documentato da evidenza;
 - Windows interoperability resta integra;
 - non viene introdotto alcun nuovo rischio persistente sul reader.
 
