@@ -9,7 +9,7 @@
   },
   "execution_path": "PRIMARY",
   "phase": "ENROLLMENT_ROBUSTNESS_V2",
-  "phase_status": "NOT_STARTED",
+  "phase_status": "IN_PROGRESS",
   "completed_gates": [
     "SELF_CONTAINED_ARCHITECTURE_APPROVAL",
     "ARTIFACT_INDEX_BASELINE_RECONCILED",
@@ -126,13 +126,17 @@
       "P12_LIVE_REPEATED_SCORE_ZERO_ON_SMALL_CHILD_FINGER",
       "P12_ROCKYTKG_3_8_TWO_DUPLICATE_CONVERGENCE_PROVENANCE",
       "P12_WINDOWS_WBF_ADAPTIVE_ENROLLMENT_CORROBORATION",
-      "P12_GOODIXMOC_DEVICE_DEPENDENT_ENROLL_STAGE_COUNTS"
+      "P12_GOODIXMOC_DEVICE_DEPENDENT_ENROLL_STAGE_COUNTS",
+      "ENROLLMENT_V2_12_16_20_36_POLICY_OFFLINE",
+      "ENROLLMENT_V2_POOR_DUPLICATE_AND_NEAR_DUPLICATE_RETRY_OFFLINE",
+      "ENROLLMENT_V2_BOUNDED_EXHAUSTION_OFFLINE",
+      "ENROLLMENT_V2_PRODUCTION_BUILD_AND_INTEGRATED_SANITIZER_PASS"
     ],
     "inferred": [],
     "initial_blockers": []
   },
   "current_blockers": [
-    "ENROLLMENT_TEMPLATE_COVERAGE_POLICY_TOO_WEAK"
+    "ENROLLMENT_ROBUSTNESS_V2_TARGET_LIVE_QUALIFICATION_REQUIRED"
   ],
   "host_modified": false,
   "relevant_artifacts": [
@@ -172,6 +176,13 @@
     "libfprint-driver/goodix_pairing_provision.h",
     "libfprint-driver/tests/test_goodix_pairing_provision.c",
     "libfprint-driver/goodix_fpimage_device.c",
+    "libfprint-driver/goodix_fpimage_device.h",
+    "libfprint-driver/goodix_enrollment_diversity.c",
+    "libfprint-driver/goodix_enrollment_diversity.h",
+    "libfprint-driver/goodix_sigfm_metrics.cpp",
+    "libfprint-driver/goodix_sigfm_metrics.h",
+    "libfprint-driver/tests/test_goodix_enrollment_diversity.c",
+    "libfprint-driver/tests/run_goodix_enrollment_diversity_test.sh",
     "libfprint-driver/tests/test_goodix_fpimage_device.c",
     "deployment/install.py",
     "deployment/test_install.py",
@@ -184,9 +195,9 @@
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "Implement the single ROADMAP.md enrollment candidate exactly as specified: >=12 accepted minimum, 16 normal target, 20 template maximum, 36 bounded physical contacts, no duplicate-streak early convergence, duplicate/near-duplicate and poor samples retry without progress, diversity based on coverage + SIGFM + quality. Complete offline tests before any live sensor qualification.",
-  "last_verified_head": "09e00a02a08aed700d75a0c123213d170647f3ec",
-  "state_note": "ENROLLMENT_ROBUSTNESS_V2 reset to one implementation task matching ROADMAP.md. Previous live-baseline blocker removed; implementation and offline tests come first.",
+  "next_action": "After explicit Human Gate execution by the User, install the offline-qualified candidate through the existing transactional installer and run the bounded target-real comparison required by ROADMAP.md. Stop on installer error, authentication regression, unexpected persistent behavior or the 36-contact bound; use goodix-uninstall after failure.",
+  "last_verified_head": "6c04711699a7de94bc9d56855646c379ef32964c",
+  "state_note": "ENROLLMENT_ROBUSTNESS_V2 implementation is offline-qualified at the recorded commit: deterministic normal and sanitizer policy tests, 63-test normal and sanitizer image-device integration runs, source-manifest verification, public-builder tests and the production build all pass without USB access. The phase remains open pending the required target-live empirical comparison.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }

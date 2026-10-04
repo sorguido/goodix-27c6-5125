@@ -19,12 +19,12 @@
     "base_ref": "main",
     "indexed_ref": "development",
     "base_head": "c3918892c91b3b208b12e1167e14e864eeb2b4ca",
-    "indexed_head": "9f21b4bc1e818f65defa1e74d06873ebdbcde276",
+    "indexed_head": "6c04711699a7de94bc9d56855646c379ef32964c",
     "merge_base": "c3918892c91b3b208b12e1167e14e864eeb2b4ca",
     "relationship": "development_ahead_of_main",
-    "development_ahead_by": 2,
+    "development_ahead_by": 15,
     "development_behind_main_by": 0,
-    "note": "Reconciled against main c3918892c91b3b208b12e1167e14e864eeb2b4ca through development commit 9f21b4bc1e818f65defa1e74d06873ebdbcde276: the development delta is the .gitignore policy change plus restoration/tracking of the five canonical governance files with P12 state/roadmap updates. This artifact-index maintenance commit itself follows that indexed head and changes only ARTIFACT_INDEX.json."
+    "note": "Reconciled against main c3918892c91b3b208b12e1167e14e864eeb2b4ca through development commit 6c04711699a7de94bc9d56855646c379ef32964c. The active delta includes the tracked governance/state files and the offline-qualified ENROLLMENT_ROBUSTNESS_V2 candidate; target-live qualification remains pending."
   },
   "canonical_routing": {
     "governance": "AGENTS.md",
@@ -84,6 +84,134 @@
       "role": "NON_AUTHORITATIVE_CONTEXT_ROUTER",
       "relevance": [
         "ALL_PHASES",
+        "ENROLLMENT_V2"
+      ]
+    },
+    {
+      "path": "TECHNICAL_MANUAL.md",
+      "git_status": "modified",
+      "role": "CURRENT_TECHNICAL_REFERENCE",
+      "relevance": [
+        "ENROLLMENT_V2"
+      ]
+    },
+    {
+      "path": "docs/VALIDATION.md",
+      "git_status": "modified",
+      "role": "QUALIFICATION_BOUNDARY",
+      "relevance": [
+        "ENROLLMENT_V2"
+      ]
+    },
+    {
+      "path": "docs/learning/06_enrollment.md",
+      "git_status": "modified",
+      "role": "PUBLIC_ENROLLMENT_EXPLANATION",
+      "relevance": [
+        "ENROLLMENT_V2"
+      ]
+    },
+    {
+      "path": "libfprint-driver/goodix_enrollment_diversity.c",
+      "git_status": "modified",
+      "role": "ENROLLMENT_POLICY_IMPLEMENTATION",
+      "relevance": [
+        "ENROLLMENT_V2"
+      ]
+    },
+    {
+      "path": "libfprint-driver/goodix_enrollment_diversity.h",
+      "git_status": "modified",
+      "role": "ENROLLMENT_POLICY_CONTRACT",
+      "relevance": [
+        "ENROLLMENT_V2"
+      ]
+    },
+    {
+      "path": "libfprint-driver/goodix_fpimage_device.c",
+      "git_status": "modified",
+      "role": "PRODUCTION_ENROLLMENT_INTEGRATION",
+      "relevance": [
+        "ENROLLMENT_V2"
+      ]
+    },
+    {
+      "path": "libfprint-driver/goodix_fpimage_device.h",
+      "git_status": "modified",
+      "role": "PRODUCTION_ENROLLMENT_BOUND",
+      "relevance": [
+        "ENROLLMENT_V2"
+      ]
+    },
+    {
+      "path": "libfprint-driver/goodix_sigfm_metrics.cpp",
+      "git_status": "modified",
+      "role": "SIGFM_ENROLLMENT_METRICS",
+      "relevance": [
+        "ENROLLMENT_V2"
+      ]
+    },
+    {
+      "path": "libfprint-driver/goodix_sigfm_metrics.h",
+      "git_status": "modified",
+      "role": "SIGFM_ENROLLMENT_METRICS_CONTRACT",
+      "relevance": [
+        "ENROLLMENT_V2"
+      ]
+    },
+    {
+      "path": "libfprint-driver/tests/test_goodix_enrollment_diversity.c",
+      "git_status": "added",
+      "role": "DETERMINISTIC_ENROLLMENT_POLICY_TEST",
+      "relevance": [
+        "ENROLLMENT_V2"
+      ]
+    },
+    {
+      "path": "libfprint-driver/tests/run_goodix_enrollment_diversity_test.sh",
+      "git_status": "added",
+      "role": "NORMAL_AND_SANITIZER_POLICY_RUNNER",
+      "relevance": [
+        "ENROLLMENT_V2"
+      ]
+    },
+    {
+      "path": "README.md",
+      "git_status": "modified",
+      "role": "PUBLIC_PROJECT_OVERVIEW",
+      "relevance": [
+        "ALL_PHASES"
+      ]
+    },
+    {
+      "path": "libfprint-driver/README.md",
+      "git_status": "modified",
+      "role": "DRIVER_TEST_ROUTING",
+      "relevance": [
+        "ENROLLMENT_V2"
+      ]
+    },
+    {
+      "path": "libfprint-driver/tests/run_goodix_fpimage_device_test_inner.sh",
+      "git_status": "modified",
+      "role": "IMAGE_DEVICE_INTEGRATION_RUNNER",
+      "relevance": [
+        "ENROLLMENT_V2"
+      ]
+    },
+    {
+      "path": "libfprint-driver/tests/test_goodix_fpimage_device.c",
+      "git_status": "modified",
+      "role": "IMAGE_DEVICE_INTEGRATION_TEST",
+      "relevance": [
+        "ENROLLMENT_V2"
+      ]
+    },
+    {
+      "path": "production/source-files.sha256",
+      "git_status": "modified",
+      "role": "PUBLIC_BUILD_SOURCE_INTEGRITY",
+      "relevance": [
         "ENROLLMENT_V2"
       ]
     }
@@ -240,15 +368,23 @@
         "libfprint-driver/goodix_fpimage_device.c",
         "libfprint-driver/goodix_fpimage_device.h",
         "libfprint-driver/goodix_sigfm_metrics.cpp",
+        "libfprint-driver/goodix_sigfm_metrics.h",
+        "libfprint-driver/tests/test_goodix_enrollment_diversity.c",
+        "libfprint-driver/tests/run_goodix_enrollment_diversity_test.sh",
+        "libfprint-driver/tests/test_goodix_fpimage_device.c",
+        "libfprint-driver/tests/run_goodix_fpimage_device_test_inner.sh",
+        "production/source-files.sha256",
+        "TECHNICAL_MANUAL.md",
+        "docs/learning/06_enrollment.md",
         "reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image-device.c",
         "reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-print.c",
         "reference/libfprint-fedora44-1.94.100/source/libfprint/drivers/goodixmoc/goodix.c",
         "Rockytkg/libfprint/libfprint/sigfm/sigfm.cpp",
         "docs/VALIDATION.md"
       ],
-      "note": "The five ROADMAP development observations are concurrent concerns, not ordered phases. No per-item gate applies; use only the final ENROLLMENT_ROBUSTNESS_V2 exit gate. APP12509 >8-stage capability remains a starting assumption grounded in Windows/OEM evidence."
+      "note": "The 12/16/20 accepted-sample policy and 36-contact bound are implemented and offline-qualified at the indexed head. The route remains active because ROADMAP.md also requires a target-live empirical comparison before the ENROLLMENT_ROBUSTNESS_V2 exit gate can pass."
     }
   },
   "routing_rule": "Cold-start routing is canonical files -> PROJECT_STATE.json -> ARTIFACT_INDEX.json -> only artifacts relevant to the active phase/task.",
-  "state_note": "Context router aligned to a single integrated ENROLLMENT_ROBUSTNESS_V2 task. The five ROADMAP observations are considered jointly and are not milestones or sequential steps."
+  "state_note": "Context router aligned to the offline-qualified ENROLLMENT_ROBUSTNESS_V2 candidate. The next permitted activity is the explicitly gated target-live comparison; no phase completion is claimed."
 }
