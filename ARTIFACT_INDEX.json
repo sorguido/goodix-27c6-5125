@@ -19,12 +19,12 @@
     "base_ref": "main",
     "indexed_ref": "development",
     "base_head": "c3918892c91b3b208b12e1167e14e864eeb2b4ca",
-    "indexed_head": "309d0755629fcf3b0bf08a55358cc5d9f51a8a20",
+    "indexed_head": "9f21b4bc1e818f65defa1e74d06873ebdbcde276",
     "merge_base": "c3918892c91b3b208b12e1167e14e864eeb2b4ca",
     "relationship": "development_ahead_of_main",
-    "development_ahead_by": 1,
+    "development_ahead_by": 2,
     "development_behind_main_by": 0,
-    "note": "Baseline is the development branch immediately after the .gitignore policy commit that re-enabled tracking of the five canonical governance files. The current canonical-file restoration/P12 commit follows this baseline and is reconciled by the next artifact-index maintenance commit."
+    "note": "Reconciled against main c3918892c91b3b208b12e1167e14e864eeb2b4ca through development commit 9f21b4bc1e818f65defa1e74d06873ebdbcde276: the development delta is the .gitignore policy change plus restoration/tracking of the five canonical governance files with P12 state/roadmap updates. This artifact-index maintenance commit itself follows that indexed head and changes only ARTIFACT_INDEX.json."
   },
   "canonical_routing": {
     "governance": "AGENTS.md",
