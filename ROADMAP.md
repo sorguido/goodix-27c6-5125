@@ -14,17 +14,6 @@ osservato sia su un dito adulto sia, con frequenza maggiore, su un dito piccolo.
 La soluzione non deve abbassare la sicurezza del matching. Deve migliorare ciò
 che viene appreso durante l'enrollment.
 
-### Vincoli invariati
-
-- nessun firmware flash, IAP o ClearApp;
-- nessuna scrittura OTP o factory-data;
-- nessun cambiamento persistente di VID:PID o modalità;
-- nessun indebolimento intenzionale della rejection di un dito errato;
-- nessun retry sensor-reaching nascosto o non limitato;
-- pairing, TLS, state-v2 e convivenza Windows devono restare invariati salvo
-  evidenza tecnica che richieda una modifica separata;
-- qualunque prova sul sensore reale resta soggetta a Human Gate.
-
 ### Evidenza di partenza
 
 - il driver attuale memorizza al massimo 8 sample SIGFM;
