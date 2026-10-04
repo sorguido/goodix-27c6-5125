@@ -595,7 +595,7 @@ test_enroll_finger_off_before_minutiae_done (void)
 }
 
 static void
-test_d279_57_sigfm_stage8_candidate_policy (void)
+test_enrollment_v2_structural_max_policy (void)
 {
   g_autoptr(GCancellable) cancellable = g_cancellable_new ();
   g_autoptr(FpPrint) template = NULL;
@@ -4007,7 +4007,9 @@ stage_done:
   guint case_kind = GPOINTER_TO_UINT (scenario) / 100u;
   guint recovered = (case_kind == 1u || case_kind == 8u || case_kind == 9u) ? 1u : 0u;
   guint late = case_kind == 8u || case_kind == 9u ? 1u : 0u;
-  g_assert_cmpuint (events_audit.parsed_a0_count, ==, 71u - 3u * recovered + late);
+  g_assert_cmpuint (events_audit.parsed_a0_count, ==,
+                    9u * GOODIX_SIGFM_ENROLL_MAX_STAGES - 1u -
+                    3u * recovered + late);
   g_assert_cmpuint (events_audit.primary_b0_count, ==,
                     GOODIX_SIGFM_ENROLL_MAX_STAGES);
   g_assert_cmpuint (events_audit.auxiliary_b0_count, ==,
@@ -4021,9 +4023,12 @@ stage_done:
   g_assert_cmpuint (events_audit.auxiliary_b0_delivery_count, ==,
                     GOODIX_SIGFM_ENROLL_MAX_STAGES - recovered);
   g_assert_cmpuint (auxiliary_count, ==, GOODIX_SIGFM_ENROLL_MAX_STAGES - recovered);
-  g_assert_cmpuint (binding_audit.graph_ready_submit_count, ==, 47u - 2u * recovered);
+  g_assert_cmpuint (binding_audit.graph_ready_submit_count, ==,
+                    6u * GOODIX_SIGFM_ENROLL_MAX_STAGES - 1u -
+                    2u * recovered);
   g_assert_cmpuint (binding_audit.transaction.committed_after_completion_count,
-                    ==, 47u - 2u * recovered);
+                    ==, 6u * GOODIX_SIGFM_ENROLL_MAX_STAGES - 1u -
+                    2u * recovered);
   g_assert_cmpuint (binding_audit.retry_count, ==, 0u);
   g_assert_cmpuint (goodix_fpi_usb_backend_get_outstanding (backend), ==, 0u);
 
@@ -4040,8 +4045,8 @@ stage_done:
   fixture_close (f);
   test_fixture_free (f);
   g_print ("D279_24_CONTEXT_FIRST_ARM_ENROLLMENT_HANDOFF=PASS\n");
-  g_print ("D279_57_SIGFM_STAGE8_CONTEXT_TRANSCRIPT=PASS\n");
-  g_print ("D279_57_LEGACY_21_STAGE_FIXTURE_RETIRED=PASS\n");
+  g_print ("ENROLLMENT_V2_STRUCTURAL_MAX20_CONTEXT_TRANSCRIPT=PASS\n");
+  g_print ("ENROLLMENT_V2_LEGACY_21_STAGE_FIXTURE_RETIRED=PASS\n");
 }
 
 static void
@@ -4352,7 +4357,7 @@ int
 main (int argc, char **argv)
 {
   g_test_init (&argc, &argv, NULL);
-  const guint contact_cases[] = { 102, 104, 107, 108, 202, 302, 402, 502, 602, 702, 802, 902, 1002 };
+  const guint contact_cases[] = { 102, 104, 119, 120, 202, 302, 402, 502, 602, 702, 802, 902, 1002 };
   const gchar *contact_names[] = { "stage2", "intermediate", "near-terminal", "terminal",
     "cancel-after-zero", "cancel-before-zero", "malformed", "wrong-irq", "reserved", "wrong-control", "late-before-host-result", "late-pending-out32", "out32-error" };
   for (guint i = 0; i < G_N_ELEMENTS (contact_cases); i++)
@@ -4400,8 +4405,8 @@ main (int argc, char **argv)
                    test_terminal_hold_release_before_sigfm_completion);
   g_test_add_func ("/goodix-fpimage-device/d279-57-terminal-release-before-sigfm-failure-fail-closed",
                    test_terminal_release_before_sigfm_failure_is_fail_closed);
-  g_test_add_func ("/goodix-fpimage-device/d279-57-sigfm-stage8-candidate-policy",
-                   test_d279_57_sigfm_stage8_candidate_policy);
+  g_test_add_func ("/goodix-fpimage-device/enrollment-v2-structural-max-policy",
+                   test_enrollment_v2_structural_max_policy);
   g_test_add_func ("/goodix-fpimage-device/no-rearm-before-both-gates",
                    test_no_rearm_before_both_gates);
   g_test_add_func ("/goodix-fpimage-device/no-command-after-deactivate-fence",

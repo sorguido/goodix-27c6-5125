@@ -14,7 +14,7 @@ local_fp_dir="$git_root/reference/libfprint-fedora44-1.94.100/source/libfprint"
 test_dir="$git_root/libfprint-driver/tests"
 test_source="$test_dir/test_goodix_fpimage_device.c"
 test_warnings=""
-test_timeout=30
+test_timeout=90
 
 glib_cflags=$(pkg-config --cflags glib-2.0 gio-2.0 gobject-2.0 openssl)
 glib_libs=$(pkg-config --libs glib-2.0 gio-2.0 gobject-2.0 openssl)
@@ -450,7 +450,7 @@ if [ "$normal_rc" -ne 0 ] || [ "$san_rc" -ne 0 ]; then
 fi
 echo D279_20_DORMANT_CONTEXT_OWNERSHIP_AND_DRAIN=PASS
 echo D279_24_CONTEXT_FIRST_ARM_ENROLLMENT_HANDOFF=PASS
-echo D279_57_SIGFM_STAGE8_CONTEXT_TRANSCRIPT=PASS
+echo ENROLLMENT_V2_STRUCTURAL_MAX20_CONTEXT_TRANSCRIPT=PASS
 echo D279_28_PRODUCTION_ENROLLMENT_GRAPH_BOUND=PASS
 echo D279_28_PRODUCTION_OPEN_EPOCH_ACTION_MAX=1
 echo D279_20_REAL_USB_SUBMIT=0

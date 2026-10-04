@@ -53,11 +53,10 @@ typedef struct _GUsbDevice GUsbDevice;
  * target, convergence criterion, protocol ceiling or biometric-policy input. */
 #define GOODIX_TARGET_LOCAL_ENROLL_STAGES 21u
 
-/* D279/56 replayed the exact Rockytkg selector over ATTEMPT02 and reached its
- * maximum with eight distinct accepted samples.  D279/57 stages that maximum
- * as the production candidate for the separate APP12509 early-terminal
- * hardware boundary.  It is not yet target-live validated. */
-#define GOODIX_SIGFM_ENROLL_MAX_STAGES 8u
+/* Structural host-side ceiling for the empirical enrollment-v2 candidate.
+ * Completion is selected dynamically between 12 and 20 accepted samples;
+ * this maximum is not a sensor or protocol constant. */
+#define GOODIX_SIGFM_ENROLL_MAX_STAGES 20u
 
 typedef enum
 {

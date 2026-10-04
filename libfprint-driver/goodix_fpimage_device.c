@@ -24,6 +24,7 @@
 #include "goodix_pairing_activation.h"
 #include "goodix_enrollment_fpi_usb_binding.h"
 #include "goodix_enrollment_diversity.h"
+#include "goodix_sigfm_metrics.h"
 
 #include "fpi-device.h"
 #include "fpi-image-device.h"
@@ -2863,9 +2864,9 @@ goodix_usb_fpimage_device_class_init (GoodixUsbFpImageDeviceClass *klass)
   device_class->features |= FP_DEVICE_FEATURE_IDENTIFY;
 #endif
 
-  /* The production protocol permits exactly eight sensor acquisitions for
-   * enrollment.  Once an image has been delivered, host-side SIGFM failure
-   * is terminal and must not become an implicit ninth contact. */
+  /* The enrollment-v2 candidate permits at most 36 physical contacts and 20
+   * stored samples. Once an accepted image has been delivered, host-side
+   * SIGFM failure is terminal and must not become an implicit extra contact. */
   img_class->enroll_processing_fail_closed = TRUE;
 }
 
@@ -3240,7 +3241,13 @@ context_enrollment_image (GoodixEnrollmentPipeline *pipeline,
       GoodixFpImagePipeline *sigfm_pipeline = NULL;
       GoodixFpImagePipelineResult result;
       GoodixEnrollmentDiversityDecision diversity_decision;
+      GoodixEnrollmentDiversityObservation diversity_observation;
+      GoodixEnrollmentSampleMetrics enrollment_metrics = { 0 };
+      GoodixSigfmEnrollmentMetrics sigfm_metrics = { 0 };
+      GoodixSigfmSample *metric_sample = NULL;
+      GoodixSigfmResult sigfm_result;
       guint template_stage_target;
+      int keypoints = 0;
       const guchar *image_data;
       gsize image_data_length = 0u;
       const uint16_t *samples;
@@ -3273,10 +3280,56 @@ context_enrollment_image (GoodixEnrollmentPipeline *pipeline,
       image_data = fp_image_get_data (
         goodix_fpimage_pipeline_get_image (sigfm_pipeline),
         &image_data_length);
+      /* Keep the policy local: obtain only keypoint count and an 8x8 spatial
+       * coverage mask. Libfprint still owns the later asynchronous extraction
+       * that creates the stored sample; no template or matcher format changes. */
+      sigfm_result = goodix_sigfm_extract_pixels (
+        image_data, image_data_length, &metric_sample, &keypoints);
+      if (sigfm_result == GOODIX_SIGFM_OK)
+        {
+          sigfm_result = goodix_sigfm_sample_enrollment_metrics (
+            metric_sample, &sigfm_metrics);
+          goodix_sigfm_sample_free (metric_sample);
+          metric_sample = NULL;
+          if (sigfm_result != GOODIX_SIGFM_OK)
+            {
+              goodix_fpimage_pipeline_free (sigfm_pipeline);
+              g_set_error (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                           "SIGFM enrollment metrics failed: %u",
+                           sigfm_result);
+              return FALSE;
+            }
+          enrollment_metrics.sigfm_keypoints = sigfm_metrics.keypoints;
+          enrollment_metrics.sigfm_coverage_mask =
+            sigfm_metrics.coverage_mask;
+        }
+      else if (sigfm_result != GOODIX_SIGFM_KEYPOINT_GATE_FAILED)
+        {
+          goodix_fpimage_pipeline_free (sigfm_pipeline);
+          g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                       "SIGFM enrollment precheck failed: %u", sigfm_result);
+          return FALSE;
+        }
       diversity_decision = goodix_enrollment_diversity_observe (
-        ctx->enrollment_diversity, image_data, image_data_length);
+        ctx->enrollment_diversity, image_data, image_data_length,
+        &enrollment_metrics);
+      goodix_enrollment_diversity_get_last_observation (
+        ctx->enrollment_diversity, &diversity_observation);
+      g_message (
+        "GOODIX_ENROLLMENT_POLICY_AUDIT contact=%u accepted=%u decision=%u keypoints=%u coverage_cells=%u aggregate_cells=%u raster_range=%u raster_contrast=%u nearest_mad=%u nearest_coverage=%u",
+        diversity_observation.physical_attempt_count,
+        diversity_observation.accepted_sample_count,
+        diversity_observation.decision,
+        diversity_observation.sigfm_keypoints,
+        diversity_observation.sigfm_coverage_cells,
+        diversity_observation.aggregate_coverage_cells,
+        diversity_observation.raster_range,
+        diversity_observation.raster_contrast,
+        diversity_observation.nearest_mad,
+        diversity_observation.nearest_coverage_percent);
       if (diversity_decision ==
-          GOODIX_ENROLLMENT_DIVERSITY_RETRY_DUPLICATE)
+            GOODIX_ENROLLMENT_DIVERSITY_RETRY_DUPLICATE ||
+          diversity_decision == GOODIX_ENROLLMENT_DIVERSITY_RETRY_POOR)
         {
           if (!goodix_enrollment_pipeline_retry_current_stage (pipeline,
                                                                 error))
@@ -3284,8 +3337,11 @@ context_enrollment_image (GoodixEnrollmentPipeline *pipeline,
               goodix_fpimage_pipeline_free (sigfm_pipeline);
               return FALSE;
             }
-          g_debug ("enrollment contact %u duplicates accepted coverage; retry",
-                   stage_index);
+          g_debug ("enrollment contact %u rejected as %s; retry",
+                   stage_index,
+                   diversity_decision ==
+                     GOODIX_ENROLLMENT_DIVERSITY_RETRY_DUPLICATE ?
+                     "duplicate/near-duplicate" : "poor sample");
           fpi_image_device_retry_scan (FP_IMAGE_DEVICE (ctx->device),
                                        FP_DEVICE_RETRY_GENERAL);
           goodix_fpimage_pipeline_free (sigfm_pipeline);
@@ -3296,7 +3352,7 @@ context_enrollment_image (GoodixEnrollmentPipeline *pipeline,
           goodix_fpimage_pipeline_free (sigfm_pipeline);
           g_set_error_literal (
             error, G_IO_ERROR, G_IO_ERROR_NO_SPACE,
-            "SIGFM enrollment exhausted its 20-contact diversity bound");
+            "SIGFM enrollment exhausted its 20-sample/36-contact bounds without sufficient coverage");
           return FALSE;
         }
       if (diversity_decision ==

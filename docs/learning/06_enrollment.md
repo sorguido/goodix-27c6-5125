@@ -33,36 +33,34 @@ flowchart TD
     D --> E["Wait for finger"]
     E --> F["Detect, capture, decode, preprocess"]
     F --> G["Extract one SIGFM sample"]
-    G --> H{"Diversity decision"}
+    G --> H{"Coverage, SIGFM and quality decision"}
     H -->|New useful coverage| I["Add accepted sample"]
-    H -->|Duplicate without convergence| J["Ask for another touch"]
-    H -->|Second duplicate after enough coverage| T["Accept terminal sample"]
-    I --> K{"Eight samples reached?"}
+    H -->|Poor or duplicate| J["Ask for another touch"]
+    I --> K{"At least 12 and sufficient?"}
     J --> E
     K -->|Not yet| E
     K -->|Yes| L["Finish after the contact boundary is accepted"]
-    T --> L
     L --> M["libfprint serializes template"]
     M --> N["fprintd saves it for the user"]
 ```
 
 ## How many touches?
 
-The current Goodix path is bounded but not simply "always eight touches."
+The current source contains an empirical enrollment-v2 candidate:
 
-- It accepts at most eight template samples.
-- It wants at least three distinct views before early convergence is possible.
-- A capture that is too similar to accepted coverage can be rejected and the
-  same enrollment stage retried.
-- After enough distinct coverage, two duplicate-like captures in a row can
-  signal convergence; the final one becomes the terminal accepted sample.
-- This makes the stored template contain between four and eight accepted
-  samples.
-- A hard ceiling of 20 physical enrollment contacts prevents endless retries.
+- It cannot complete before 12 accepted samples.
+- Its normal target is 16 accepted samples.
+- It can continue when coverage is insufficient, up to 20 template samples.
+- Poor, duplicate and near-duplicate contacts request a retry without progress.
+- A hard ceiling of 36 physical contacts prevents endless retries.
+- Reaching either hard ceiling does not turn an insufficient template into
+  success.
 
-The enrollment exercised on the tested reader reached all eight accepted
-stages. The dynamic rules above describe the current implementation, not a
-promise that every finger will finish in the same number of touches.
+The candidate combines SIGFM keypoint count and spatial coverage with simple
+raster quality and duplicate signals. Its exact thresholds are experimental
+and have passed offline policy tests, but the 12/16/20/36 behavior has not yet
+been qualified on the real reader. The earlier target qualification reached
+eight accepted stages under the superseded policy.
 
 ## Why lifting the finger matters
 
@@ -124,8 +122,8 @@ preserve the user's templates for later reinstallation.
 
 - Enrollment teaches the host using several views of one finger.
 - Accepted images become separate SIGFM feature samples in one template.
-- The current policy stores four to eight accepted samples and bounds physical
-  contacts at 20.
+- The current candidate stores 12 to 20 accepted samples and bounds physical
+  contacts at 36; target-live qualification is still pending.
 - Each stage follows its contact-completion rules before requesting another touch.
 - `fprintd` saves the completed host template; the sensor does not become a
   database of Linux users.

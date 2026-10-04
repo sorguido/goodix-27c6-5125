@@ -11,6 +11,13 @@ extern "C" {
 
 typedef struct GoodixSigfmSample GoodixSigfmSample;
 
+typedef struct
+{
+  uint32_t keypoints;
+  /* One bit per 10x8-pixel cell in the canonical 80x64 raster. */
+  uint64_t coverage_mask;
+} GoodixSigfmEnrollmentMetrics;
+
 typedef enum
 {
   GOODIX_SIGFM_OK = 0,
@@ -57,6 +64,12 @@ GoodixSigfmResult
 goodix_sigfm_match_ephemeral (GoodixSigfmSample *frame,
                               GoodixSigfmSample *enrolled,
                               int               *score_out);
+
+/* Extract the small, observable subset used by the enrollment selector. */
+GoodixSigfmResult
+goodix_sigfm_sample_enrollment_metrics (
+  const GoodixSigfmSample       *sample,
+  GoodixSigfmEnrollmentMetrics  *metrics_out);
 
 GoodixSigfmResult
 goodix_sigfm_sample_copy (const GoodixSigfmSample  *source,

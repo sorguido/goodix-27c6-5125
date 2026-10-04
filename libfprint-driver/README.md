@@ -34,6 +34,7 @@ commands, bounded late releases, raw bounds, cancellation and terminal cleanup.
 The low-level binding suite also checks diagnostic fallback when recovery is not
 enabled. The self-contained boundaries have their own runners in the same
 directory: `tests/run_goodix_pairing_crypto_test.sh`,
+`tests/run_goodix_enrollment_diversity_test.sh`,
 `tests/run_goodix_config90_bb010002_test.sh`,
 `tests/run_goodix_self_state_test.sh`,
 `tests/run_goodix_live_preflight_test.sh`,

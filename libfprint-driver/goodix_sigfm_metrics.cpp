@@ -312,6 +312,73 @@ goodix_sigfm_match_ephemeral (GoodixSigfmSample *frame,
 }
 
 GoodixSigfmResult
+goodix_sigfm_sample_enrollment_metrics (
+  const GoodixSigfmSample      *sample,
+  GoodixSigfmEnrollmentMetrics *metrics_out)
+{
+  constexpr float kWidth = static_cast<float> (GOODIX_CANONICAL_IMAGE_WIDTH);
+  constexpr float kHeight = static_cast<float> (GOODIX_CANONICAL_IMAGE_HEIGHT);
+  unsigned char *payload = nullptr;
+  int payload_size = 0;
+  int keypoint_count;
+  uint64_t coverage = 0;
+
+  if (sample == nullptr || sample->info == nullptr || metrics_out == nullptr)
+    return GOODIX_SIGFM_INVALID_ARGUMENT;
+  *metrics_out = GoodixSigfmEnrollmentMetrics {};
+  try
+    {
+      keypoint_count = sigfm_keypoints_count (sample->info);
+      if (!keypoints_valid (keypoint_count))
+        return GOODIX_SIGFM_KEYPOINT_GATE_FAILED;
+      payload = sigfm_serialize_binary (sample->info, &payload_size);
+      if (payload == nullptr || payload_size <= 0 ||
+          !rocky_payload_valid (payload, static_cast<size_t> (payload_size),
+                                static_cast<uint32_t> (keypoint_count)))
+        {
+          std::free (payload);
+          return GOODIX_SIGFM_SERIALIZE_INVALID;
+        }
+      for (int i = 0; i < keypoint_count; i++)
+        {
+          const uint8_t *point =
+            &payload[8u + static_cast<size_t> (i) * 28u];
+          const float x = read_float32le (&point[20]);
+          const float y = read_float32le (&point[24]);
+          unsigned int column;
+          unsigned int row;
+
+          if (!std::isfinite (x) || !std::isfinite (y) ||
+              x < 0.0f || x >= kWidth || y < 0.0f || y >= kHeight)
+            {
+              secure_clear (payload, static_cast<size_t> (payload_size));
+              std::free (payload);
+              return GOODIX_SIGFM_SERIALIZE_INVALID;
+            }
+          column = std::min (7u, static_cast<unsigned int> (x * 8.0f / kWidth));
+          row = std::min (7u, static_cast<unsigned int> (y * 8.0f / kHeight));
+          coverage |= UINT64_C (1) << (row * 8u + column);
+        }
+      secure_clear (payload, static_cast<size_t> (payload_size));
+      std::free (payload);
+      metrics_out->keypoints = static_cast<uint32_t> (keypoint_count);
+      metrics_out->coverage_mask = coverage;
+      return GOODIX_SIGFM_OK;
+    }
+  catch (...)
+    {
+      if (payload != nullptr)
+        {
+          if (payload_size > 0)
+            secure_clear (payload, static_cast<size_t> (payload_size));
+          std::free (payload);
+        }
+      *metrics_out = GoodixSigfmEnrollmentMetrics {};
+      return GOODIX_SIGFM_EXTRACT_EXCEPTION;
+    }
+}
+
+GoodixSigfmResult
 goodix_sigfm_sample_copy (const GoodixSigfmSample  *source,
                           GoodixSigfmSample       **copy_out)
 {
