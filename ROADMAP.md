@@ -39,8 +39,10 @@ che viene appreso durante l'enrollment.
   arrivando anche oltre 20 quando non è soddisfatto;
 - il Goodix MOC driver di riferimento usa conteggi di enrollment
   device-dependent, inclusi 12 stage per numerosi PID Goodix;
-- il progetto possiede già evidenza target-local di 21 primary stage riusciti,
-  da riesaminare senza assumere che 21 sia un limite o un obiettivo biometrico.
+- una precedente cattura passiva Windows Hello/OEM sul target reale registrò
+  un enrollment completo con un numero elevato di cicli di acquisizione; quel
+  conteggio appartiene esclusivamente a quella singola run e non costituisce
+  minimo, massimo, target o limite progettuale.
 
 ---
 
@@ -116,16 +118,15 @@ Non sostituire semplicemente `8` con un altro numero fisso arbitrario.
 La conclusione dell'enrollment deve dipendere da qualità e coverage sufficienti,
 con un minimo prudenziale e un limite di sicurezza bounded.
 
-Qualificare almeno template nell'ordine di:
+Non predefinire una scala di conteggi come obiettivo biometrico. Il numero
+finale di sample utili deve emergere dal comportamento adattivo della policy:
+un enrollment può terminare prima quando qualità e coverage sono realmente
+sufficienti, oppure continuare più a lungo quando il dito è presentato male,
+la coverage resta incompleta o i nuovi contatti non aggiungono informazione.
 
-- 12 sample utili;
-- 16 sample utili;
-- 20 sample utili;
-- oltre 20, se l'evidenza mostra che è necessario.
-
-Il limite strutturale attuale del contenitore SIGFM/libfprint va investigato
-separatamente: non assumere che 21 sample siano automaticamente sufficienti,
-né che debbano costituire il massimo definitivo.
+Gli eventuali limiti strutturali del contenitore SIGFM/libfprint devono essere
+ispezionati e, se necessario, estesi come vincoli implementativi separati. Non
+devono essere ricavati dal conteggio osservato in una singola enrollment run.
 
 **PASS quando**
 
@@ -140,9 +141,10 @@ dall'eredità Rockytkg.
 
 Non assumere che APP12509 abbia un limite di 8 stage per enrollment.
 
-Verificare sul target reale quanti contatti puliti il protocollo attuale può
-gestire in una singola azione di enrollment e riconciliare il risultato con
-l'evidenza storica delle 21 primary stage.
+Verificare sul target reale che il protocollo attuale possa sostenere un
+enrollment adattivo per tutto il tempo necessario alla policy di qualità e
+coverage, senza assumere in anticipo un numero minimo o massimo derivato da una
+precedente run Windows.
 
 La prova deve essere preparata e validata offline prima di qualsiasi accesso
 al sensore.

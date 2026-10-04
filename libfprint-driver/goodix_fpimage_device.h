@@ -47,10 +47,10 @@ typedef struct _GUsbDevice GUsbDevice;
 #define GOODIX_PRE_SESSION_RX_MAX_BYTES 65536u
 #define GOODIX_PRE_SESSION_RX_MAX_TOTAL_MS 2000u
 
-/* Successful primary stages observed for this exact target/profile in
- * D279/10 ATTEMPT02.  This is retained as the authentic wire/regression
- * profile, not as the final biometric policy or a universal firmware
- * constant. */
+/* Primary-stage count observed in the single D279/10 ATTEMPT02 Windows/OEM
+ * enrollment capture.  Keep this value only as historical wire/regression
+ * fixture metadata.  It MUST NOT be used as an enrollment minimum, maximum,
+ * target, convergence criterion, protocol ceiling or biometric-policy input. */
 #define GOODIX_TARGET_LOCAL_ENROLL_STAGES 21u
 
 /* D279/56 replayed the exact Rockytkg selector over ATTEMPT02 and reached its
