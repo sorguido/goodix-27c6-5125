@@ -8,7 +8,7 @@
     "qualified_host": "Fedora 44 KDE x86_64"
   },
   "execution_path": "PRIMARY",
-  "phase": "P12",
+  "phase": "1",
   "phase_status": "NOT_STARTED",
   "completed_gates": [
     "SELF_CONTAINED_ARCHITECTURE_APPROVAL",
@@ -184,9 +184,9 @@
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "P12: redesign enrollment coverage offline. Preserve verification strictness; remove premature 3/8 two-duplicate convergence; qualify adaptive richer templates and the real APP12509 single-action stage boundary. Any sensor-reaching qualification stops at HUMAN_REQUIRED.",
+  "next_action": "Roadmap item 1: preserve verification strictness, then remove the Rockytkg-derived premature enrollment convergence before redesigning Diversity v2. Any sensor-reaching work stops at HUMAN_REQUIRED.",
   "last_verified_head": "c3918892c91b3b208b12e1167e14e864eeb2b4ca",
-  "state_note": "Development reopened for P12 after real-use evidence showed legitimate score=0 outcomes against the current eight-sample templates. The present defect is treated as an enrollment-coverage policy problem, not as justification to lower verification thresholds. Governance files are tracked again on development by explicit User decision dated 2026-10-04.",
+  "state_note": "Development roadmap reset on 2026-10-04 to the active enrollment-robustness work only. ROADMAP.md now starts at item 1 and contains no closed historical phases. Historical completed gates remain evidence/cache only.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }

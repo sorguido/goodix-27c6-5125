@@ -10,7 +10,7 @@
       "A task adds, removes, renames or materially repurposes an artifact.",
       "A phase EXIT_GATE is accepted and routing for the next phase changes.",
       "The operational branch differs materially from the last indexed branch.",
-      "ROADMAP P0A reconciliation detects drift."
+      "ROADMAP/current-state reconciliation detects drift."
     ],
     "do_not_rewrite_history": true,
     "no_retroactive_repository_conversion": true
@@ -41,7 +41,7 @@
       "git_status": "modified",
       "role": "REPOSITORY_POLICY",
       "relevance": [
-        "P12"
+        "ENROLLMENT_V2"
       ]
     },
     {
@@ -66,7 +66,7 @@
       "role": "CANONICAL_STATE_MACHINE",
       "relevance": [
         "ALL_PHASES",
-        "P12"
+        "ENROLLMENT_V2"
       ]
     },
     {
@@ -75,7 +75,7 @@
       "role": "OPERATIVE_STATE_CACHE",
       "relevance": [
         "ALL_PHASES",
-        "P12"
+        "ENROLLMENT_V2"
       ]
     },
     {
@@ -84,7 +84,7 @@
       "role": "NON_AUTHORITATIVE_CONTEXT_ROUTER",
       "relevance": [
         "ALL_PHASES",
-        "P12"
+        "ENROLLMENT_V2"
       ]
     }
   ],
@@ -229,8 +229,8 @@
       ],
       "note": "Compare against main and edit only documentation made obsolete or incomplete by the qualified self-contained driver."
     },
-    "P12": {
-      "purpose": "Redesign enrollment quality/coverage after legitimate score=0 failures exposed the weakness of the Rockytkg-derived 3/8 two-duplicate convergence policy.",
+    "ENROLLMENT_V2": {
+      "purpose": "Route the active enrollment-robustness roadmap items 1–7 only.",
       "load": [
         "ROADMAP.md",
         "PROJECT_STATE.json",
@@ -246,9 +246,9 @@
         "Rockytkg/libfprint/libfprint/sigfm/sigfm.cpp",
         "docs/VALIDATION.md"
       ],
-      "note": "Start offline. Do not lower verification threshold to mask score=0. Any target-live stage-boundary experiment stops at HUMAN_REQUIRED before sensor access."
+      "note": "ROADMAP.md restarts at item 1. Begin offline; do not lower verification threshold to mask score=0. Any target-live stage-boundary experiment stops at HUMAN_REQUIRED before sensor access."
     }
   },
   "routing_rule": "Cold-start routing is canonical files -> PROJECT_STATE.json -> ARTIFACT_INDEX.json -> only artifacts relevant to the active phase/task.",
-  "state_note": "This file is a cache/router. If any entry conflicts with Git or qualified evidence, repair this file rather than adapting Git to match it."
+  "state_note": "Context router aligned to the reset enrollment-robustness roadmap. Historical phase routes may remain for provenance, but the active route is ENROLLMENT_V2 and ROADMAP.md starts at item 1."
 }

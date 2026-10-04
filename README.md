@@ -1,4 +1,14 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+<!-- DEVELOPMENT-BRANCH-WARNING -->
+<p align="center">
+  <img src="https://img.shields.io/badge/DEVELOPMENT%20BRANCH-DO%20NOT%20INSTALL-red?style=for-the-badge" alt="Development branch — do not install">
+</p>
+
+> [!CAUTION]
+> **This is the development branch. Do not download, clone for installation, or install software from this branch.**
+>
+> Work here may be incomplete, experimental, or temporarily broken. Use the **`main` branch** for the current public/stable version.
+
 # Goodix 27c6:5125 for Fedora KDE
 
 Fingerprint driver for the Goodix USB reader `27c6:5125` running
