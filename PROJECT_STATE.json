@@ -9,7 +9,7 @@
   },
   "execution_path": "PRIMARY",
   "phase": "ENROLLMENT_ROBUSTNESS_V2",
-  "phase_status": "NOT_STARTED",
+  "phase_status": "IN_PROGRESS",
   "completed_gates": [
     "SELF_CONTAINED_ARCHITECTURE_APPROVAL",
     "ARTIFACT_INDEX_BASELINE_RECONCILED",
@@ -132,7 +132,8 @@
     "initial_blockers": []
   },
   "current_blockers": [
-    "ENROLLMENT_TEMPLATE_COVERAGE_POLICY_TOO_WEAK"
+    "ENROLLMENT_TEMPLATE_COVERAGE_POLICY_TOO_WEAK",
+    "TARGET_ENROLLMENT_METRICS_REQUIRED_BEFORE_POLICY_THRESHOLDS"
   ],
   "host_modified": false,
   "relevant_artifacts": [
@@ -184,9 +185,9 @@
   "relevant_corroborations": [
     "Rockytkg snapshot pinned to 227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   ],
-  "next_action": "Execute ENROLLMENT_ROBUSTNESS_V2 as one integrated task. Consider all five development observations jointly; do not treat them as sequential gates or independent milestones. Close only on the single final ENROLLMENT_ROBUSTNESS_V2 exit gate.",
-  "last_verified_head": "c3918892c91b3b208b12e1167e14e864eeb2b4ca",
-  "state_note": "On 2026-10-04 the active roadmap was normalized to one narrowly scoped enrollment-robustness task. Its five development observations are simultaneous design/qualification concerns, with no per-item PASS/NEXT state and one final exit gate only.",
+  "next_action": "At the live biometric Human Gate, collect a bounded current-policy baseline on the target with deliberately varied placements, near-identical contacts and wrong-finger controls. Use the existing GOODIX_SIGFM_EXTRACT_AUDIT and GOODIX_SIGFM_MATCH_AUDIT records to ground the integrated adaptive-policy design; do not select new biometric thresholds from synthetic fixtures alone.",
+  "last_verified_head": "2fcd8cdca0ef46cd85f4382693c333410c96c113",
+  "state_note": "On 2026-10-04 bootstrap/recovery verified a clean development worktree at 2fcd8cdca0ef46cd85f4382693c333410c96c113. ENROLLMENT_ROBUSTNESS_V2 is active. The repository still implements the Rockytkg-derived 3..8, MAD<8 and two-duplicate convergence policy. Current code exposes per-contact SIGFM keypoint counts and per-template comparison scores, but no target evidence yet justifies replacement quality, near-duplicate or coverage thresholds; live baseline evidence is therefore required before implementing those thresholds.",
   "branch_policy": "CURRENT_CHECKED_OUT_BRANCH",
   "last_verified_branch": "development"
 }
