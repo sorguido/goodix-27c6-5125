@@ -62,21 +62,6 @@ and run **`goodix-force-remove`**. Both commands request their own sudo
 authentication, preserve host pairing state and templates, and work after
 the clone is removed.
 
-## Pairing state and security
-
-The installer always creates or preserves root.
-[Security and privacy](docs/SECURITY.md) describes the
-boundary.
-
-The supported path never flashes firmware, replaces the reader application,
-writes OTP or factory data, or persistently changes VID:PID or mode. Its single
-persistent reader mutation is the one host-pairing write above, which preserves
-the reader's current `BB010002` byte-for-byte and is proven by readback and TLS
-before use. Windows keeps working alongside Linux: when Windows replaces the
-pairing, Linux restores the same stored key with one qualified write instead of
-generating a new one. Compatibility with future Fedora releases, other Windows
-VM/OEM configurations, and broader hardware remains outside the qualified scope.
-
 ## Documentation
 
 - [Beginner learning guide](docs/learning/README.md)
