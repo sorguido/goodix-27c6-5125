@@ -27,40 +27,25 @@ Qualification is limited to the documented target and one reader; see
 `install.sh` automatically selects first installation (`FIRST_INSTALL`) or update
 (`UPDATE`), builds the runtime from this source tree, and installs the login
 integration and removal commands. It requests normal sudo authentication when
-needed. Installation does not access the reader, which may be connected or
-absent.
+needed.
 
-You need a working password login and administrative access. Nothing else has to
-be prepared: no Windows machine, no capture tooling, no private key material and
-no reader-specific file. The installer creates the empty, root-only host pairing
-state directory without opening USB. Fedora prerequisites are included in the
-installation flow; separate build instructions are unnecessary. Git must be
+You need an administrative access. Git must be
 available to run the bootstrap block.
 
-After a successful installation, the repository clone may be removed; a later run
-of the same bootstrap block clones it again automatically. Updates and
-reinstalls preserve `/var/lib/fprint/goodix-5125-state-v2/`, so ordinary
-reinstallation reuses the existing pairing and does not write to the reader.
+After a successful installation, the repository clone may be removed.
 
 ## Using fingerprint authentication
 
-The first fingerprint action initializes the reader by itself. It confirms the
-target identity, derives the configuration from the reader's own OTP, stores a
-locally generated pairing key in root-only host pairing state and records it with
-a single bounded pairing write. Ordinary later use reuses that stored key and
-writes nothing to the reader.
+The first fingerprint action initializes the reader by itself.
 
 Manage enrolled fingers through KDE's fingerprint settings. At Plasma Login,
 a nonempty password uses ordinary password login immediately. Submitting an
 empty password field explicitly selects fingerprint authentication, with at
 most three attempts and a stop on the first match. After selecting fingerprint,
-allow roughly one second before touching the reader. Other consumers follow
-Fedora's normal prompts where its current policy enables fingerprints; the
-installer does not modify authselect or global PAM policy.
+allow roughly one second before touching the reader.
 
 Keep password access available. Fingerprint login does not automatically unlock
-a password-encrypted KWallet. No recognition accuracy or false-acceptance rate
-is claimed for untested users or devices.
+a password-encrypted KWallet.
 
 ## Learn how it works
 
@@ -75,24 +60,13 @@ Run **`goodix-uninstall`** from a working desktop terminal. If graphical login
 is unavailable, follow the [text-console emergency instructions](docs/UNINSTALL.md)
 and run **`goodix-force-remove`**. Both commands request their own sudo
 authentication, preserve host pairing state and templates, and work after
-the clone is removed. Removal does not access the reader, which may stay
-connected or be absent.
-
-Removal exposes current Fedora configuration and finishes with a normal restart
-instruction. It cannot repair an independently broken Fedora authentication stack.
+the clone is removed.
 
 ## Pairing state and security
 
-The installer always creates or preserves root-only host pairing state under
-`/var/lib/fprint/goodix-5125-state-v2/`. It holds the locally generated Linux
-pairing key and its authenticated receipts in two crash-safe generations. Keep
-that directory, fingerprint images, templates and raw USB captures out of source
-trees and issue reports. [Security and privacy](docs/SECURITY.md) describes the
+The installer always creates or preserves root.
+[Security and privacy](docs/SECURITY.md) describes the
 boundary.
-
-Discovery, enumeration, ordinary open, boot and an uninitialized login read no
-pairing state and claim no USB; only an explicit fingerprint action does, and it
-runs a bounded read-only preflight before the secure session starts.
 
 The supported path never flashes firmware, replaces the reader application,
 writes OTP or factory data, or persistently changes VID:PID or mode. Its single
