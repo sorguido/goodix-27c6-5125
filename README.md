@@ -1,9 +1,4 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-> [!WARNING]
-> **⚠️ Use only official releases or the `main` branch for installation.**
->
-> Other branches, including `development`, are development workspaces and are not supported for installation.
-
 # Goodix 27c6:5125 for Fedora KDE
 
 Fingerprint driver for the Goodix USB reader `27c6:5125` running
@@ -24,6 +19,9 @@ Qualification is limited to the documented target and one reader; see
 [validation and limitations](docs/VALIDATION.md).
 
 ## Installation
+
+> [!WARNING]
+> **Use only official releases or the `main` branch for installation.**
 
 **[Install using the single copy-paste block](docs/INSTALLATION.md).** The root
 `install.sh` automatically selects first installation (`FIRST_INSTALL`) or update
