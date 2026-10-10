@@ -13,11 +13,11 @@ __pycache__/
 /development/
 
 # Root governance/orchestration files stay local only and are never published.
-#/AGENTS.md
-#/START.md
-#/ROADMAP.md
-#/PROJECT_STATE.json
-#/ARTIFACT_INDEX.json
+/AGENTS.md
+/START.md
+/ROADMAP.md
+/PROJECT_STATE.json
+/ARTIFACT_INDEX.json
 
 # Protected user-supplied material: forbidden anywhere inside the repository.
 **/goodix-5125-materials/
