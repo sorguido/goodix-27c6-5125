@@ -19,6 +19,7 @@ Windows 11 virtual machine.
 | Function | Evidence and boundary |
 | --- | --- |
 | Enrollment and standard verification | Enrollment completed and a subsequent verification matched the enrolled finger |
+| Fixed-21 live recognition qualification | The fixed-21 candidate was exercised on the physical target through real enrollment and continued day-to-day use. Across 100 valid matcher probes, 97 produced at least one positive SIGFM comparison score and 3 produced only zero scores, for an observed all-zero incidence of 3.00%. In this qualification sample, missed recognition attributable to the all-zero condition was operationally negligible and the resulting day-to-day recognition experience was close to the Windows Hello experience observed on the same hardware. This is a bounded target qualification, not a universal false-reject-rate claim. |
 | Enrollment zero-mask recovery | A logged zero at the third contact preserved the primary, skipped auxiliary acquisition and continued to 8 accepted stages in 8 contacts with one zero-specific re-arm; final audit recorded no persistent writes and complete host drain/close |
 | Duplicate detection | A manual duplicate-detection check with recovery enabled was reported successful, alongside ordinary enrollment and verification |
 | KScreenLocker | Password unlock and fingerprint unlock reached the desktop |
@@ -127,9 +128,18 @@ The fixed-21 enrollment policy has deterministic normal and sanitizer
 coverage for completion exactly at the 21st accepted sample, the absence of a
 22nd accepted sample, poor-sample retry without progress, unbounded physical
 contacts, duplicate/near-duplicate acceptance and non-decisional diversity
-diagnostics. This is offline implementation evidence only. The live results in
-the table above belong to the earlier eight-sample policy; no target-live
-robustness claim is made for the fixed-21 policy yet.
+diagnostics.
+
+The policy is also qualified on the physical target for real enrollment and
+continued day-to-day verification. The observed qualification sample contains
+100 valid matcher probes: 3 were all-zero across the enrolled SIGFM samples and
+97 produced at least one positive score, giving an all-zero incidence of
+3.00%. In practical use this made missed recognition attributable to the
+all-zero condition substantially negligible and produced a recognition
+experience close to the Windows Hello experience observed on the same hardware.
+The measurement is intentionally reported as a bounded project qualification;
+it does not establish a universal false-reject rate, population-level accuracy
+claim or equivalence with the proprietary Windows template construction.
 
 ## Known limitations
 
