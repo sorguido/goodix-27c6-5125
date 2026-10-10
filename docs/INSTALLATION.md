@@ -128,6 +128,30 @@ is already enrolled, keep that enrollment;
 installation preserves existing templates. Otherwise enroll one finger following
 the normal prompts, without opening simultaneous fingerprint applications.
 
+### Recommended enrollment practice
+
+For reliable recognition, do not place your finger in exactly the same position
+for all enrollment samples.
+
+During enrollment:
+
+- lift your finger completely after each accepted sample;
+- place it again with a slightly different position or angle;
+- include the center of the fingertip as well as slightly higher, lower, left
+  and right areas;
+- vary the angle naturally so that the enrollment represents different parts
+  of the fingerprint;
+- keep the finger reasonably flat on the sensor and avoid deliberately
+  repeating the same contact area.
+
+The goal is not to reproduce the same touch 21 times, but to build good coverage
+of the finger across the 21 accepted samples.
+
+Windows Hello follows a similar principle and explicitly encourages capturing
+the finger from different angles. KDE's standard enrollment dialog may provide
+less positional guidance, so following these recommendations manually can
+improve day-to-day recognition reliability.
+
 Check ordinary password login first. For the fingerprint check at Plasma Login,
 submit the empty password field once and follow its prompts with the enrolled
 finger. Stop on the first successful match. If it does not match, allow at most
