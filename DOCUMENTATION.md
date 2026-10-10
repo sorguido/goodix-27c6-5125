@@ -71,7 +71,8 @@ technical specification.
 5. **[From image to fingerprint template](docs/learning/05_from_image_to_template.md)** —
    Image preprocessing, SIGFM features, descriptors, and template samples.
 6. **[Enrollment](docs/learning/06_enrollment.md)** — Multiple contacts,
-   diversity, convergence, and host-side template creation.
+   fixed-21 acceptance, quality retries, diversity diagnostics, and host-side
+   template creation.
 7. **[Verification and matching](docs/learning/07_verification_and_matching.md)** —
    MATCH, NO MATCH, retry, cancellation, and comparison behavior.
 8. **[Login, lock screen, sudo, and PolicyKit](docs/learning/08_desktop_authentication.md)** —

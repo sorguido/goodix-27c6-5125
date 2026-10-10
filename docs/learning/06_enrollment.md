@@ -60,10 +60,12 @@ The current source implements the fixed-21 enrollment policy:
   delays or blocks enrollment.
 
 The policy combines the SIGFM keypoint/coverage and raster quality gate for
-poor-sample retries with per-contact diversity diagnostics. It has passed
-offline policy tests, but the fixed-21 behavior has not yet been qualified on
-the real reader. The earlier target qualification reached eight accepted
-stages under the superseded policy.
+poor-sample retries with per-contact diversity diagnostics. It has passed both
+offline policy tests and target-live qualification on the physical reader.
+Across the qualified day-to-day observation sample, 100 valid matcher probes
+produced 97 probes with at least one positive SIGFM score and 3 all-zero probes,
+for a 3.00% observed all-zero incidence. This is a bounded project qualification,
+not a universal false-reject-rate claim.
 
 ## Why lifting the finger matters
 
@@ -129,7 +131,7 @@ preserve the user's templates for later reinstallation.
 - Accepted images become separate SIGFM feature samples in one template.
 - The current policy stores exactly 21 accepted samples, with no early
   completion and no policy-side cap on physical contacts; target-live
-  qualification is still pending.
+  qualification has been completed on the physical reader.
 - Each stage follows its contact-completion rules before requesting another touch.
 - `fprintd` saves the completed host template; the sensor does not become a
   database of Linux users.

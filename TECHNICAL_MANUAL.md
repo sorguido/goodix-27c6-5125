@@ -914,8 +914,7 @@ the driver advertises and uses identify.
 
 ### 10.2 Fixed-21 enrollment policy
 
-The active source implements the fixed-21 enrollment policy. It is
-offline-qualified but remains pending target-live biometric qualification.
+The active source implements the fixed-21 enrollment policy.
 
 | Rule | Value |
 | --- | --- |
