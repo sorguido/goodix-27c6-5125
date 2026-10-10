@@ -18,6 +18,7 @@ __pycache__/
 /ROADMAP.md
 /PROJECT_STATE.json
 /ARTIFACT_INDEX.json
+#git rm --cached AGENTS.md START.md ROADMAP.md PROJECT_STATE.json ARTIFACT_INDEX.json
 
 # Protected user-supplied material: forbidden anywhere inside the repository.
 **/goodix-5125-materials/
