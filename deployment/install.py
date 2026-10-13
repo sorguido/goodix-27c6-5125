@@ -47,21 +47,40 @@ def command(*args):
     return result.stdout.strip()
 
 
+def is_debian_like():
+    release = platform.freedesktop_os_release()
+    return release.get('ID') in ('ubuntu', 'debian') or 'debian' in release.get('ID_LIKE', '').split()
+
+
 def supported_system():
     os_info = platform.freedesktop_os_release()
-    require(os_info.get('ID') == 'fedora' and os_info.get('VERSION_ID') == '44'
-            and platform.machine() == 'x86_64', 'Fedora 44 x86_64 is required')
-    require(command('getenforce') == 'Enforcing', 'SELinux Enforcing is required; do not disable it')
+    valid_system = (
+        (os_info.get('ID') == 'fedora' and os_info.get('VERSION_ID') == '44') or
+        (os_info.get('ID') in ('ubuntu', 'debian') or 'debian' in os_info.get('ID_LIKE', '').split())
+    ) and platform.machine() == 'x86_64'
+    require(valid_system, 'Fedora 44 x86_64 or Ubuntu x86_64 is required')
+    if not is_debian_like():
+        require(command('getenforce') == 'Enforcing', 'SELinux Enforcing is required; do not disable it')
 
 
 def prerequisites():
     missing = []
-    for package in (*builder.BUILD_PACKAGES, *RUNTIME_PACKAGES):
-        result = subprocess.run(['rpm', '-q', package], env=ENV, capture_output=True)
-        if result.returncode:
-            missing.append(package)
-    require(not missing, 'Missing Fedora packages. Run: sudo dnf install ' + ' '.join(missing) +
-            '; then run ./install.sh again')
+    runtime_pkgs = ('fprintd', 'libpam-fprintd') if is_debian_like() else RUNTIME_PACKAGES
+    all_packages = (*builder.BUILD_PACKAGES, *runtime_pkgs)
+    if is_debian_like():
+        for package in all_packages:
+            result = subprocess.run(['dpkg', '-s', package], env=ENV, capture_output=True)
+            if result.returncode:
+                missing.append(package)
+        require(not missing, 'Missing Ubuntu packages. Run: sudo apt install ' + ' '.join(missing) +
+                '; then run ./install.sh again')
+    else:
+        for package in all_packages:
+            result = subprocess.run(['rpm', '-q', package], env=ENV, capture_output=True)
+            if result.returncode:
+                missing.append(package)
+        require(not missing, 'Missing Fedora packages. Run: sudo dnf install ' + ' '.join(missing) +
+                '; then run ./install.sh again')
 
 
 def safe_parent(path):
@@ -73,14 +92,15 @@ def safe_parent(path):
 
 def host_preflight():
     supported_system()
-    safe_parent(VENDOR)
-    r.trusted(VENDOR)
-    require(command('rpm', '-qf', '--qf', '%{NAME}', str(VENDOR)) == 'plasma-login-manager',
-            'current Plasma Login PAM must belong to the Fedora package')
+    if not is_debian_like():
+        safe_parent(VENDOR)
+        r.trusted(VENDOR)
+        require(command('rpm', '-qf', '--qf', '%{NAME}', str(VENDOR)) == 'plasma-login-manager',
+                'current Plasma Login PAM must belong to the Fedora package')
     require(command('systemctl', 'show', 'fprintd.service', '-p', 'FragmentPath', '--value') ==
-            '/usr/lib/systemd/system/fprintd.service', 'stock Fedora fprintd unit is required')
+            '/usr/lib/systemd/system/fprintd.service', 'stock fprintd unit is required')
     commands = re.findall(r'path=([^ ;]+)', command('systemctl', 'show', 'fprintd.service', '-p', 'ExecStart', '--value'))
-    require(commands == ['/usr/libexec/fprintd'], 'stock Fedora fprintd ExecStart is required')
+    require(commands == ['/usr/libexec/fprintd'], 'stock fprintd ExecStart is required')
     for name in command('systemctl', 'show', 'fprintd.service', '-p', 'DropInPaths', '--value').split():
         require(name == str(r.DROPIN) or name.startswith('/usr/lib/systemd/system/'),
                 'unrecognized fprintd override: ' + name)
@@ -88,13 +108,15 @@ def host_preflight():
     require(not any(item.startswith('LD_PRELOAD=') for item in environment), 'foreign fprintd preload environment')
     library_paths = [item for item in environment if item.startswith('LD_LIBRARY_PATH=')]
     if library_paths:
-        require(library_paths == ['LD_LIBRARY_PATH=/usr/local/lib64/goodix-27c6-5125'],
+        require(library_paths == [f'LD_LIBRARY_PATH={r.RUNTIME}'],
                 'foreign library environment')
         require(r.present(r.DROPIN) and r.read(r.DROPIN) == r.DROPIN_BYTES,
                 'foreign library environment')
 
 
 def material_rule():
+    if is_debian_like() or not r.selinux_active() or shutil.which('semanage') is None:
+        return None
     listing = command('semanage', 'fcontext', '-l', '-C', '-n')
     found = False
     kinds = 'all files|regular file|directory|character device|block device|socket|symbolic link|named pipe'
@@ -129,6 +151,8 @@ def create_state_root():
 
 
 def label_materials():
+    if is_debian_like() or not r.selinux_active() or shutil.which('restorecon') is None:
+        return
     paths = [r.STATE]
     if material_present(r.MATERIAL):
         paths.extend((r.MATERIAL, *(r.MATERIAL / n for n in r.MATERIAL_NAMES)))
@@ -148,7 +172,8 @@ def write_file(path, data, mode=0o644):
             out.flush()
             os.fchmod(out.fileno(), mode)
             os.fsync(out.fileno())
-        command('restorecon', '-F', str(temporary))
+        if not is_debian_like() and r.selinux_active() and shutil.which('restorecon') is not None:
+            command('restorecon', '-F', str(temporary))
         os.link(temporary, path, follow_symlinks=False)  # atomic, no overwrite
     finally:
         temporary.unlink(missing_ok=True)
@@ -159,7 +184,8 @@ def write_json(path, value, mode=0o600):
 
 
 def software_paths():
-    return (r.CONFIG, r.DROPIN, r.SUPPORT, r.RUNTIME, r.NORMAL, r.FORCE, r.RECOVERY)
+    return (r.CONFIG, r.DROPIN, r.SUPPORT, r.RUNTIME, r.NORMAL, r.FORCE, r.RECOVERY,
+            r.PAM_PROFILE, r.GREETER_DCONF)
 
 
 def snapshot_software(destination):
@@ -182,10 +208,13 @@ def install_tools(source_id):
         write_file(path, payload, 0o755)
     write_json(r.RECOVERY / 'receipt.json', {'schema': 2, 'source_id': source_id,
                'files': {p.name: r.digest(payload) for p in (r.NORMAL, r.FORCE)}}, 0o644)
-    command('restorecon', '-F', str(r.RECOVERY), str(r.RECOVERY / 'receipt.json'), str(r.NORMAL), str(r.FORCE))
+    if not is_debian_like() and r.selinux_active() and shutil.which('restorecon') is not None:
+        command('restorecon', '-F', str(r.RECOVERY), str(r.RECOVERY / 'receipt.json'), str(r.NORMAL), str(r.FORCE))
 
 
 def install_selinux_module():
+    if is_debian_like() or not r.selinux_active() or shutil.which('semodule') is None:
+        return
     if r.selinux_module_present():
         return
     with tempfile.TemporaryDirectory(prefix='goodix-selinux-') as directory:
@@ -200,6 +229,8 @@ def install_selinux_module():
 
 
 def restore_selinux_module(was_present):
+    if is_debian_like() or not r.selinux_active() or shutil.which('semodule') is None:
+        return
     if was_present:
         install_selinux_module()
     else:
@@ -230,13 +261,31 @@ def install_runtime(payload, manifest, rule_preexisting, legacy_present):
         'files': hashes, 'links': links, 'material_selinux': material_selinux,
         'material_mode': 'legacy-and-state-v2' if legacy_present else 'state-v2',
         'state_root': str(r.STATE)})
-    command('restorecon', '-RF', str(r.RUNTIME))
+    if not is_debian_like() and r.selinux_active() and shutil.which('restorecon') is not None:
+        command('restorecon', '-RF', str(r.RUNTIME))
     r.DROPIN.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
     write_file(r.DROPIN, r.DROPIN_BYTES)
-    command('restorecon', '-F', str(r.DROPIN))
+    if not is_debian_like() and r.selinux_active() and shutil.which('restorecon') is not None:
+        command('restorecon', '-F', str(r.DROPIN))
+
+
+def sync_debian_login():
+    """Make common-auth and the GDM greeter database match the files on disk."""
+    if r.present(r.PAM_PROFILE):
+        command('pam-auth-update', '--package', '--disable', 'fprintd')
+        command('pam-auth-update', '--package', '--enable', r.PAM_PROFILE_NAME)
+    r.regenerate_greeter()
 
 
 def install_login(payload, source_id):
+    if is_debian_like():
+        # Fingerprint for sudo, polkit and the lock screen; password-only for
+        # the GDM greeter and gdm-password so GNOME Keyring unlocks at login.
+        write_file(r.PAM_PROFILE, r.PAM_PROFILE_BYTES)
+        if r.GREETER_DCONF.parent.is_dir():
+            write_file(r.GREETER_DCONF, r.GREETER_DCONF_BYTES)
+        sync_debian_login()
+        return
     r.SUPPORT.mkdir(mode=0o755)
     module = (payload / 'login' / r.MODULE).read_bytes()
     config = (payload / 'login/plasmalogin.pam').read_bytes()
@@ -265,6 +314,11 @@ def rollback(saved, rule_before, selinux_module_before):
                            'commands retained. Report this error: ' + str(error) + module_error) from error
     errors = []
     tool_paths = (r.NORMAL, r.FORCE, r.RECOVERY)
+    if is_debian_like():
+        try:
+            r.remove_debian_login()  # de-register from common-auth before deletion
+        except (RuntimeError, OSError, subprocess.SubprocessError) as error:
+            errors.append(str(error))
     for path in software_paths():
         if path in tool_paths:
             continue
@@ -292,6 +346,8 @@ def rollback(saved, rule_before, selinux_module_before):
         if r.present(r.MATERIAL):
             command('restorecon', '-F', '--', str(r.MATERIAL), *(str(r.MATERIAL / n) for n in r.MATERIAL_NAMES))
         command('systemctl', 'daemon-reload')
+        if is_debian_like() and not errors:
+            sync_debian_login()
     except (RuntimeError, OSError, subprocess.SubprocessError) as error:
         errors.append(str(error))
     try:
@@ -449,7 +505,7 @@ def apply(payload, material_directory, owner_uid, *, explicit=False):
                 create_state_root()
                 legacy_present = material_present(r.MATERIAL)
                 preexisting = material_rule() if legacy_present else None
-                if legacy_present and not preexisting:
+                if not is_debian_like() and legacy_present and not preexisting:
                     command('semanage', 'fcontext', '-a', '-f', 'a', '-t', 'fprintd_var_lib_t', '-r', 's0', r.RULE)
                 label_materials()
                 print('GOODIX_PAIRING_STATE=READY')
@@ -463,7 +519,11 @@ def apply(payload, material_directory, owner_uid, *, explicit=False):
                 print('GOODIX_ROLLBACK=PASS PRIOR_PROJECT_SOFTWARE_RESTORED=true', file=sys.stderr)
                 raise
     print('GOODIX_INSTALL=PASS READER_PRESENT_ALLOWED=true')
-    print('Use KDE fingerprint settings to enroll or your existing template. The service was not started by installation.')
+    if is_debian_like():
+        print('Enroll with Settings > System > Users > Fingerprint Login, or: fprintd-enroll "$USER". '
+              'GDM login stays password-only; lock screen, sudo and polkit accept fingerprint.')
+    else:
+        print('Use KDE fingerprint settings to enroll or your existing template. The service was not started by installation.')
     print('Removal: goodix-uninstall. Emergency recovery: goodix-force-remove.')
 
 
@@ -518,9 +578,14 @@ def main():
     if result.returncode:
         return result.returncode
     if args.install_dependencies:
-        print('\n==> [2/3] Installing Fedora prerequisites', flush=True)
-        result = subprocess.run(['/usr/bin/sudo', '--', '/usr/bin/dnf', 'install', 'git', 'python3',
-                                 *builder.BUILD_PACKAGES, *RUNTIME_PACKAGES], env=ENV)
+        print('\n==> [2/3] Installing prerequisites', flush=True)
+        if is_debian_like():
+            runtime_pkgs = ('fprintd', 'libpam-fprintd')
+            result = subprocess.run(['/usr/bin/sudo', '--', '/usr/bin/apt-get', 'install', '-y', 'git', 'python3',
+                                     *builder.BUILD_PACKAGES, *runtime_pkgs], env=ENV)
+        else:
+            result = subprocess.run(['/usr/bin/sudo', '--', '/usr/bin/dnf', 'install', 'git', 'python3',
+                                     *builder.BUILD_PACKAGES, *RUNTIME_PACKAGES], env=ENV)
         if result.returncode:
             return result.returncode
     prerequisites()

@@ -17,9 +17,18 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 LIBFPRINT_SOURCE = Path('reference/libfprint-fedora44-1.94.100/source')
 LOGIN_SOURCE = Path('deployment/plasma-login-opt-in')
-BUILD_PACKAGES = ('gcc', 'gcc-c++', 'meson', 'ninja-build', 'pkgconf-pkg-config',
-                  'glib2-devel', 'libgusb-devel', 'openssl-devel', 'opencv-devel',
-                  'pam-devel', 'binutils')
+def is_debian_like():
+    release = platform.freedesktop_os_release()
+    return release.get('ID') in ('ubuntu', 'debian') or 'debian' in release.get('ID_LIKE', '').split()
+
+
+FEDORA_BUILD_PACKAGES = ('gcc', 'gcc-c++', 'meson', 'ninja-build', 'pkgconf-pkg-config',
+                         'glib2-devel', 'libgusb-devel', 'openssl-devel', 'opencv-devel',
+                         'pam-devel', 'binutils')
+UBUNTU_BUILD_PACKAGES = ('gcc', 'g++', 'meson', 'ninja-build', 'pkg-config',
+                         'libglib2.0-dev', 'libgusb-dev', 'libssl-dev', 'libopencv-dev',
+                         'libpam0g-dev', 'binutils')
+BUILD_PACKAGES = UBUNTU_BUILD_PACKAGES if is_debian_like() else FEDORA_BUILD_PACKAGES
 OPENCV_PARTS = ('core', 'features2d', 'flann', 'imgproc')
 LICENSES = ('GPL-2.0-or-later', 'LGPL-2.1-or-later', 'GPL-3.0-or-later', 'Apache-2.0')
 BASE_ENV = {'PATH': '/usr/bin:/bin:/usr/sbin:/sbin', 'LC_ALL': 'C'}
@@ -43,6 +52,10 @@ def sha256(data):
 
 
 def missing_packages():
+    if is_debian_like():
+        return [name for name in BUILD_PACKAGES if subprocess.run(
+            ['dpkg', '-s', name], env=BASE_ENV, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL).returncode != 0]
     return [name for name in BUILD_PACKAGES if subprocess.run(
         ['rpm', '-q', name], env=BASE_ENV, stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL).returncode != 0]
@@ -51,11 +64,17 @@ def missing_packages():
 def prerequisites():
     require(os.geteuid() != 0, 'build as your normal user, before privileged installation')
     release = platform.freedesktop_os_release()
-    require(release.get('ID') == 'fedora' and release.get('VERSION_ID') == '44'
-            and platform.machine() == 'x86_64', 'Fedora 44 x86_64 is required')
+    valid_system = (
+        (release.get('ID') == 'fedora' and release.get('VERSION_ID') == '44') or
+        (release.get('ID') in ('ubuntu', 'debian') or 'debian' in release.get('ID_LIKE', '').split())
+    ) and platform.machine() == 'x86_64'
+    require(valid_system, 'Fedora 44 x86_64 or Ubuntu x86_64 is required')
     missing = missing_packages()
     require(not missing, 'missing build packages: ' + ' '.join(missing))
-    for name in ('meson', 'ninja', 'cc', 'c++', 'pkg-config', 'rpm', 'readelf', 'nm', 'ldd'):
+    tools = ['meson', 'ninja', 'cc', 'c++', 'pkg-config', 'readelf', 'nm', 'ldd']
+    if not is_debian_like():
+        tools.append('rpm')
+    for name in tools:
         require(shutil.which(name, path=BASE_ENV['PATH']) is not None, f'missing build command: {name}')
 
 
@@ -109,6 +128,14 @@ def opencv_inputs():
 
 
 def opencv_notices(libraries):
+    if is_debian_like():
+        license_files = set()
+        for doc_dir in (Path('/usr/share/doc/libopencv-core410'), Path('/usr/share/doc/libopencv-dev')):
+            cp = doc_dir / 'copyright'
+            if cp.is_file():
+                license_files.add(cp)
+        require(license_files, 'OpenCV package license notices are unavailable')
+        return '\n'.join(f'===== {path} =====\n' + path.read_text() for path in sorted(license_files)) + '\n'
     owners = sorted({run('rpm', '-qf', '--qf', '%{NAME}', path) for path in libraries.values()})
     license_files = set()
     for owner in owners:
@@ -228,7 +255,8 @@ def build_payload(output):
         cflags = ['-DGOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE',
                   f'-ffile-prefix-map={ROOT}=/usr/src/goodix',
                   f'-ffile-prefix-map={work}=/usr/src/goodix-build']
-        run('meson', 'setup', build, ROOT / LIBFPRINT_SOURCE, '--prefix=/usr', '--libdir=lib64',
+        libdir_arg = '--libdir=lib' if is_debian_like() else '--libdir=lib64'
+        run('meson', 'setup', build, ROOT / LIBFPRINT_SOURCE, '--prefix=/usr', libdir_arg,
             '--buildtype=release', '--wrap-mode=nodownload', '-Ddrivers=goodix_27c6_5125',
             '-Dintrospection=false', '-Ddoc=false', '-Dinstalled-tests=false',
             '-Dudev_rules=disabled', '-Dudev_hwdb=disabled', '-Dgoodix_production_minimal=true',
@@ -247,7 +275,8 @@ def build_payload(output):
         run('cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-O2', '-fPIC', '-shared',
             ROOT / LOGIN_SOURCE / 'pam_goodix_login_gate.c', '-lpam',
             '-Wl,-z,relro,-z,now', '-Wl,--no-undefined', '-o', login / 'pam_goodix_login_gate.so')
-        pam_synthetic_tests(work)
+        if not is_debian_like():
+            pam_synthetic_tests(work)
         shutil.copyfile(ROOT / LOGIN_SOURCE / 'plasmalogin.pam', login / 'plasmalogin.pam')
         material_sources = [ROOT / f'libfprint-driver/{name}.c' for name in
             ('goodix_runtime_material', 'goodix_target_material', 'goodix_runtime_inputs', 'goodix_action_binding')]
@@ -274,8 +303,12 @@ def build_payload(output):
     for name in LICENSES:
         shutil.copyfile(ROOT / 'LICENSES' / (name + '.txt'), runtime / 'licenses' / (name + '.txt'))
     (runtime / 'source-files.sha256').write_text(inventory)
+    if is_debian_like():
+        pkg_versions = run('dpkg-query', '-W', '-f=${Package} ${Version}\n', *BUILD_PACKAGES, 'fprintd').splitlines()
+    else:
+        pkg_versions = run('rpm', '-q', *BUILD_PACKAGES, 'fprintd').splitlines()
     provenance = {'source_id': source_id, 'opencv_version': version,
-                  'packages': run('rpm', '-q', *BUILD_PACKAGES, 'fprintd').splitlines()}
+                  'packages': pkg_versions}
     (runtime / 'build-provenance.json').write_text(json.dumps(provenance, sort_keys=True) + '\n')
     require(source_inventory() == inventory, 'source content changed during the build')
     manifest = {'schema': 1, 'source_id': source_id, 'files': {}, 'links': {}}

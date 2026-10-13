@@ -13,9 +13,19 @@ import stat
 import subprocess
 import sys
 
+def is_debian_like():
+    try:
+        import platform
+        release = platform.freedesktop_os_release()
+        return release.get('ID') in ('ubuntu', 'debian') or 'debian' in release.get('ID_LIKE', '').split()
+    except Exception:
+        return False
+
+
+LIB_DIR = Path('/usr/local/lib') if is_debian_like() else Path('/usr/local/lib64')
 CONFIG = Path('/etc/pam.d/plasmalogin')
-SUPPORT = Path('/usr/local/lib64/goodix-plasma-login')
-RUNTIME = Path('/usr/local/lib64/goodix-27c6-5125')
+SUPPORT = LIB_DIR / 'goodix-plasma-login'
+RUNTIME = LIB_DIR / 'goodix-27c6-5125'
 DROPIN = Path('/etc/systemd/system/fprintd.service.d/90-goodix-5125-runtime.conf')
 MASK = Path('/run/systemd/system/fprintd.service')
 NORMAL = Path('/usr/local/bin/goodix-uninstall')
@@ -31,7 +41,8 @@ SELINUX_MODULE_PRIORITY = '400'
 SELINUX_MODULE_RULE = '(dontaudit fprintd_t sysctl_vm_t (file (read)))'
 MODULE = 'pam_goodix_login_gate.so'
 LIBRARIES = ('libfprint-2.so.2.0.0',) + tuple(
-    'libopencv_' + part + '.so.413' for part in ('core', 'features2d', 'flann', 'imgproc'))
+    'libopencv_' + part + ('.so.410' if is_debian_like() else '.so.413')
+    for part in ('core', 'features2d', 'flann', 'imgproc'))
 RUNTIME_FILES = set(LIBRARIES) | {
     'OpenCV-LICENSES.txt', 'source-files.tsv', 'source-files.sha256',
     'LICENSING_AND_PROVENANCE.md', 'build-provenance.txt', 'SHA256SUMS',
@@ -39,8 +50,25 @@ RUNTIME_FILES = set(LIBRARIES) | {
     *('licenses/' + name + '.txt' for name in
       ('GPL-2.0-or-later', 'LGPL-2.1-or-later', 'GPL-3.0-or-later', 'Apache-2.0'))}
 LINKS = {'libfprint-2.so.2': 'libfprint-2.so.2.0.0', 'libfprint-2.so': 'libfprint-2.so.2'}
-DROPIN_BYTES = b'[Service]\nEnvironment=LD_LIBRARY_PATH=/usr/local/lib64/goodix-27c6-5125\n'
+DROPIN_BYTES = f'[Service]\nEnvironment=LD_LIBRARY_PATH={RUNTIME}\n'.encode()
 ENV = {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'LC_ALL': 'C'}
+# Debian/Ubuntu login policy: fingerprint for sudo, polkit and the lock screen,
+# but never for the GDM greeter or gdm-password, so the initial login always
+# receives the password needed to unlock GNOME Keyring.
+PAM_PROFILE_NAME = 'goodix-fprintd'
+PAM_PROFILE = Path('/usr/share/pam-configs') / PAM_PROFILE_NAME
+PAM_PROFILE_BYTES = (
+    b'Name: Fingerprint authentication (Goodix 27c6:5125, password-only GDM login)\n'
+    b'Default: no\n'
+    b'Priority: 260\n'
+    b'Conflicts: fprintd, fprint\n'
+    b'Auth-Type: Primary\n'
+    b'Auth:\n'
+    b'\t[success=1 default=ignore]\tpam_succeed_if.so service = gdm-password quiet\n'
+    b'\t[success=end default=ignore]\tpam_fprintd.so max-tries=1 timeout=10\n')
+GREETER_DCONF = Path('/usr/share/gdm/dconf/95-goodix-27c6-5125')
+GREETER_DCONF_BYTES = b'[org/gnome/login-screen]\nenable-fingerprint-authentication=false\n'
+GDM_GENERATE_CONFIG = Path('/usr/share/gdm/generate-config')
 
 
 def require(ok, message):
@@ -163,6 +191,10 @@ def normal_preflight():
     require({p.name for p in RECOVERY.iterdir()} == {'receipt.json'}, 'recovery directory drift')
     for path in (NORMAL, FORCE):
         require(digest(read(path)) == receipt['files'][path.name], f'recovery command drift: {path}')
+    if present(PAM_PROFILE):
+        require(read(PAM_PROFILE) == PAM_PROFILE_BYTES, 'project PAM profile drift')
+    if present(GREETER_DCONF):
+        require(read(GREETER_DCONF) == GREETER_DCONF_BYTES, 'project GDM greeter setting drift')
     return owned_rule
 
 
@@ -191,7 +223,30 @@ def remove_path(path):
         path.unlink()
 
 
+def regenerate_greeter():
+    if present(GDM_GENERATE_CONFIG):
+        command(str(GDM_GENERATE_CONFIG))
+
+
+def remove_debian_login():
+    # Take the profile out of common-auth BEFORE deleting it from disk, as
+    # pam-auth-update(8) requires. The stock fprintd profile is not re-enabled:
+    # without this project's runtime there is no usable reader anyway.
+    if present(PAM_PROFILE):
+        command('pam-auth-update', '--package', '--remove', PAM_PROFILE_NAME)
+        remove_path(PAM_PROFILE)
+    if present(GREETER_DCONF):
+        remove_path(GREETER_DCONF)
+        regenerate_greeter()
+
+
+def selinux_active():
+    return shutil.which('getenforce') is not None and command('getenforce') == 'Enforcing'
+
+
 def remove_label():
+    if not selinux_active() or shutil.which('semanage') is None:
+        return
     # Query/delete only the exact project customization. No Fedora version,
     # vendor PAM, receipt, material content, or historical labels are consulted.
     def rule_present():
@@ -215,6 +270,8 @@ def remove_label():
 
 
 def selinux_module_present():
+    if not selinux_active() or shutil.which('semodule') is None:
+        return False
     lines = []
     for line in command('semodule', '-lfull').splitlines():
         fields = line.split()
@@ -303,6 +360,8 @@ def remove(force=False):
 
     # Disarm entry points BEFORE touching their dependencies or service state.
     login_removed = attempt('login entry', lambda: remove_path(CONFIG))
+    if is_debian_like() or present(PAM_PROFILE) or present(GREETER_DCONF):
+        attempt('Debian PAM/GDM login policy', remove_debian_login)
     runtime_detached = attempt('runtime entry', lambda: remove_path(DROPIN))
     created_mask = None
     try:
