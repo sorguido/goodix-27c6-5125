@@ -1,6 +1,10 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Validation scope and known limitations
 
+The [3.0.1 Fedora 44+ candidate record](VALIDATION_3.0.1.md) separately tracks
+current packaging checks and the pending supervised Fedora 44/45 qualification.
+The observations below concern earlier versions unless explicitly stated.
+
 ## Tested configuration
 
 Initial operator-supervised functional testing concerns one Goodix USB

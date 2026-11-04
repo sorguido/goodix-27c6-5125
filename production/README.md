@@ -10,7 +10,10 @@ for the maintainer release procedure.
 ## Build architecture
 
 `build-public.py` resolves the source root from its own location and builds as
-an ordinary user on Fedora 44 x86_64. It uses the public libfprint base, Goodix
+an ordinary user on Fedora 44 or newer x86_64. The distributed RPM is always
+built on Fedora 44, the oldest supported baseline. Later Fedora versions
+require compatible dependencies and runtime interfaces; Fedora 45 live
+qualification remains pending. It uses the public libfprint base, Goodix
 driver and a pinned native biometric backend together with supported Fedora
 development packages. The native engine's original C sources are included in
 the public tree under `production/chicago-native/`.
@@ -26,7 +29,9 @@ libgusb, OpenSSL, PAM, Plasma and the ordinary authentication consumers.
 
 The builder verifies the library ABI and SONAME, stock fprintd resolution,
 absence of private RPATH/RUNPATH and forbidden matcher dependencies, PAM selector
-checks, source inventories and content hashes before installation. It validates
+checks, source inventories and content hashes before installation. Activation
+repeats the ABI and loader checks against the target host before replacing
+software or stopping fprintd. It validates
 the pinned source manifest for the native algorithm and retains all applicable
 upstream copyright and licensing notices. Build provenance records the
 source-content digest and package versions rather than depending on Git objects.

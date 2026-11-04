@@ -43,7 +43,17 @@ If **Download RPM** appears:
 
 Installing a newer RPM alone does **not** update the active driver. If the release check reports **Check unavailable**, try **Check again** later.
 
-**Upgrading from a 2.x version?** For a recognized, intact installation, Goodix Manager offers **Upgrade to 3.0.0**. No preliminary uninstall is needed, but **you must register your fingerprints again** after the upgrade. Existing fingerprint files and pairing data are preserved.
+**Preparing to upgrade Fedora 44 to Fedora 45?** The 3.0.1 candidate removes the
+package dependency that makes the published 3.0.0 RPM block the upgrade. Once
+3.0.1 is qualified and officially released, install it on Fedora 44 before
+upgrading Fedora. You do not need to uninstall the driver first. Apply the
+driver update in Goodix Manager and follow its restart instruction. This
+3.0.0 → 3.0.1 update keeps the ChicagoHS fingerprint format: existing enrollments
+can be used without registering again. Later Fedora compatibility depends on
+the required system components remaining compatible. Fedora 45 live testing
+of this candidate is still pending; see [candidate validation](VALIDATION_3.0.1.md).
+
+**Upgrading from a 2.x version?** For a recognized, intact installation, Goodix Manager offers **Upgrade to 3.0.1**. No preliminary uninstall is needed, but **you must register your fingerprints again** after the upgrade. Existing fingerprint files and pairing data are preserved.
 
 ## Removing the driver
 

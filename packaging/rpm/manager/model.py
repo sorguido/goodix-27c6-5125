@@ -171,6 +171,9 @@ class Release:
         if not isinstance(assets, list) or len(assets) > 128:
             raise ValueError('invalid assets')
         found = []
+        # fc44 identifies the oldest build baseline, not the running Fedora
+        # release. Keep this asset contract so installed 3.0.0 Managers discover
+        # 3.0.1 before the distribution upgrade, and newer Fedora hosts use it too.
         pattern = re.compile(r'goodix-manager-' + re.escape(version) + r'-([1-9][0-9]{0,5})\.fc44\.x86_64\.rpm\Z')
         for asset in assets:
             if not isinstance(asset, dict) or not isinstance(asset.get('name'), str):

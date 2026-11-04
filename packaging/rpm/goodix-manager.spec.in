@@ -18,7 +18,7 @@ BuildRequires:  fprintd desktop-file-utils
 BuildRequires:  python3-pyside6 qt6-qtdeclarative kf6-kirigami
 Requires:       python3 python3-pyside6 kf6-kirigami qt6-qtdeclarative
 Requires:       polkit fprintd fprintd-pam policycoreutils-python-utils
-Requires:       plasma-login-manager systemd rpm sudo
+Requires:       plasma-login-manager systemd rpm sudo binutils
 # Do not require system-release(44): the package must survive Fedora upgrades.
 # Runtime activation separately checks the Fedora family, ABI and security preflight.
 

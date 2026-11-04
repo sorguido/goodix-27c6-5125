@@ -31,6 +31,14 @@ with a different source identity are refused: bump `VERSION` for driver changes.
 Password access must already work. Read [installation](../../docs/INSTALLATION.md)
 and [recovery](../../docs/UNINSTALL.md) before activation.
 
+The 3.0.1 candidate preserves the 3.0.0 ChicagoHS template format and pairing
+behavior. New enrollment is required when migrating from 2.x, not for this
+3.0.0 → 3.0.1 update. Before activation, the immutable staged payload is checked
+against the host's stock fprintd symbols and loader resolution (`ldd -r`).
+An incompatible ABI or unresolved dependency stops before service/file changes.
+`binutils` supplies the runtime ELF inspection tools; no compiler is required.
+See the [3.0.1 evidence and operator gate](../../docs/VALIDATION_3.0.1.md).
+
 **Remove** performs the ordinary `goodix-uninstall` operation with the original
 receipt, ownership and hash checks. The Manager remains installed. Reboot as
 instructed after removal, then check password login. Reinstallation preserves
@@ -44,7 +52,7 @@ Emergency `goodix-force-remove` remains a TTY recovery command; it is not a GUI
 action. No RPM scriptlet attempts authentication changes or irreversible cleanup.
 
 Unknown or damaged software stops safely. Recognized, intact 2.x installations
-offer **Upgrade to 3.0.0**, using the canonical transactional update without a
+offer **Upgrade to 3.0.1**, using the canonical transactional update without a
 preliminary uninstall. Old fingerprints require **new enrollment** with the 3.x
 engine; historical files are preserved. Real populated-installation migration
 and rollback remain a separate VM qualification gate.
@@ -63,7 +71,7 @@ application theme selector.
 
 At startup the GUI asynchronously checks the official GitHub stable Release API.
 It compares the verified local Manager package and public versions numerically. Only a
-matching Fedora/architecture RPM asset produces a download action. The flow is
+matching Fedora 44-baseline/x86_64 RPM asset produces a download action. The flow is
 **Download RPM → verify its signature → Discover → reopen Manager → Apply Update**; no remote code
 is executed by the helper. Prereleases, malformed replies, missing compatible
 RPMs, rate limits and offline failures do not disable local operations.
@@ -183,12 +191,11 @@ checks a saved published-release response instead. Both modes check local
 evidence only: they neither publish nor prove GitHub availability. Do not publish
 a candidate that fails the gate.
 
-Future-release regression tests use a fictional 3.0.1 response and isolated
+Release regression tests use saved, fictional release responses and isolated
 test packages. Their private artifacts are **TEST ONLY / NEVER PUBLISH** and
 are separate from production releases; the test signer is not a trusted
-production identity. A public 3.0.1 release is not required to qualify update
-continuity before the first 3.0.0 publication. Real populated 2.x migration
-remains a separate VM gate.
+production identity. These fixtures do not establish publication or live qualification. Real
+populated migration remains a separate VM gate.
 
 Run public fixture tests and inspect the RPM before a VM transaction:
 

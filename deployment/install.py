@@ -23,7 +23,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 ENV = {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'LC_ALL': 'C'}
 VENDOR = Path('/usr/lib/pam.d/plasmalogin')
-RUNTIME_PACKAGES = ('fprintd', 'fprintd-pam', 'policycoreutils-python-utils')
+RUNTIME_PACKAGES = ('fprintd', 'fprintd-pam', 'policycoreutils-python-utils', 'binutils')
 UNCHECKED_SOURCE = object()
 
 
@@ -436,6 +436,7 @@ def apply(payload, material_directory, owner_uid, *, explicit=False, expected_so
         staged_payload = staging / 'payload'
         shutil.copytree(payload, staged_payload, symlinks=True)
         require(builder.validate_payload(staged_payload) == manifest, 'build payload changed during staging')
+        builder.verify_runtime_abi(staged_payload / 'runtime')
         native_check = lambda directory: command(str(staged_payload / 'check-material'), str(directory))
         if reuse:
             native_check(r.MATERIAL)
@@ -484,7 +485,7 @@ def apply(payload, material_directory, owner_uid, *, explicit=False, expected_so
                 print('GOODIX_ROLLBACK=PASS PRIOR_PROJECT_SOFTWARE_RESTORED=true', file=sys.stderr)
                 raise
     print('GOODIX_INSTALL=PASS READER_PRESENT_ALLOWED=true')
-    print('ChicagoHS requires new enrollment for every finger/user; SIGFM and Milan templates are incompatible.')
+    print('Upgrading from SIGFM or Milan requires new enrollment for every finger/user; existing ChicagoHS templates are preserved.')
     print('Live biometric qualification remains pending. The service was not started by installation.')
     print('Removal: goodix-uninstall. Emergency recovery: goodix-force-remove.')
 

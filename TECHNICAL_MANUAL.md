@@ -1188,10 +1188,14 @@ service sandbox. Its only current setting is the private runtime
 | Manager | `python3-pyside6`, `qt6-qtdeclarative`, `kf6-kirigami`, `polkit` |
 | Build toolchain | `gcc`, `meson`, `ninja-build`, `pkgconf-pkg-config`, `binutils` |
 | Development headers | `glib2-devel`, `libgusb-devel`, `libusb1-devel`, `openssl-devel`, `json-glib-devel`, `pam-devel` |
-| Runtime/integration | `fprintd`, `fprintd-pam`, `policycoreutils-python-utils` |
+| Runtime/integration | `fprintd`, `fprintd-pam`, `policycoreutils-python-utils`, `binutils` |
 
-The builder runs as the invoking unprivileged user and requires Fedora 44
-x86_64. It constructs a source inventory by content, so a source-only copy does
+The source builder runs as the invoking unprivileged user and accepts Fedora
+44 or newer x86_64. The distributed RPM is built on Fedora 44 as the oldest
+supported baseline; its `.fc44` suffix and package metadata identify that
+baseline, not the running distribution. No fixed Fedora release dependency
+is imposed. Later releases require compatible system dependencies and runtime
+interfaces. It constructs a source inventory by content, so a source-only copy does
 not depend on Git history. It builds the Goodix-enabled libfprint, selector, and
 native validation helper; verifies ABI and stock-fprintd symbol resolution;
 performs validation checks; and records relevant package versions and source
@@ -1265,9 +1269,12 @@ flowchart TD
 
 Before project-owned integration mutation, the installer requires:
 
-- Fedora 44 on x86_64 with SELinux Enforcing;
+- Fedora 44 or newer on x86_64 with SELinux Enforcing;
 - a trusted, package-owned Fedora Plasma Login PAM file;
 - the stock fprintd unit and `/usr/libexec/fprintd` executable;
+- the expected payload SONAME without private RPATH/RUNPATH, versioned
+  libfprint symbols required by the host daemon, and successful `ldd -r`
+  resolution to the staged payload without missing libraries or symbols;
 - no unrecognized local fprintd drop-in or preload; and
 - either no project library setting or exactly the expected project setting.
 

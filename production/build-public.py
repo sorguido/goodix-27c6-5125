@@ -39,9 +39,9 @@ def require(condition, message):
         raise RuntimeError(message)
 
 
-def run(*args, env=None):
+def run(*args, env=None, timeout=None):
     result = subprocess.run([str(arg) for arg in args], env=env or BASE_ENV,
-                            text=True, capture_output=True)
+                            text=True, capture_output=True, timeout=timeout)
     require(result.returncode == 0,
             f'{args[0]} failed: {result.stderr.strip() or result.stdout.strip()}')
     return result.stdout.strip()
@@ -103,13 +103,28 @@ def source_inventory():
     return ''.join(rows)
 
 
-def soname(path):
-    dynamic = run('readelf', '-d', path)
+def soname(path, *, timeout=None):
+    dynamic = run('readelf', '-d', path, timeout=timeout)
     require('(RPATH)' not in dynamic and '(RUNPATH)' not in dynamic,
             f'library contains a private loader path: {path.name}')
     names = re.findall(r'\(SONAME\).*?\[([^]]+)\]', dynamic)
     require(len(names) == 1, f'library SONAME is missing or ambiguous: {path.name}')
     return names[0]
+
+
+def verify_runtime_abi(runtime):
+    """Resolve the verified library against this host's stock daemon, without starting it."""
+    library = Path(runtime) / 'libfprint-2.so.2.0.0'
+    require(soname(library, timeout=30) == 'libfprint-2.so.2', 'unexpected libfprint ABI')
+    required = set(re.findall(r'\b(fp_\w+)@LIBFPRINT_2\.0\.0', run('nm', '-D', '--undefined-only', '/usr/libexec/fprintd', timeout=30)))
+    provided = set(re.findall(r'\b(fp_\w+)@@LIBFPRINT_2\.0\.0', run('nm', '-D', '--defined-only', library, timeout=30)))
+    require(required and required <= provided, 'payload libfprint does not supply the stock fprintd ABI')
+    linked = run('ldd', '-r', '/usr/libexec/fprintd', env=dict(BASE_ENV, LD_LIBRARY_PATH=str(runtime)), timeout=30)
+    require(str(Path(runtime) / 'libfprint-2.so.2') in linked
+            and 'not found' not in linked and 'undefined symbol:' not in linked,
+            'stock fprintd dependency resolution failed')
+    require(not any(name in linked.lower() for name in ('opencv', 'libstdc++', 'libc++')),
+            'OpenCV/C++ dependency present in stock fprintd resolution')
 
 
 def _safe_relative(name):
@@ -249,14 +264,7 @@ def build_payload(output, *, work_root=None):
             *flags, '-o', native_test)
         run('python3', '-I', '-B', ROOT / 'deployment/test_materials.py',
             env=dict(BASE_ENV, GOODIX_MATERIAL_TEST_NATIVE=str(native_test)))
-    required = set(re.findall(r'\b(fp_\w+)@LIBFPRINT_2\.0\.0', run('nm', '-D', '--undefined-only', '/usr/libexec/fprintd')))
-    provided = set(re.findall(r'\b(fp_\w+)@@LIBFPRINT_2\.0\.0', run('nm', '-D', '--defined-only', runtime / library.name)))
-    require(required and required <= provided, 'built libfprint does not supply the stock fprintd ABI')
-    linked = run('ldd', '/usr/libexec/fprintd', env=dict(BASE_ENV, LD_LIBRARY_PATH=str(runtime)))
-    require(str(runtime / 'libfprint-2.so.2') in linked and 'not found' not in linked,
-            'stock fprintd dependency resolution failed')
-    require(not any(name in linked.lower() for name in ('opencv', 'libstdc++', 'libc++')),
-            'OpenCV/C++ dependency present in stock fprintd resolution')
+    verify_runtime_abi(runtime)
     shutil.copyfile(ROOT / native.NATIVE_SOURCE / 'NOTICES.txt', runtime / 'ChicagoHS-NOTICES.txt')
     shutil.copyfile(ROOT / 'docs/LICENSING_AND_PROVENANCE.md', runtime / 'LICENSING_AND_PROVENANCE.md')
     (runtime / 'licenses').mkdir()
@@ -291,5 +299,5 @@ def main():
 if __name__ == '__main__':
     try:
         main()
-    except (OSError, RuntimeError, ValueError) as error:
+    except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as error:
         raise SystemExit(f'GOODIX_BUILD=STOP {error}')

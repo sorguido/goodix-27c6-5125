@@ -88,6 +88,7 @@ class Installer(unittest.TestCase):
         self.ctx.enter_context(patch.object(m, 'supported_system'))
         self.ctx.enter_context(patch.object(m, 'prerequisites'))
         self.ctx.enter_context(patch.object(m.builder, 'validate_chicago_sources', return_value={}))
+        self.abi_check = self.ctx.enter_context(patch.object(m.builder, 'verify_runtime_abi'))
         self.ctx.enter_context(patch.object(m, 'safe_parent', side_effect=m.r.parents))
         self.ctx.enter_context(patch.object(m.r, 'trusted', side_effect=self.trusted))
         self.ctx.enter_context(patch.object(m, 'label_materials', side_effect=self.labels))
@@ -224,6 +225,39 @@ class Installer(unittest.TestCase):
     def apply(self):
         with patch.object(m.os, 'geteuid', return_value=0):
             m.apply(self.payload, self.source, os.getuid())
+
+    def test_runtime_abi_uses_verified_staged_payload_before_mutation(self):
+        def verify(runtime):
+            self.assertNotEqual(runtime, self.payload / 'runtime')
+            self.assertEqual(m.builder.validate_payload(runtime.parent),
+                             m.builder.validate_payload(self.payload))
+            self.assertTrue(self.active)
+            self.assertFalse(m.r.MASK.exists())
+            self.assertFalse(m.r.STATE.exists())
+            self.assertFalse(any(m.r.present(p) for p in m.software_paths()))
+        self.abi_check.side_effect = verify
+        self.apply()
+        self.abi_check.assert_called_once()
+
+    def test_incompatible_runtime_stops_update_before_service_or_data_mutation(self):
+        self.apply()
+        software_before = {str(path): path.read_bytes() for root in m.software_paths()
+                           for path in ([root] if root.is_file() else root.rglob('*'))
+                           if path.is_file() and not path.is_symlink()}
+        self.active = True
+        self.events.clear()
+        self.abi_check.side_effect = RuntimeError('stock fprintd ABI incompatible')
+        with self.assertRaisesRegex(RuntimeError, 'stock fprintd ABI'):
+            self.apply()
+        self.assertTrue(self.active)
+        self.assertFalse(m.r.MASK.exists())
+        self.assertFalse(any(event[:2] == ('systemctl', 'stop') or event[0] == 'restorecon'
+                             or event[0].endswith('/check-material')
+                             or event[:3] in (('semanage', 'fcontext', '-a'),
+                                             ('semanage', 'fcontext', '-d'))
+                             for event in self.events))
+        self.assertEqual(software_before, {name: Path(name).read_bytes() for name in software_before})
+        self.assert_preserved()
 
     def test_manager_expected_absent_refuses_changed_runtime(self):
         self.apply()

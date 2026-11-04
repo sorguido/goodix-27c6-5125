@@ -40,6 +40,36 @@ class BuildHostCompatibility(unittest.TestCase):
                     b.prerequisites()
 
 
+class RuntimeAbi(unittest.TestCase):
+    def test_host_resolution_rejects_incompatible_or_missing_interfaces(self):
+        runtime = Path('/tmp/verified-payload/runtime')
+        good_link = f'libfprint-2.so.2 => {runtime}/libfprint-2.so.2'
+        for fault in ('none', 'soname', 'required-symbol', 'missing-library',
+                      'undefined-symbol', 'foreign-library', 'cpp-dependency'):
+            def run(*args, env=None, timeout=None):
+                self.assertEqual(timeout, 30)
+                if args[0] == 'readelf':
+                    name = 'libfprint-2.so.9' if fault == 'soname' else 'libfprint-2.so.2'
+                    return f'(SONAME) [{name}]'
+                if args[0] == 'nm':
+                    if '--undefined-only' in args:
+                        return ' U fp_context_new@LIBFPRINT_2.0.0'
+                    return '' if fault == 'required-symbol' else ' T fp_context_new@@LIBFPRINT_2.0.0'
+                self.assertEqual(args, ('ldd', '-r', '/usr/libexec/fprintd'))
+                self.assertEqual(env, dict(b.BASE_ENV, LD_LIBRARY_PATH=str(runtime)))
+                return {'missing-library': good_link + '\nlibmissing.so => not found',
+                        'undefined-symbol': good_link + '\nundefined symbol: g_missing (/tmp/library)',
+                        'foreign-library': 'libfprint-2.so.2 => /usr/lib64/libfprint-2.so.2',
+                        'cpp-dependency': good_link + '\nlibstdc++.so.6 => /usr/lib64/libstdc++.so.6'
+                        }.get(fault, good_link)
+            with self.subTest(fault=fault), patch.object(b, 'run', side_effect=run):
+                if fault == 'none':
+                    b.verify_runtime_abi(runtime)
+                else:
+                    with self.assertRaises(RuntimeError):
+                        b.verify_runtime_abi(runtime)
+
+
 class PublicBuild(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix='goodix-public-build-test-')
@@ -84,7 +114,7 @@ class PublicBuild(unittest.TestCase):
         self.addCleanup(replacement.stop)
         return value
 
-    def command(self, *args, env=None):
+    def command(self, *args, env=None, timeout=None):
         args = tuple(str(arg) for arg in args)
         self.commands.append((args, env))
         program = args[0]

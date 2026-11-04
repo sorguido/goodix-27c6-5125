@@ -83,6 +83,18 @@ class StateTests(unittest.TestCase):
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_300_discovers_portable_301_and_301_discovers_next_release(self):
+        old = LocalPackage('3.0.0', 13)
+        candidate = Release.parse(release('3.0.1'))
+        self.assertTrue(candidate.newer_than(old))
+        current = LocalPackage('3.0.1', 1)
+        self.assertFalse(candidate.newer_than(current))
+        self.assertTrue(Release.parse(release('3.0.2')).newer_than(current))
+        # Updating the RPM does not implicitly update the installed runtime.
+        pending = status(payload_version='3.0.1', runtime_version='3.0.0')
+        self.assertEqual(pending.action, 'update')
+        self.assertEqual(LocalPackage.from_status(pending), current)
+
     def test_compatible_download_and_numeric_ordering(self):
         parsed = Release.parse(release())
         self.assertTrue(parsed.newer_than(LocalPackage.from_status(status())))

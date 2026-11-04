@@ -296,6 +296,18 @@ class NetworkUiTests(unittest.TestCase):
                 self.assertEqual(controller.view['action'], '')
                 self.assertEqual(self.item(window, 'Download RPM').property('visible'), expected == 'available')
 
+    def test_301_manager_discovers_next_release_with_old_or_current_runtime(self):
+        for runtime in ('3.0.0', '3.0.1'):
+            with self.subTest(runtime=runtime):
+                controller, window = self.client(
+                    status(runtime_version=runtime, payload_version='3.0.1',
+                           package_version='3.0.1-1.fc44',
+                           message_code='update_available' if runtime == '3.0.0' else 'up_to_date'),
+                    {'body': release('3.0.2')})
+                self.assert_banner(controller, window, '3.0.2-1.fc44')
+                self.assertEqual(controller.view['action'], 'update' if runtime == '3.0.0' else '')
+                self.assertNotIn('update', SyntheticProcess.calls)
+
     def test_api_failures_are_unavailable_and_local_actions_survive(self):
         cases = [{'http': code} for code in (403, 404, 429)] + [
             {'error': QNetworkReply.NetworkError.HostNotFoundError},

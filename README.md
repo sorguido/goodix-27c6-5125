@@ -47,15 +47,18 @@ offered. Driver installation, update and removal use the local payload and work
 offline once Fedora dependencies are installed.
 
 Use a release explicitly labeled compatible with your Fedora version. The
-existing published 3.0.0 RPM still requires Fedora 44; the portable RPM is
-not published until its verification and VM tests pass. See
+existing published 3.0.0 RPM still requires Fedora 44; the portable 3.0.1
+candidate is not published until its verification and VM tests pass.
+Once qualified and published, install 3.0.1 on Fedora 44 before upgrading
+to Fedora 45; no driver uninstall is needed. Existing 3.0.0 ChicagoHS
+fingerprints do not need new enrollment for this update. See
 [validation](docs/VALIDATION.md) for the RPM/Discover qualification boundary.
 
 ### Upgrading from an earlier release
 
 Version 3.0.0 introduces the ChicagoHS biometric engine and a new stored
 fingerprint format. For an intact, recognized 2.x installation, Goodix Manager
-offers **Upgrade to 3.0.0** through the transactional installer, without a
+offers **Upgrade to 3.0.1** through the transactional installer, without a
 preliminary uninstall. Host pairing state and existing fingerprint files are
 preserved. **Previously enrolled fingers
 must be enrolled again** because the old templates cannot be used by the new
