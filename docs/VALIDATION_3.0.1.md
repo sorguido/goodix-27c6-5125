@@ -1,241 +1,193 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# Goodix Manager 3.0.1: Fedora 44+ candidate qualification
+# Goodix Manager 3.0.1: Fedora 44+ test candidate
 
-This is Milestone 1 work on `fedora45-port`, starting at
-`e6a32afb257c9c08e611f7f50d13eb1cb4ed9f6b`. No official 3.0.1 release has been
-published. Existing tags and published assets are unchanged. Fedora 44 x86_64
-remains the RPM build baseline. Fedora 45 and later are conditional targets,
-subject to actual dependencies and runtime interfaces. Earlier Fedora 44
-biometric observations are recorded separately in [VALIDATION.md](VALIDATION.md).
+Current task: packaging revision **3**, enrollment-notice correction on
+`fedora45-port`, starting from `bc1410b9bd3bb0a460dc4b9b827ddb8d43eda54d`.
+No official release, tag or published asset is changed. Fedora 44 x86_64 remains
+the required RPM build baseline; later Fedora releases require compatible system
+components and runtime interfaces. `.fc44` identifies the build baseline.
 
-## Audit and compatibility contract
+## Evidence and scope
 
-- The published `goodix-manager-3.0.0-13.fc44.x86_64.rpm` has SHA-256
-  `ca26fb2028dbf91435ac8d9929d7b03cd81e8a30ee912fa4a71e97e4de75312e` and requires
-  `system-release(44)`. Its verified payload source identity is
-  `f259f6f10a60e5facc5a8404f951bce3eb18da2aaefebc8c9a167e4540938d97`, already
-  recognized by the existing helper. The source tag and downloaded public RPM
-  agree on the fixed dependency. The public release currently contains only
-  the binary RPM; no historical assets are repaired or replaced by this work.
-- The baseline commit already removes that dependency. Source builds and
-  activation accept numeric Fedora releases >=44 on x86_64. The RPM build
-  command remains restricted to Fedora 44; `.fc44` and `package.json.fedora=44`
-  identify that build baseline. The Manager parser and release verifier retain
-  this asset identity so already-installed 3.0.0 Managers discover 3.0.1.
-- Architecture, package verification, source identity, payload hashes, SONAME,
-  versioned fprintd ABI, library resolution, SELinux Enforcing, stock service and
-  PAM ownership/structure checks remain required. Activation additionally
-  repeats the ABI and relocation check on its immutable staged payload before
-  stopping services or replacing project software. Missing or changed runtime
-  interfaces fail closed. Recovery remains independent of Fedora release.
-- RPM transactions contain no lifecycle scriptlets and own no active runtime,
-  pairing state, templates, PAM override or service drop-in. RPM replacement and
-  driver activation remain separate. A recognized 3.0.0 runtime offers Apply
-  Update after RPM replacement; an unknown source still blocks. Packaging-only
-  revision changes do not reapply the driver. Public update discovery continues
-  independently of local runtime gates.
-- ChicagoHS source, template format, matching/enrollment behavior, USB/TLS and
-  pairing code are unchanged. Existing 3.x enrollments remain usable; no implicit
-  re-pairing or template conversion/deletion is introduced. 2.x migration still
-  requires new enrollment. Synthetic sentinels prove software preservation
-  contracts, not preservation of real protected data during a real upgrade.
+The signed revision 2 binary and SRPM were verified against the existing public
+publisher certificate, fingerprint
+`5FB20F583C831729D5FF073FE99ADAE5B7EA4918`. Their current SHA-256 values are
+`2e195e7dc84d5803545e06ba28632309f7495b4ff213d6fbbdbaf89046928d14` (binary) and
+`e2b513d77539b37968c89eeecbfe15298697942381aed73d42ae101b7dbba74a` (source).
+Revision 2 and its `result.json` must remain byte-for-byte unchanged.
 
-## Reproducible offline evidence
+The operator's supplied correction request reports installation of signed
+revision 2, activation, KDE login, screen lock and sudo on Fedora 45. It also
+reports the incorrect mandatory-enrollment notice after reinstalling the driver
+with preserved ChicagoHS templates. These are **operator-reported observations
+for revision 2**, not independent tests or revision 3 live qualification. They
+are not evidence of a completed Fedora 44 → 45 upgrade with the RPM installed.
 
-Build: `python3 -I -B packaging/rpm/build.py --release 2` as the ordinary user
-on Fedora 44. Build identities are never overwritten. Outputs and full logs
-are in the ignored `development/rpm/` workspace. The candidate is unsigned;
-publisher signing and official release verification belong to Milestone 2.
+`enrollment_required` means a known incompatible fingerprint-format migration.
+Plain install/reinstall cannot prove absence or incompatibility of saved prints.
+The helper and GUI use the verified flag without inferring it from a generic
+legacy state. Recognized SIGFM 2.x migration retains its warning. Unqualified
+Milan/unknown lineage remains blocked under the existing provenance rules.
+No template/gallery, pairing or PSK inspection is added; the fix is confined to
+Manager/helper logic, its tests and user documentation.
 
-Build revision 1 is reserved and was not overwritten: its real libpam synthetic
-dispatch test failed inside the execution sandbox. The identical isolated PAM
-test passed outside that sandbox as the ordinary user, with no changes to tests,
-system PAM policy or security configuration. Revision 2 uses that environment.
-The restriction's exact syscall mechanism was not established.
+Version stays **3.0.1** and only packaging Release increases. The expected
+payload source identity is unchanged from revision 2:
+`908364380a00a6ad8b86ab56126ccabc4c0aa277b80179625c23a2c8ea743994`.
+Native biometric behavior, USB/TLS, PAM, password fallback, ABI preflight,
+SELinux Enforcing and stock-system checks are unchanged. The RPM still has no
+`system-release(44)` dependency, no activation scriptlets and no ownership of
+active runtime or protected-data paths. RPM replacement does not reapply an
+identical driver payload.
 
-The complete Python, Qt, native C, deployment/recovery and release-contract
-suites are run separately from compilation. Signature fixtures use ephemeral
-TEST ONLY keys in the ignored workspace, never the publisher's private key.
-Optional private OEM oracle tests do not read private material and are reported
-as skipped. Neither unit tests nor loader checks open the USB reader.
+## Offline checks and artifacts
 
-The successful ordinary-user Fedora 44 build produced:
+Canonical build: `python3 -I -B packaging/rpm/build.py --release 3` as the
+ordinary user on Fedora 44. Build identities are never overwritten. The isolated
+PAM dispatch test requires execution outside the tool sandbox, as established
+for revision 2; tests and host PAM/security policy are not modified.
+
+Revision 3 build and RPM `%check`: **PASS**. Public Python suite: **265 executed
+PASS, 0 FAIL, 2 SKIP**; the two skipped compiled material-check integration cases
+run separately during the actual payload build. Offscreen QML visibility,
+install/refresh, cached-interface regression and light/dark sequences: **PASS**.
+Tests cover unknown template presence, preserved synthetic ChicagoHS templates
+through normal removal/reinstall, direct SIGFM 2.2.1 → 3.0.1, 3.0.0 → 3.0.1,
+status refresh and blocked unknown lineage. These are software-contract tests.
+
+Artifact headers, full payload hashes/inventory/modes/links, root ownership,
+absence of lifecycle scriptlets/release lock/private libfprint provides and
+packaged helper/Manager correspondence: **PASS**. Fedora 44 native build/loader
+ABI preflight: **PASS**. DNF5 resolves the actual candidate in empty Fedora 44
+and 45 roots (747 and 753 packages): **PASS**, cancelled with `--assumeno` before
+installation. RPM lint on binary and source: **PASS, 0 errors, 8 existing
+warnings**, with no new suppression or security-policy change.
+
+Payload comparison initially stopped progression for independent review:
+**raw byte equality FAIL; executable/data equivalence PASS**. The identical
+source identity permits this packaging-only revision. All payload files except
+`runtime/libfprint-2.so.2.0.0` and `runtime/build-provenance.json` are byte-identical.
+The library differs in exactly **21 bytes**: 20 GNU build-ID bytes and one
+nonallocated debug-path byte (`3.0.1-2.fc44` → `3.0.1-3.fc44`). Executable code,
+initialized data, relocation tables, dynamic symbols, ABI versions and layout
+are identical. Temporary copies with debug/build-ID removed are byte-identical,
+SHA-256 `2883e0fd4f5195b88470d355bf735c2c0c0c914f16c9825abfed4e1e90db078a`.
+Only the native archive hash differs in provenance. **Original RPM/payload
+bytes were never stripped or rewritten.** Independent review accepted the
+metadata-only difference; no version bump or native change is required.
+Revision 2 artifacts and `result.json` remain byte-for-byte unchanged.
+
+Unsigned artifacts (not yet installable under the required publisher-signature
+gate):
 
 ```text
-/home/guido/Repository/goodix-27c6-5125/development/rpm/builds/3.0.1-2.fc44/rpmbuild/RPMS/x86_64/goodix-manager-3.0.1-2.fc44.x86_64.rpm
-SHA256 3e06ae4d3380037b581af01fc389b2f8a6d48e2cc478acb435e0a0beb2fd1084
+/home/guido/Repository/goodix-27c6-5125/development/rpm/builds/3.0.1-3.fc44/rpmbuild/RPMS/x86_64/goodix-manager-3.0.1-3.fc44.x86_64.rpm
+SHA256 66fbe15c2ae9a5095de353c985639e3bbff1e0f029798e98f6007dde57c0e3f7
+/home/guido/Repository/goodix-27c6-5125/development/rpm/builds/3.0.1-3.fc44/rpmbuild/SRPMS/goodix-manager-3.0.1-3.fc44.src.rpm
+SHA256 a6c1abefeab8a30c59e548d8cebd0efb1be9cf1582dee98f2fd60deba63efab7
 ```
 
-Payload source identity:
-`908364380a00a6ad8b86ab56126ccabc4c0aa277b80179625c23a2c8ea743994`.
-It matches the current source inventory. The builder also generated an unsigned
-corresponding SRPM as a local build output, not an official release artifact:
-`goodix-manager-3.0.1-2.fc44.src.rpm`, SHA-256
-`dfd0a905b7bb45132f44fc43a72cf1e2ca2992e7d67c2ca14af1e707d566feee`.
-Its source archive SHA-256 is
-`c50a1ff64f40b715d3b43cf815f029b3a6ecde1e6897d1338868212a0253dfc3`.
+Independent review: **ACCEPT_AND_CONTINUE** to the human signing handoff only.
+Publisher signature/verification, actual revision 3 VM reinstall, KDE login,
+screen unlock, sudo, PolicyKit, password fallback/recovery and biometric use:
+**NOT_TESTED**. Previous revision 2 operator reports are not promoted to revision
+3 qualification. Broad native/ASan/UBSan tests from revision 2 were not rerun for
+this Manager-only delta; executable equivalence and native compilation were
+verified directly. No active runtime, sensor or protected data was accessed.
 
-Observed checks:
+Raw software-only evidence belongs in ignored
+`development/rpm/enrollment-301-3/`; the canonical build log and result are in
+`development/rpm/builds/3.0.1-3.fc44/`. Earlier broad native/ASan/UBSan and
+Fedora 44/45 dependency evidence remains under `development/rpm/fedora45-port/`.
+Optional private OEM-oracle cases were skipped; no synthetic test qualifies
+biometrics or password login on real hardware.
 
-- Python suites: builder 24, installer 39, selection 8, bootstrap 6, removal 54,
-  materials 38 executed/2 compiled-check cases skipped in the standalone run,
-  packaging 5, helper 28, compatibility transactions 15, model 16,
-  network/UI 13, release/signature contracts 14: **260 executed PASS**. The
-  compiled material-check cases additionally run during the real payload build.
-  Offscreen Qt cache regression and light/dark render sequences also passed.
-  The signature fixture needed ordinary-user execution outside the sandbox for
-  its temporary gpg-agent; no publisher key or normal keyring was used.
-- Native tests: **274 normal +274 ASan/UBSan PASS** across all retained C
-  runners: 202 current transport/pairing/lifecycle tests and 72 retained legacy
-  diversity/SIGFM-profile regression tests per mode. Legacy profile tests cover
-  retained shared integration code, not ChicagoHS biometric qualification.
-  Separately, **64 ChicagoHS native +5 adapter PASS**. The 42 optional private
-  OEM oracle cases were skipped; stock-fprintd storage multiuser/delete was
-  unavailable without its separate source fixture. ASan/UBSan libraries missing
-  from the host were downloaded as matching Fedora 44 packages, signature and
-  digest verified, and extracted under `/tmp` for test compiler/loader use.
-  No host packages were installed. LSan remains disabled by the existing runners;
-  no sanitizer coverage is claimed for the pinned ChicagoHS native archive.
-- Actual compilation and RPM `%check`: **PASS**, from the self-contained source
-  archive without development material. Stock Fedora 44 fprintd resolves the
-  built private library with all relocations satisfied. All **47** versioned
-  `fp_*` symbols needed by the signature-verified Fedora 45
-  `fprintd-1.94.5-6.fc45` binary are present. That latter check is static ABI
-  evidence, not Fedora 45 execution. Neither byte-identical binaries across
-  toolchains nor live biometric compatibility is inferred.
-- Artifact inspection: exact RPM/SRPM headers and embedded full payload
-  inventory, hashes, permissions, links and provenance **PASS**. No fixed
-  distribution-release requirement, lifecycle scriptlet, active authentication
-  path or private libfprint RPM provide was found. A comparison against the
-  published 3.0.0 source ledger found **366 unchanged driver, native, reference
-  and PAM files**. The actual model extracted from the signature-verified
-  published 3.0.0 RPM successfully parses a 3.0.1 release fixture and offers its
-  `.fc44.x86_64.rpm`; this is software discovery evidence only.
-- DNF solved the **exact same candidate RPM** with official Fedora/updates
-  repositories in empty Fedora 44 and 45 roots: **747** and **753** packages,
-  respectively, with no dependency errors. These were `--assumeno` runs; their
-  exit status 1 denotes the deliberate cancellation after a transaction summary,
-  not a completed installation. No packages were downloaded or installed by
-  those solves. The published 3.0.0 RPM fails the same empty Fedora 45 solve
-  specifically because nothing provides `system-release(44)`.
-- A read-only DNF solve against the existing Fedora 44 host proposes upgrading
-  only Goodix Manager **3.0.0-13 → 3.0.1-2**, without extra package removals.
-  Full-host Fedora 45 distro-sync resolution removes Goodix's release-version
-  blocker when the candidate is included, but still **FAILS** on pre-existing
-  rpmfusion-release and protobuf dependencies with only official Fedora repos
-  enabled. A baseline solve without the candidate reproduces those blockers and
-  the old Goodix dependency. No host package/configuration was changed to resolve
-  these unrelated conflicts. This is not a successful distribution upgrade;
-  the snapshotted VM test remains required.
-- `rpmlint` on binary and SRPM: **0 errors, 8 warnings, exit 0**. Warnings concern
-  the three unstripped hashed binaries, suggested PIE for check-material,
-  source-archive URL, duplicated reviewed PAM text, private libfprint development
-  link and the reader's existing OpenSSL cipher selection. No new suppression
-  or policy relaxation was added. These warnings are not live security proof.
-- Official signature/release gate: **NOT_TESTED** for 3.0.1. The unsigned
-  candidate correctly fails strict signature verification; no synthetic signer
-  is accepted as the publisher. The source/metadata checks were run separately
-  and do not attest publication. No draft/tag/release or remote asset was changed.
+## HUMAN_REQUIRED: publisher signing
 
-Raw software-only logs and JSON records are under the ignored
-`development/rpm/fedora45-port/`; build logs and hashes are under
-`development/rpm/builds/3.0.1-2.fc44/`. They include `python-tests.json`,
-`python-12-test_verify_release-escalated.log`, `native-sanitized-summary.txt`,
-`sanitizer-library-proof.log`, `published-300-audit.json`,
-`artifact-validation.json`, `candidate-*-dependency-solve.log`,
-`distro45{,-baseline}-solve.json` and `rpmlint.log`. The initial sandbox failures
-are retained alongside their successful environment-specific reruns.
+**GATE:** `SIGN_TEST_RPM_3_0_1_3`. **PURPOSE:** sign the exact reviewed binary
+and SRPM locally with the existing publisher identity. **EXPECTED_RESULT:**
+canonical isolated verification passes for both files and `result.json` records
+`signature=VERIFIED`, the full expected fingerprint and new signed checksums.
+**RISK:** signing changes artifact bytes and attests this specific candidate.
+**ROLLBACK:** retain the untouched signed revision 2; a cancelled/failed canonical
+sign operation leaves the unsigned revision 3 artifacts and record intact.
+**EVIDENCE_TO_RETURN:** updated revision 3 `result.json` and non-secret signature
+verification output, never private keys or pinentry/passphrase content.
 
-Independent code, documentation and artifact review: **ACCEPT_AND_CONTINUE**
-for the offline candidate. Live qualification and publication gates remain closed.
+The operator runs this in their Fedora 44 terminal as the normal user:
 
-## Completion status for this candidate
+```sh
+cd /home/guido/Repository/goodix-27c6-5125
+python3 -I -B packaging/rpm/build.py --release 3 \
+  --sign 5FB20F583C831729D5FF073FE99ADAE5B7EA4918 \
+  --sign-existing /home/guido/Repository/goodix-27c6-5125/development/rpm/builds/3.0.1-3.fc44
+```
 
-| Required area | Status | Boundary |
-| --- | --- | --- |
-| Automated tests | PASS | Public software suite; explicit optional skips above |
-| Native build and ABI verification | PASS | Actual Fedora 44 build/loader; Fedora 45 static symbols only |
-| RPM dependency checks | PASS | Empty Fedora 44/45 repository solves, no fixed release dependency |
-| RPM upgrade from v3.0.0 | NOT_TESTED | DNF solve and synthetic canonical update PASS; no real transaction |
-| Fedora 44 → 45 distribution upgrade | NOT_TESTED | No rebooted upgrade; full-host solver still has unrelated blockers |
-| Clean Fedora 45 installation | NOT_TESTED | Dependency solution is not installation/activation |
-| Fingerprint enrollment and verification | NOT_TESTED | No 3.0.1 reader access |
-| KDE login, screen unlock, sudo and PolicyKit | NOT_TESTED | Earlier Fedora 44 observations do not qualify this candidate |
-| Password fallback and recovery | NOT_TESTED | Synthetic tests PASS; live candidate VM tests pending |
-| Signature and release verification | NOT_TESTED | Candidate intentionally unsigned; official gate remains closed |
+Use normal local pinentry. No private-key export, new key, loopback passphrase,
+chat credential or policy bypass is permitted. **Stop before running this command
+in the agent workflow**, as explicitly required by the current user request.
+After the operator signs, signature, fingerprint and digests must be verified
+and **new signed SHA-256 values** returned before VM installation. Unsigned build
+hashes below are not valid checksums for the signed files.
 
-Offline candidate preparation is complete. Milestone 1 qualification remains
-at the operator gate below; Milestone 2 is not started.
+## HUMAN_REQUIRED: Fedora 45 VM message/reinstall test
 
-## HUMAN_REQUIRED: operator-supervised Fedora qualification
+**GATE:** `FEDORA45_3_0_1_3_REINSTALL_AND_AUTH`. **PURPOSE:** verify the corrected
+message with preserved compatible enrollments and repeat the reported
+login/lock/sudo observations. **EXPECTED_RESULT:** no mandatory-enrollment notice
+on ChicagoHS reinstall, existing fingerprint usable and password fallback intact.
+**RISK:** temporary fingerprint unavailability or an unexpected integration error.
+**ROLLBACK:** ordinary removal and the known-good VM snapshot/software; a VM
+snapshot does not restore reader pairing. **EVIDENCE_TO_RETURN:** RPM version,
+Manager diagnostics, notice visible/absent and PASS/FAIL/NOT_TESTED for each live
+operation, with sanitized errors only. Keep protected-data comparisons private.
 
-**GATE:** `FEDORA_44_45_VM_AND_LIVE_TESTS`. **PURPOSE:** qualify real package
-transactions, system upgrade and authentication. **EXPECTED_RESULT:** the same
-RPM installs on both releases, stays installed across 44 → 45, preserves
-existing protected data and supports ordinary authentication/recovery.
-**RISK:** a VM may lose fingerprint access or reveal an integration mismatch.
-**ROLLBACK:** use a known-good VM snapshot and documented ordinary removal;
-never reset/re-pair the sensor to make a test pass. A VM snapshot cannot restore
-sensor pairing: stop on any unexpected persistent-state change.
-**EVIDENCE_TO_RETURN:** PASS/FAIL/NOT_TESTED for each row below, versions,
-transaction outcomes, fixed Manager diagnostics and sanitized errors only.
-Keep any privileged protected-data comparisons private; return only equality
-results, never PSK/template contents or hashes.
+1. Use the populated, snapshotted Fedora 45 KDE VM that retains its existing
+   valid host pairing and ChicagoHS templates. Confirm password/TTY/sudo access
+   and SELinux Enforcing. Keep USB passthrough disabled for package operations;
+   never copy protected state from another VM or trigger fresh pairing.
+2. Only after publisher signing and verification, transfer the signed binary
+   and public certificate to the VM. Compare the binary SHA-256 with the **new
+   signed** result. Authenticate the full public fingerprint independently.
+   In the VM terminal, with the files in your Downloads directory:
 
-1. Use disposable snapshotted Fedora KDE x86_64 VMs with working password login,
-   TTY/sudo access and SELinux Enforcing. Keep USB passthrough disabled during
-   package tests. Preserve the existing 3.0.0 runtime, enrollments and pairing.
-   Confirm `rpm -q goodix-manager fprintd fprintd-pam libfprint`,
-   `getenforce`, and the existing Manager status. An integrity/source mismatch
-   is a STOP. Never use force-remove as an upgrade prerequisite.
-2. Transfer the exact candidate locally and compare its SHA-256 with the
-   recorded build result. It is an unsigned local test artifact, not an official
-   download. Use the target's ordinary package policy with
-   `sudo dnf install /absolute/path/goodix-manager-3.0.1-2.fc44.x86_64.rpm`.
-   Never pass `--nogpgcheck`, `--nodeps`, `--allowerasing` or weaken policy. If
-   local policy requires a publisher signature, STOP: obtain an explicitly
-   authorized normally signed test build before installing. Do not import a
-   synthetic test key. Compare project PAM/drop-in files and protected state
-   privately before/after the RPM-only transaction: they must be unchanged.
-3. On the populated Fedora 44 VM, reopen Goodix Manager: it must show package
-   3.0.1 and runtime 3.0.0 with **Apply Update**, with no new enrollment warning.
-   With networking disabled, apply the update under PolicyKit and restart as
-   instructed. Existing ChicagoHS fingerprints must remain usable. Compare
-   pairing/template bytes, ownership and modes privately. Unexpected drift,
-   new pairing, enrollment demand or incomplete rollback is a STOP.
-4. Upgrade that Fedora 44 VM through Fedora's normal 44 → 45 procedure while
-   keeping Goodix Manager installed. Review the transaction before accepting:
-   it must not remove Goodix Manager or report `system-release(44)` as a blocker.
-   After reboot confirm `rpm -q goodix-manager` still reports 3.0.1, SELinux is
-   Enforcing, password login works, and the Manager verifies the runtime.
-   A dependency solution alone is not a completed distribution upgrade.
-5. Separately test a clean Fedora 45 KDE VM: install the same RPM, launch
-   Manager and activate offline without USB. Confirm PolicyKit authorization,
-   stock fprintd/PAM ownership, no unexplained AVCs, restart and password login.
-   Test ordinary Manager removal, restart/password access and reinstall.
-   Verify standalone `goodix-uninstall` remains available if the RPM alone is
-   removed while its runtime is active. Follow [UNINSTALL.md](UNINSTALL.md) for
-   TTY recovery; retain snapshots before destructive test scenarios.
-6. Only after the package checks pass, assign the reader exclusively to the
-   populated upgraded Fedora 45 VM with its existing valid host pairing state.
-   Keep the clean Fedora 45 VM USB-free: do not copy protected state between
-   VMs or trigger first-use pairing there. Start with verification of existing
-   enrollment on the upgraded VM. Each VERIFY/MATCH series has **at most three physical attempts, stopping
-   at the first MATCH**, with no hidden retry. No fourth attempt is authorized.
-   A timeout, corrupt template, unknown firmware, binding/identity mismatch or
-   pairing request on an already-active reader is a STOP. Do not reprovision.
-   Test new enrollment separately with an unused finger on that same populated
-   VM, without deleting prior enrollments. Enrollment uses the normal twelve-stage policy;
-   its contacts are distinct from the bounded VERIFY/MATCH series.
-7. Record separately enrollment, verification, KDE login, screen unlock, sudo,
-   PolicyKit, reboot and password fallback/recovery. A console `fprintd-verify`
-   MATCH does not qualify all authentication consumers. Preserve password access
-   throughout. Stop on unexplained authentication or SELinux changes, incomplete
-   cleanup, or unexpected changes to existing pairing, protected data or
-   Windows coexistence. A deliberately added enrollment may create its own
-   new template; it must not alter or delete earlier enrollments.
+   ```sh
+   goodix_test_rpm="$HOME/Scaricati/goodix-manager-3.0.1-3.fc44.x86_64.rpm"
+   sha256sum "$goodix_test_rpm"
+   gpg --show-keys --with-fingerprint "$HOME/Scaricati/Guido-Soraru.asc"
+   sudo rpmkeys --import "$HOME/Scaricati/Guido-Soraru.asc"
+   rpmkeys --define '_pkgverify_level all' --checksig --verbose "$goodix_test_rpm"
+   sudo dnf5 install "$goodix_test_rpm"
+   rpm -q goodix-manager
+   goodix-manager
+   ```
 
-**PASS:** observed expected result at the tested layer, with preserved data and
-working fallback. **FAIL:** an attempted check contradicts the contract.
-**NOT_TESTED:** no real observation, including unavailable hardware or VM.
-No publication or Milestone 2 is authorized by completing these instructions.
+   Adjust the Downloads path if necessary. Signature and digest checks must be
+   OK for the expected publisher. Never use `--nogpgcheck`, `--nodeps`,
+   `--allowerasing` or weaken SELinux/PAM. Installing the -3 RPM should leave the
+   existing 3.0.1 runtime up to date, without requiring Apply Update or enrollment.
+3. Close Manager. Run **`goodix-uninstall`** for ordinary driver removal, follow
+   its authorization prompt and reboot. Confirm password login, then open
+   Manager: runtime must be absent. Existing pairing/templates must remain.
+   Removing only the Manager RPM would leave the runtime active and would not
+   exercise this test. Do not use force-remove as an ordinary test procedure.
+4. Choose **Install** in Manager and authorize activation with USB still disabled.
+   After success and a status refresh, the mandatory incompatible-template
+   notice must stay absent. A new user can enroll in KDE settings if needed;
+   do not delete or re-enroll existing compatible fingerprints to hide the bug.
+   Restart as instructed. Compare existing protected bytes/ownership/modes
+   privately; report only preserved/not-preserved, never contents or hashes.
+5. Assign the reader exclusively to this VM only for supervised authentication.
+   Verify an existing fingerprint, then separately repeat KDE login, lock-screen
+   unlock and sudo; retain password fallback throughout. Each VERIFY/MATCH
+   series allows **at most three physical attempts, stopping at the first
+   MATCH**, with no fourth attempt or hidden retry. Do not repeat enrollment
+   merely because software was reinstalled.
+6. **STOP/FAIL** for unexpected notice, source/integrity mismatch, pairing request,
+   missing templates, unexpected protected-data/SELinux changes, authentication
+   regression or incomplete rollback/cleanup. Do not reprovision/reset the reader.
+   Report unavailable live checks as NOT_TESTED. Follow [UNINSTALL.md](UNINSTALL.md)
+   for ordinary removal/recovery; seek review before any emergency intervention.
+
+No signing, installation or sensor action is performed automatically. Official
+release, merge and tag creation require a later explicit authorization.

@@ -269,6 +269,56 @@ class NetworkUiTests(unittest.TestCase):
         self.capture(window, 'legacy-confirmation')
         QMetaObject.invokeMethod(dialog, 'close')
 
+    def test_mandatory_enrollment_message_requires_explicit_format_evidence(self):
+        scenarios = (
+            (status(state='absent', runtime_version=None, message_code='not_installed'), False),
+            (status(), False),
+            (status(runtime_version='3.0.1', payload_version='3.0.1',
+                    package_version='3.0.1-3.fc44'), False),
+            (status(state='legacy', runtime_version=None,
+                    message_code='legacy_unqualified'), False),
+            (status(state='blocked', runtime_version=None,
+                    message_code='version_unknown', result='blocked'), False),
+            (status(state='legacy', runtime_version='2.2.1',
+                    message_code='legacy_upgrade_available', enrollment_required=True), True),
+            (status(runtime_version='3.0.1', payload_version='3.0.1',
+                    package_version='3.0.1-3.fc44', message_code='installed',
+                    enrollment_required=True), True),
+        )
+        for local, expected in scenarios:
+            with self.subTest(state=local['state'], code=local['message_code']):
+                controller, window = self.client(local)
+                warning = window.findChild(QObject, 'enrollmentRequiredNotice')
+                self.assertEqual(controller.view['enrollmentRequired'], expected)
+                self.assertEqual(warning.property('visible'), expected)
+                if expected:
+                    self.assertIn('New fingerprint enrollment is required', warning.property('text'))
+                if local['message_code'] in ('legacy_unqualified', 'version_unknown'):
+                    self.assertEqual(controller.view['action'], '')
+                    controller.perform('update')
+                    self.assertNotIn('update', SyntheticProcess.calls)
+
+    def test_chicago_install_and_refresh_do_not_claim_template_incompatibility(self):
+        current = status(runtime_version='3.0.1', payload_version='3.0.1',
+                         package_version='3.0.1-3.fc44', message_code='installed')
+        controller, window = self.client(status(state='absent', runtime_version=None,
+                                               payload_version='3.0.1', package_version='3.0.1-3.fc44',
+                                               message_code='not_installed'))
+        warning = window.findChild(QObject, 'enrollmentRequiredNotice')
+        self.assertFalse(warning.property('visible'))
+        SyntheticProcess.responses['install'] = current
+        controller.perform('install')
+        self.wait_for(lambda: not controller.busy)
+        self.assertFalse(warning.property('visible'))
+        self.assertFalse(controller.view['enrollmentRequired'])
+        SyntheticProcess.responses['status'] = dict(current, message_code='up_to_date')
+        controller.refresh()
+        self.wait_for(lambda: not controller.busy)
+        self.assertFalse(warning.property('visible'))
+        self.assertFalse(controller.view['enrollmentRequired'])
+        self.assertEqual(controller.view['action'], '')
+        self.assertEqual(SyntheticProcess.calls, ['status', 'install', 'status'])
+
     def test_package_transition_exposes_apply_without_implicit_mutation(self):
         controller, window = self.client(status(payload_version='3.0.1', package_version='3.0.1-1.fc44',
                                                message_code='update_available'))

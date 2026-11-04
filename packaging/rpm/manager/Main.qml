@@ -153,6 +153,7 @@ Kirigami.ApplicationWindow {
                         Controls.Label { text: info.package; Layout.fillWidth: true; wrapMode: Text.Wrap }
                     }
                     Kirigami.InlineMessage {
+                        objectName: "enrollmentRequiredNotice"
                         Layout.fillWidth: true
                         visible: info.enrollmentRequired
                         type: Kirigami.MessageType.Information

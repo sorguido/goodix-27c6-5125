@@ -29,7 +29,7 @@ MESSAGES = {
     'missing_dependencies': 'Required Fedora runtime dependencies are missing.',
     'absent': 'The driver has not been activated.',
     'installed': 'The driver installation passed its integrity checks.',
-    'legacy': 'An earlier driver is installed. Migration requires new enrollment.',
+    'legacy': 'An earlier driver is installed. Review its verified upgrade status.',
     'blocked': 'Installation state could not be verified. Use the documented recovery procedure.',
     'unsupported_host': 'This Fedora release or architecture is not supported by this package.',
     'invalid_payload': 'The local payload could not be verified. Reinstall a trusted RPM.',
@@ -59,7 +59,7 @@ class Status:
     sensor_present: bool | None = None
     message_code: str = 'invalid_response'
     reboot_required: bool = False
-    enrollment_required: bool = False
+    enrollment_required: bool = False  # Known incompatible format, not missing enrollment.
 
     @property
     def action(self):

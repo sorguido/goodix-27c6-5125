@@ -152,7 +152,8 @@ class Transactions(fixture.Installer):
         self.assertFalse(m.r.RUNTIME.exists())
         result = self.execute('install')
         self.assertEqual((result['result'], result['runtime_version']), ('success', '3.0.1'))
-        self.assertTrue(result['enrollment_required'] and result['reboot_required'])
+        self.assertFalse(result['enrollment_required'])
+        self.assertTrue(result['reboot_required'])
         receipt = json.loads((m.r.RUNTIME / 'installation.json').read_bytes())
         provenance = json.loads((m.r.RUNTIME / 'build-provenance.json').read_bytes())
         for record in (receipt, provenance):
@@ -161,6 +162,25 @@ class Transactions(fixture.Installer):
         self.assertEqual(self.template.read_bytes(), b'synthetic template sentinel')
         self.assertFalse(m.r.MASK.is_symlink())
         m.r.normal_preflight()
+
+    def test_chicago_software_remove_and_reinstall_preserves_templates_without_enrollment_claim(self):
+        self.initial()
+        self.package('3.0.1', 'b' * 64)
+        updated = self.execute('update')
+        self.assertFalse(updated['enrollment_required'])
+        self.preserved_and_safe()
+        removed = self.execute('remove')
+        self.assertEqual((removed['state'], removed['result']), ('absent', 'success'))
+        self.assertFalse(removed['enrollment_required'])
+        self.assertEqual(self.preserved, self.protected_snapshot())
+        self.assertFalse(self.execute('status')['enrollment_required'])
+        reinstalled = self.execute('install')
+        self.assertEqual((reinstalled['runtime_version'], reinstalled['result']), ('3.0.1', 'success'))
+        self.assertFalse(reinstalled['enrollment_required'])
+        self.preserved_and_safe()
+        refreshed = self.execute('status')
+        self.assertEqual(refreshed['message_code'], 'up_to_date')
+        self.assertFalse(refreshed['enrollment_required'])
 
     def test_sigfm_221_to_300_to_301(self):
         self.initial('sigfm')
@@ -182,7 +202,20 @@ class Transactions(fixture.Installer):
         self.assertEqual(self.execute('status')['message_code'], 'legacy_upgrade_available')
         result = self.execute('remove')
         self.assertEqual((result['state'], result['result']), ('absent', 'success'))
+        self.assertFalse(result['enrollment_required'])
         self.assertEqual(self.preserved, self.protected_snapshot())
+
+    def test_recognized_sigfm_direct_301_upgrade_keeps_mandatory_enrollment_notice(self):
+        self.initial('sigfm')
+        self.package('3.0.1', 'b' * 64)
+        current = self.execute('status')
+        self.assertEqual((current['runtime_version'], current['message_code']),
+                         ('2.2.1', 'legacy_upgrade_available'))
+        self.assertTrue(current['enrollment_required'])
+        result = self.execute('update')
+        self.assertEqual((result['runtime_version'], result['result']), ('3.0.1', 'success'))
+        self.assertTrue(result['enrollment_required'])
+        self.preserved_and_safe()
 
     def test_cli_300_missing_version_up_to_date_then_301(self):
         self.initial('cli')

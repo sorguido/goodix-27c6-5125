@@ -176,7 +176,7 @@ def inspect_runtime(backend, metadata):
         known = HISTORICAL.get(identity)
         if matcher != 'chicago-type24' and (not known or known[1] != 'sigfm' or matcher != 'sigfm'):
             return response(metadata, state='legacy', result='success',
-                            message_code='legacy_unqualified', enrollment_required=True), identity
+                            message_code='legacy_unqualified'), identity
         provenance = json.loads(r.read(r.RUNTIME / 'build-provenance.json'))
         require(provenance.get('source_id') == receipt.get('source_id'))
         require('matcher' not in provenance or provenance['matcher'] == matcher)
@@ -285,8 +285,11 @@ def execute(operation, backend, metadata):
     if operation != 'remove':
         require(after['runtime_version'] == metadata['version'] and
                 after_source == metadata['source_id'], 'runtime_changed')
+    # Installing software does not establish whether compatible prints exist.
+    # Only a recognized migration proves a change from an incompatible format.
     after.update(message_code='removed' if operation == 'remove' else 'installed',
-                 reboot_required=True, enrollment_required=operation == 'install' or current['state'] == 'legacy',
+                 reboot_required=True, enrollment_required=(operation == 'update' and
+                     current['message_code'] == 'legacy_upgrade_available'),
                  sensor_present=current['sensor_present'])
     return after
 

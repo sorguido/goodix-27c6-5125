@@ -46,6 +46,7 @@ class HelperTests(unittest.TestCase):
         value, identity = self.inspect(backend)
         self.assertEqual(value['state'], 'absent')
         self.assertIsNone(identity)
+        self.assertFalse(value['enrollment_required'])
         backend.r.read.assert_not_called()
         backend.r.normal_preflight.assert_not_called()
 
@@ -69,6 +70,7 @@ class HelperTests(unittest.TestCase):
         for matcher in ('sigfm', 'milan-type17'):
             value, _ = self.inspect(self.backend(matcher=matcher, version=None))
             self.assertEqual(value['message_code'], 'legacy_unqualified')
+            self.assertFalse(value['enrollment_required'])
 
     def test_exact_local_source_proves_missing_version(self):
         value, _ = self.inspect(self.backend(version=None))
@@ -165,7 +167,7 @@ class HelperTests(unittest.TestCase):
                     h.execute('update', backend, META)
             backend.apply.assert_not_called()
 
-    def test_install_uses_fixed_payload_and_canonical_guard(self):
+    def test_install_with_unknown_template_presence_uses_fixed_payload_without_enrollment_claim(self):
         backend = self.backend(installed=False)
         absent = h.response(META, state='absent', result='success')
         installed = h.response(META, state='installed', runtime_version='3.0.0', result='success')
@@ -175,8 +177,9 @@ class HelperTests(unittest.TestCase):
             value = h.execute('install', backend, META)
         backend.apply.assert_called_once_with(h.PAYLOAD, backend.r.MATERIAL, 0, expected_source_id=None)
         self.assertEqual(value['result'], 'success')
-        self.assertTrue(value['enrollment_required'])
+        self.assertFalse(value['enrollment_required'])
         self.assertTrue(value['reboot_required'])
+        backend.r.read.assert_not_called()
 
     def test_noop_or_racing_update_cannot_report_success(self):
         backend = self.backend()

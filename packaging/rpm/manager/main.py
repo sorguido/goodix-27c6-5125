@@ -77,7 +77,7 @@ class Controller(QObject):
             'remoteAvailable': remote, 'remoteChecking': self.remote_state == 'checking',
             'remoteVersion': self.release.package_version if remote else '',
             'rebootRequired': state.reboot_required,
-            'enrollmentRequired': state.enrollment_required or state.state == 'legacy',
+            'enrollmentRequired': state.enrollment_required,
         }
 
     def public_status(self):

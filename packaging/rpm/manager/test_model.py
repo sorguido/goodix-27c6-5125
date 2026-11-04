@@ -68,6 +68,18 @@ class StateTests(unittest.TestCase):
         legacy = status(state='legacy', runtime_version=None, message_code='legacy_unqualified')
         self.assertEqual(legacy.action, '')
         self.assertIsNone(legacy.runtime_version)
+        self.assertFalse(legacy.enrollment_required)
+
+    def test_enrollment_notice_uses_explicit_format_evidence_only(self):
+        for state, runtime in (('absent', None), ('installed', '3.0.0'),
+                               ('legacy', None), ('blocked', None)):
+            self.assertFalse(status(state=state, runtime_version=runtime).enrollment_required)
+        self.assertTrue(status(state='legacy', runtime_version='2.2.1',
+                               message_code='legacy_upgrade_available',
+                               enrollment_required=True).enrollment_required)
+        # A successful recognized migration can report its known format change.
+        self.assertTrue(status(runtime_version='3.1.0', message_code='installed',
+                               enrollment_required=True).enrollment_required)
 
     def test_untrusted_package_can_only_report_blocked(self):
         item = status(state='blocked', runtime_version=None, payload_version='', package_version='', result='blocked')

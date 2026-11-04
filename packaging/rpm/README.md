@@ -44,6 +44,11 @@ receipt, ownership and hash checks. The Manager remains installed. Reboot as
 instructed after removal, then check password login. Reinstallation preserves
 host pairing state and historical templates; there is no implicit re-pairing.
 
+The mandatory enrollment notice means a recognized migration from an
+incompatible earlier fingerprint format. Installing or reinstalling ChicagoHS
+3.x alone does not set it. The Manager never checks protected galleries to infer
+whether fingerprints are present; existing compatible enrollments can be reused.
+
 Removing the **RPM itself** leaves any activated runtime and its standalone
 `/usr/local/bin/goodix-uninstall` and `goodix-force-remove` commands in place.
 Those files are installed by the existing backend and are never RPM-owned.

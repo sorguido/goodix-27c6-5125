@@ -23,9 +23,14 @@ Open **Goodix Manager** from your KDE application menu and click **Install**. Ap
 
 *Goodix Manager after installation. On a new installation, the **Install** button is enabled; after installation, the status can show **Up to date**.*
 
-### 4. Register your fingerprint
+### 4. Register your fingerprint if needed
 
 Go to **System Settings → Users → Fingerprint Authentication** and follow the prompts. Lift your finger after each touch and slightly change its position each time.
+
+If you already have a valid ChicagoHS 3.x fingerprint, reinstalling the driver
+does not require registering it again. Goodix Manager requires new registration
+only for a recognized upgrade from an incompatible earlier fingerprint format;
+it does not inspect your saved fingerprints to decide whether any are present.
 
 ### 5. Use fingerprint login
 
