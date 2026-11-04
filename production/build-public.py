@@ -67,8 +67,10 @@ def missing_packages():
 def prerequisites():
     require(os.geteuid() != 0, 'build as your normal user, before privileged installation')
     release = platform.freedesktop_os_release()
-    require(release.get('ID') == 'fedora' and release.get('VERSION_ID') == '44'
-            and platform.machine() == 'x86_64', 'Fedora 44 x86_64 is required')
+    version_id = release.get('VERSION_ID')
+    require(release.get('ID') == 'fedora' and isinstance(version_id, str)
+            and re.fullmatch(r'[0-9]+', version_id) and int(version_id) >= 44
+            and platform.machine() == 'x86_64', 'Fedora 44 or newer x86_64 is required')
     missing = missing_packages()
     require(not missing, 'missing build packages: ' + ' '.join(missing))
     for name in ('meson', 'ninja', 'cc', 'ar', 'glib-mkenums', 'pkg-config', 'rpm', 'readelf', 'nm', 'ldd'):

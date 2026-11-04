@@ -13,7 +13,8 @@ and factory data.
 
 ## Supported configuration
 
-- Fedora 44 KDE, x86_64, with local user accounts.
+- Fedora KDE on x86_64, release 44 or newer, with local user accounts (portable
+  packaging candidate; tested biometric baseline remains Fedora 44).
 - Goodix USB `27c6:5125`, recognized firmware `GF_ST411SEC_APP_12509` and
   `GF_ST411SEC_APP_12508`.
 - Fedora-provided fprintd, PAM, Plasma Login, KScreenLocker, sudo and PolicyKit.
@@ -45,7 +46,9 @@ After installing a newer RPM, reopen the Manager and choose **Apply Update** whe
 offered. Driver installation, update and removal use the local payload and work
 offline once Fedora dependencies are installed.
 
-Use a release with a compatible Fedora 44 x86_64 RPM asset. See
+Use a release explicitly labeled compatible with your Fedora version. The
+existing published 3.0.0 RPM still requires Fedora 44; the portable RPM is
+not published until its verification and VM tests pass. See
 [validation](docs/VALIDATION.md) for the RPM/Discover qualification boundary.
 
 ### Upgrading from an earlier release

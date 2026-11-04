@@ -22,6 +22,30 @@ m = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)
 
 
+class HostCompatibility(unittest.TestCase):
+    def test_fedora_44_and_newer_accepted_without_disabling_selinux(self):
+        for version in ('44', '45', '46', '100'):
+            with self.subTest(version=version), \
+                    patch.object(m.platform, 'freedesktop_os_release', return_value={'ID': 'fedora', 'VERSION_ID': version}), \
+                    patch.object(m.platform, 'machine', return_value='x86_64'), \
+                    patch.object(m, 'command', return_value='Enforcing'):
+                m.supported_system()
+
+    def test_unsupported_hosts_and_non_enforcing_selinux_rejected(self):
+        for distro, version, arch, selinux in (
+                ('fedora', '43', 'x86_64', 'Enforcing'),
+                ('fedora', 'rawhide', 'x86_64', 'Enforcing'),
+                ('fedora', '45', 'aarch64', 'Enforcing'),
+                ('ubuntu', '45', 'x86_64', 'Enforcing'),
+                ('fedora', '45', 'x86_64', 'Permissive')):
+            with self.subTest(host=(distro, version, arch, selinux)), \
+                    patch.object(m.platform, 'freedesktop_os_release', return_value={'ID': distro, 'VERSION_ID': version}), \
+                    patch.object(m.platform, 'machine', return_value=arch), \
+                    patch.object(m, 'command', return_value=selinux):
+                with self.assertRaises(RuntimeError):
+                    m.supported_system()
+
+
 class Installer(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix='goodix-install-test-')

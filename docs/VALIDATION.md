@@ -19,8 +19,13 @@ with an upgrade offered, and subsequently a 3.0.0 driver status. Those screens
 alone do not establish a complete, recorded 2.x -> 3.0.0 migration sequence,
 a post-upgrade reboot/login, or byte-for-byte preservation of populated pairing
 state and templates. Interactive migration/rollback and the complete RPM
-lifecycle remain separate qualification checks. Fedora 45 is not qualified;
-the package targets Fedora 44 x86_64.
+lifecycle remain separate qualification checks. Fedora 45 biometric operation
+is not yet qualified. A Fedora 45 KDE VM upgraded successfully with the
+Fedora 44-only RPM removed; on that VM libfprint 1.94.100, fprintd 1.94.5,
+stock `/usr/libexec/fprintd` and SELinux Enforcing were observed. This does
+not prove that the Goodix runtime works on Fedora 45. The portable package
+candidate intentionally removes the `system-release(44)` dependency and
+accepts Fedora 44+ x86_64, while preserving runtime and security checks.
 
 The maintainer considers the 3.0.0 biometric driver qualified. Driver acceptance,
 historical CLI recognition, and RPM/Manager migration remain distinct evidence

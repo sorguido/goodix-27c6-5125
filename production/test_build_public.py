@@ -18,6 +18,28 @@ b = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(b)
 
 
+class BuildHostCompatibility(unittest.TestCase):
+    def test_source_build_allows_fedora_44_and_newer(self):
+        for version in ('44', '45', '46'):
+            with self.subTest(version=version), \
+                    patch.object(b.os, 'geteuid', return_value=1000), \
+                    patch.object(b.platform, 'freedesktop_os_release', return_value={'ID': 'fedora', 'VERSION_ID': version}), \
+                    patch.object(b.platform, 'machine', return_value='x86_64'), \
+                    patch.object(b, 'missing_packages', return_value=[]), \
+                    patch.object(b.shutil, 'which', return_value='/usr/bin/tool'):
+                b.prerequisites()
+
+    def test_source_build_rejects_unsupported_host(self):
+        for distro, version, arch in (('fedora', '43', 'x86_64'), ('ubuntu', '45', 'x86_64'),
+                                      ('fedora', '45', 'aarch64'), ('fedora', 'rawhide', 'x86_64')):
+            with self.subTest(host=(distro, version, arch)), \
+                    patch.object(b.os, 'geteuid', return_value=1000), \
+                    patch.object(b.platform, 'freedesktop_os_release', return_value={'ID': distro, 'VERSION_ID': version}), \
+                    patch.object(b.platform, 'machine', return_value=arch):
+                with self.assertRaises(RuntimeError):
+                    b.prerequisites()
+
+
 class PublicBuild(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix='goodix-public-build-test-')

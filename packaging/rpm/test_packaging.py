@@ -57,6 +57,11 @@ class Packaging(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'redirected source directory'):
                 b.archive_bytes(root, '3.0.0')
 
+    def test_rpm_does_not_pin_fedora_system_release(self):
+        spec = (HERE / 'goodix-manager.spec.in').read_text()
+        self.assertNotRegex(spec, r'(?m)^Requires:\s+system-release(?:\(|\s)')
+        self.assertIn('ExclusiveArch:  x86_64', spec)
+
     def test_rpm_does_not_own_runtime_or_execute_scriptlets(self):
         spec = (HERE / 'goodix-manager.spec.in').read_text()
         for scriptlet in ('%pre\n', '%post\n', '%preun\n', '%postun\n', '%trigger', '%posttrans'):

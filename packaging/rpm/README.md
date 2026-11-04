@@ -2,10 +2,16 @@
 # Goodix Manager and native RPM
 
 Goodix Manager installs the Goodix fingerprint driver from a local, verified
-binary payload. I support Fedora **44 KDE, x86_64**. Fedora 45 is not qualified
-and the package and helper refuse it. No branch name is part of the build or
-runtime contract. The driver version comes exclusively from root `VERSION`;
-the packaging revision is the positive `--release` argument.
+binary payload. The portable packaging candidate permits installation and
+activation on Fedora **44 or newer KDE, x86_64**, with platform/runtime
+checks rather than an exact Fedora release lock. **Only Fedora 44 is currently
+biometrically qualified; Fedora 45 still requires live testing.** The RPM is
+built on Fedora 44 as the oldest supported baseline so it can also run on
+newer releases where its real dependencies remain compatible. Its `.fc44`
+suffix identifies the build baseline, not an installation restriction.
+No branch name is part of the build or runtime contract. The driver version
+comes exclusively from root `VERSION`; the packaging revision is the positive
+`--release` argument.
 
 ## Two explicit installation steps
 
@@ -141,7 +147,7 @@ compare the complete certificate fingerprint through an independent trusted
 channel, then import the key and verify both the RPM signature and its expected
 signer before opening Discover. A valid signature does not establish trust by
 itself. No automatic key import or disabled signature checking is provided.
-Discover/PackageKit behavior must be qualified on a clean Fedora 44 KDE VM;
+Discover/PackageKit behavior must be qualified on clean Fedora 44 and 45 KDE VMs;
 successful command-line signature verification alone is not that qualification.
 
 For backup, use a private encrypted removable volume under your control, with
@@ -156,8 +162,10 @@ do not silently regenerate the signing key in a build.
 
 ## Qualification before distribution
 
-Every public stable GitHub Release must contain its signed Fedora 44 x86_64 RPM
-and corresponding signed SRPM. Prepare the assets in a draft first, then save
+Every public stable GitHub Release must contain its signed Fedora 44-baseline
+x86_64 RPM and corresponding signed SRPM. The portable RPM does not depend on
+`system-release(44)`; test its upgrade transaction from Fedora 44 to newer
+releases and its runtime preflight before claiming qualification. Prepare the assets in a draft first, then save
 the release metadata JSON and run the offline publication check against the
 exact local files:
 

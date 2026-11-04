@@ -50,8 +50,10 @@ def command(*args):
 
 def supported_system():
     os_info = platform.freedesktop_os_release()
-    require(os_info.get('ID') == 'fedora' and os_info.get('VERSION_ID') == '44'
-            and platform.machine() == 'x86_64', 'Fedora 44 x86_64 is required')
+    release = os_info.get('VERSION_ID')
+    require(os_info.get('ID') == 'fedora' and isinstance(release, str)
+            and re.fullmatch(r'[0-9]+', release) and int(release) >= 44
+            and platform.machine() == 'x86_64', 'Fedora 44 or newer x86_64 is required')
     require(command('getenforce') == 'Enforcing', 'SELinux Enforcing is required; do not disable it')
 
 
