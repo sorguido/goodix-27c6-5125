@@ -50,8 +50,7 @@ offline once Fedora dependencies are installed.
 upgrading to Fedora 45 or later.** No driver uninstall is needed, and existing
 3.0.0 ChicagoHS fingerprints remain usable. Version 3.0.1 has no package lock
 to a specific Fedora release; dependencies and runtime compatibility checks
-still apply. It is being prepared as an unpublished draft and is not publicly
-downloadable until publication. See [3.0.1 validation](docs/VALIDATION_3.0.1.md)
+still apply. See [3.0.1 validation](docs/VALIDATION_3.0.1.md)
 for the observed Fedora 44/45 tests and their limits.
 
 ### Upgrading from an earlier release
@@ -60,7 +59,7 @@ Version 3.0.0 introduces the ChicagoHS biometric engine and a new stored
 fingerprint format. For an intact, recognized 2.x installation, Goodix Manager
 offers **Upgrade to 3.0.1** through the transactional installer, without a
 preliminary uninstall. Host pairing state and existing fingerprint files are
-preserved. **Previously enrolled fingers
+preserved. Only if coming from 2.x installation **Previously enrolled fingers
 must be enrolled again** because the old templates cannot be used by the new
 engine. See [installation](docs/INSTALLATION.md) and
 [validation](docs/VALIDATION.md). An optional return to an older version uses
