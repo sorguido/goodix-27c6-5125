@@ -56,7 +56,6 @@ Goodix Manager if offered and follow any restart instruction. This
 remain usable without registering again.
 Later Fedora compatibility depends on the required system
 components and runtime checks; see [3.0.1 validation](VALIDATION_3.0.1.md).
-The 3.0.1 draft is not publicly downloadable until it is published.
 
 **Upgrading from a 2.x version?** For a recognized, intact installation, Goodix Manager offers **Upgrade to 3.0.1**. No preliminary uninstall is needed, but **you must register your fingerprints again** after the upgrade. Existing fingerprint files and pairing data are preserved.
 
