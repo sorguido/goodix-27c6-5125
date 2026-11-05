@@ -2,11 +2,12 @@
 # Goodix Manager and native RPM
 
 Goodix Manager installs the Goodix fingerprint driver from a local, verified
-binary payload. The portable packaging candidate permits installation and
-activation on Fedora **44 or newer KDE, x86_64**, with platform/runtime
-checks rather than an exact Fedora release lock. **Only Fedora 44 is currently
-biometrically qualified; Fedora 45 still requires live testing.** The RPM is
-built on Fedora 44 as the oldest supported baseline so it can also run on
+binary payload. Version 3.0.1 permits installation and activation on Fedora
+**44 or newer KDE, x86_64**, with dependency and platform/runtime checks rather
+than an exact Fedora release lock. Fedora 44 and 45 have operator-reported
+functional tests; these do not qualify every packaging revision or future Fedora
+release. The RPM is built on Fedora 44 as the oldest supported baseline so it
+can also run on
 newer releases where its real dependencies remain compatible. Its `.fc44`
 suffix identifies the build baseline, not an installation restriction.
 No branch name is part of the build or runtime contract. The driver version
@@ -31,13 +32,16 @@ with a different source identity are refused: bump `VERSION` for driver changes.
 Password access must already work. Read [installation](../../docs/INSTALLATION.md)
 and [recovery](../../docs/UNINSTALL.md) before activation.
 
-The 3.0.1 candidate preserves the 3.0.0 ChicagoHS template format and pairing
+Version 3.0.1 preserves the 3.0.0 ChicagoHS template format and pairing
 behavior. New enrollment is required when migrating from 2.x, not for this
 3.0.0 → 3.0.1 update. Before activation, the immutable staged payload is checked
 against the host's stock fprintd symbols and loader resolution (`ldd -r`).
 An incompatible ABI or unresolved dependency stops before service/file changes.
 `binutils` supplies the runtime ELF inspection tools; no compiler is required.
-See the [3.0.1 evidence and operator gate](../../docs/VALIDATION_3.0.1.md).
+**The 3.0.0 RPM requires Fedora 44. Install 3.0.1 on Fedora 44 before upgrading
+to Fedora 45 or later.** No driver uninstall is needed. Version 3.0.1 is being
+prepared as an unpublished draft and is not publicly downloadable until publication.
+See the [3.0.1 evidence and remaining limits](../../docs/VALIDATION_3.0.1.md).
 
 **Remove** performs the ordinary `goodix-uninstall` operation with the original
 receipt, ownership and hash checks. The Manager remains installed. Reboot as
@@ -160,8 +164,9 @@ compare the complete certificate fingerprint through an independent trusted
 channel, then import the key and verify both the RPM signature and its expected
 signer before opening Discover. A valid signature does not establish trust by
 itself. No automatic key import or disabled signature checking is provided.
-Discover/PackageKit behavior must be qualified on clean Fedora 44 and 45 KDE VMs;
-successful command-line signature verification alone is not that qualification.
+Discover/PackageKit behavior must be distinguished from command-line signature
+verification. Operator-reported Fedora 44/45 installation tests and remaining
+limits are recorded in [3.0.1 validation](../../docs/VALIDATION_3.0.1.md).
 
 For backup, use a private encrypted removable volume under your control, with
 mode 0700 on the destination directory and `umask 077`. Export the passphrase

@@ -9,11 +9,11 @@ Install **Goodix Manager** with KDE Discover, then use it to activate the finger
 
 ### 1. Download Goodix Manager
 
-Open the **[official GitHub Releases](https://github.com/sorguido/goodix-27c6-5125/releases)** and download the latest RPM explicitly marked compatible with your Fedora release from **Assets**. A `.fc44` suffix indicates the Fedora 44 build baseline, not necessarily the supported installation range. **The published 3.0.0 RPM still requires Fedora 44**; do not install it on Fedora 45 until the portable release is published and tested.
+Open the **[official GitHub Releases](https://github.com/sorguido/goodix-27c6-5125/releases)** and download the latest RPM explicitly marked compatible with your Fedora release from **Assets**. A `.fc44` suffix indicates the Fedora 44 build baseline, not necessarily the supported installation range. **The existing 3.0.0 RPM requires Fedora 44.** Version 3.0.1 has no package lock to a specific Fedora release, while retaining dependency and runtime compatibility checks. It is being prepared as an unpublished draft and is not publicly downloadable until publication.
 
 ### 2. Install the RPM
 
-Double-click the downloaded file, open it with **KDE Discover** and choose **Install**.
+First [verify the RPM's digital signature](#verify-the-rpms-digital-signature). Then double-click the downloaded file, open it with **KDE Discover** and choose **Install**.
 
 ### 3. Activate the driver
 
@@ -43,20 +43,20 @@ Open **Goodix Manager** occasionally to check for updates. It checks official re
 If **Download RPM** appears:
 
 1. Click **Download RPM**. Your browser opens the direct download link for the new RPM.
-2. Close Goodix Manager, then double-click the downloaded RPM and install it with **KDE Discover**.
+2. [Verify the RPM's digital signature](#verify-the-rpms-digital-signature), close Goodix Manager, then double-click the downloaded RPM and install it with **KDE Discover**.
 3. Reopen Goodix Manager and click **Apply Update**, if offered. Follow any restart instructions.
 
 Installing a newer RPM alone does **not** update the active driver. If the release check reports **Check unavailable**, try **Check again** later.
 
-**Preparing to upgrade Fedora 44 to Fedora 45?** The 3.0.1 candidate removes the
-package dependency that makes the published 3.0.0 RPM block the upgrade. Once
-3.0.1 is qualified and officially released, install it on Fedora 44 before
-upgrading Fedora. You do not need to uninstall the driver first. Apply the
-driver update in Goodix Manager and follow its restart instruction. This
+**Install 3.0.1 on Fedora 44 before upgrading to Fedora 45 or later.**
+The 3.0.0 RPM is locked to Fedora 44; 3.0.1 removes that package restriction.
+You do not need to uninstall the driver first. Apply the driver update in
+Goodix Manager if offered and follow any restart instruction. This
 3.0.0 → 3.0.1 update keeps the ChicagoHS fingerprint format: existing enrollments
-can be used without registering again. Later Fedora compatibility depends on
-the required system components remaining compatible. Fedora 45 live testing
-of this candidate is still pending; see [candidate validation](VALIDATION_3.0.1.md).
+remain usable without registering again. Fedora 44 and 45 have operator-reported
+functional tests. Later Fedora compatibility depends on the required system
+components and runtime checks; see [3.0.1 validation](VALIDATION_3.0.1.md).
+The 3.0.1 draft is not publicly downloadable until it is published.
 
 **Upgrading from a 2.x version?** For a recognized, intact installation, Goodix Manager offers **Upgrade to 3.0.1**. No preliminary uninstall is needed, but **you must register your fingerprints again** after the upgrade. Existing fingerprint files and pairing data are preserved.
 
@@ -73,10 +73,9 @@ If an operation fails, use **Copy diagnostics** in Goodix Manager and [report th
 
 If login or normal removal is unavailable, follow the [recovery guide](UNINSTALL.md). Do not change Fedora authentication settings or disable SELinux to work around an error.
 
-<details>
-<summary><strong>Optional: Verify the RPM's digital signature</strong></summary>
+## Verify the RPM's digital signature
 
-Verifying the RPM before installing it helps detect a replaced or altered package. The check is optional in this quick-start guide; **downloading from GitHub alone does not verify the signing identity**.
+Verify the RPM before installing it to help detect a replaced or altered package. This is a required installation step; **downloading from GitHub alone does not verify the signing identity**.
 
 Download the [public signing key](../packaging/rpm/keys/Guido-Soraru.asc) as `Guido-Soraru.asc` into the same folder as the RPM. Open that folder in **Dolphin** and press **F4** to open a terminal there.
 
@@ -102,7 +101,5 @@ rpmkeys --define '_pkgverify_level all' --checksig --verbose goodix-manager-*.fc
 ```
 
 Check that the **signature and digest checks report `OK`** and the signing key matches the expected identity. Stop if the signature is missing or a check fails; do not disable signature verification. KDE Discover should not be assumed to perform this independent verification for you.
-
-</details>
 
 For more information, see [supported configurations and limitations](VALIDATION.md), [uninstallation and recovery](UNINSTALL.md), or the [technical manual](../TECHNICAL_MANUAL.md).

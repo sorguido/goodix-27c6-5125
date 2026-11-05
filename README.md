@@ -13,13 +13,14 @@ and factory data.
 
 ## Supported configuration
 
-- Fedora KDE on x86_64, release 44 or newer, with local user accounts (portable
-  packaging candidate; tested biometric baseline remains Fedora 44).
+- Fedora KDE on x86_64, release 44 or newer, with local user accounts. Fedora
+  44 and 45 have operator-reported functional tests; later releases depend on
+  compatible system components and runtime checks.
 - Goodix USB `27c6:5125`, recognized firmware `GF_ST411SEC_APP_12509` and
   `GF_ST411SEC_APP_12508`.
 - Fedora-provided fprintd, PAM, Plasma Login, KScreenLocker, sudo and PolicyKit.
 
-Within the supported Fedora 44 KDE scope, the project integrates enrollment,
+On Fedora KDE, the project integrates enrollment,
 verification, screen unlocking, ordinary sudo, PolicyKit, Plasma fingerprint
 login and password fallback through Fedora's existing authentication stack.
 An initial live functional check of the current driver passed on one APP12509
@@ -36,23 +37,22 @@ not establish general recognition accuracy or cross-device compatibility. See
 > **Use only signed RPMs from official releases for installation.**
 
 **[Install with the signed RPM and Goodix Manager](docs/INSTALLATION.md).**
-Download the compatible RPM from the official releases, open it with **KDE Discover**,
-then launch **Goodix Manager** and choose **Install**. The installation guide also
-provides **optional signature-verification instructions** for users who want to
-check the package before installing it.
+Download the compatible RPM from the official releases, **verify its signature
+before installation** as described in the guide, then open it with **KDE Discover**.
+Launch **Goodix Manager** and choose **Install**.
 
 You need administrative access. No Git checkout or local compilation is required.
 After installing a newer RPM, reopen the Manager and choose **Apply Update** when
 offered. Driver installation, update and removal use the local payload and work
 offline once Fedora dependencies are installed.
 
-Use a release explicitly labeled compatible with your Fedora version. The
-existing published 3.0.0 RPM still requires Fedora 44; the portable 3.0.1
-candidate is not published until its verification and VM tests pass.
-Once qualified and published, install 3.0.1 on Fedora 44 before upgrading
-to Fedora 45; no driver uninstall is needed. Existing 3.0.0 ChicagoHS
-fingerprints do not need new enrollment for this update. See
-[validation](docs/VALIDATION.md) for the RPM/Discover qualification boundary.
+**The existing 3.0.0 RPM requires Fedora 44. Install 3.0.1 on Fedora 44 before
+upgrading to Fedora 45 or later.** No driver uninstall is needed, and existing
+3.0.0 ChicagoHS fingerprints remain usable. Version 3.0.1 has no package lock
+to a specific Fedora release; dependencies and runtime compatibility checks
+still apply. It is being prepared as an unpublished draft and is not publicly
+downloadable until publication. See [3.0.1 validation](docs/VALIDATION_3.0.1.md)
+for the observed Fedora 44/45 tests and their limits.
 
 ### Upgrading from an earlier release
 

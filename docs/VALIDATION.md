@@ -1,8 +1,8 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Validation scope and known limitations
 
-The [3.0.1 Fedora 44+ candidate record](VALIDATION_3.0.1.md) separately tracks
-current packaging checks and the pending supervised Fedora 44/45 qualification.
+The [3.0.1 validation record](VALIDATION_3.0.1.md) separately tracks current
+packaging checks, operator-reported Fedora 44/45 tests and remaining limits.
 The observations below concern earlier versions unless explicitly stated.
 
 ## Tested configuration
@@ -23,13 +23,15 @@ with an upgrade offered, and subsequently a 3.0.0 driver status. Those screens
 alone do not establish a complete, recorded 2.x -> 3.0.0 migration sequence,
 a post-upgrade reboot/login, or byte-for-byte preservation of populated pairing
 state and templates. Interactive migration/rollback and the complete RPM
-lifecycle remain separate qualification checks. Fedora 45 biometric operation
-is not yet qualified. A Fedora 45 KDE VM upgraded successfully with the
-Fedora 44-only RPM removed; on that VM libfprint 1.94.100, fprintd 1.94.5,
-stock `/usr/libexec/fprintd` and SELinux Enforcing were observed. This does
-not prove that the Goodix runtime works on Fedora 45. The portable package
-candidate intentionally removes the `system-release(44)` dependency and
-accepts Fedora 44+ x86_64, while preserving runtime and security checks.
+lifecycle remain separate qualification checks. For 3.0.1 the operator reports
+Fedora 45 installation and fingerprint login, screen lock and sudo working;
+a Fedora 44 installation with existing 3.0.0 enrollments updated to 3.0.1 and
+then upgraded to Fedora 45 successfully; and direct 3.0.1 installation on an
+initially clean Fedora 44 VM passing its functional checks. These reports do
+not independently qualify the final packaging revision or establish a physical
+audit of templates or PSK. The 3.0.1 package removes the `system-release(44)`
+dependency and accepts Fedora 44+ x86_64 while preserving runtime and security
+checks. Future Fedora versions still require compatible system components.
 
 The maintainer considers the 3.0.0 biometric driver qualified. Driver acceptance,
 historical CLI recognition, and RPM/Manager migration remain distinct evidence
