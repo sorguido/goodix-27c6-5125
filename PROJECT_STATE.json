@@ -3,7 +3,7 @@
   "authoritative": false,
   "project": "Goodix 27c6:5125 — ChicagoHS",
   "phase": "DRAFT_RELEASE_3_0_1_FINALIZATION",
-  "phase_status": "SIGNED_FINAL_RPM_VERIFIED_DRAFT_PREFLIGHT",
+  "phase_status": "MILESTONE_COMPLETE_DRAFT_RELEASE_PROVEN",
   "branch": "fedora45-port",
   "starting_commit": "7542ef12d80e3df40299a0f2d54a1180df6c2b30",
   "source_commit": "cf5e5a9e3b9f7599cb731891d8dcd54480b1342f",
@@ -28,9 +28,12 @@
     "revision3_signature": "VERIFIED_APPROVED_FINGERPRINT_AND_CURRENT_CHECKSUMS",
     "final_revision_signature": "VERIFIED_APPROVED_FINGERPRINT_AND_POST_SIGNATURE_SHA256",
     "final_revision_vm_and_live": "NOT_TESTED",
-    "draft_creation_upload_and_authenticated_postflight": "PENDING_AUTHORIZED_DRAFT_CREATION",
-    "independent_review": "ACCEPT_AND_CONTINUE_TO_SIGN_FINAL_RPM",
-    "draft_mode_signed_local_gate": "PASS_LOCAL_CONTRACT_NOT_GITHUB_POSTFLIGHT"
+    "draft_creation_upload_and_authenticated_postflight": "PASS_DRAFT_TRUE_PRERELEASE_FALSE_TWO_SIGNED_ASSETS_DOWNLOADED_AND_VERIFIED",
+    "independent_review": "ACCEPT_AND_CONTINUE_AUTHENTICATED_DRAFT_POSTFLIGHT_PROVEN",
+    "draft_mode_signed_local_gate": "PASS_LOCAL_CONTRACT_NOT_GITHUB_POSTFLIGHT",
+    "manager_draft_exclusion": "PASS_ACTUAL_DRAFT_REJECTED_LATEST_PUBLIC_REMAINS_V3_0_0",
+    "source_archive_tag_and_srpm": "PASS_454_FILES_IDENTICAL",
+    "draft_mode_signed_downloaded_asset_gate": "PASS_LOCAL_CONTRACT_READINESS_METADATA_REAL_DRAFT_URLS_VERIFIED_SEPARATELY"
   },
   "operator_reported": {
     "fedora45_revision2_install_login_lock_sudo": "PASS_WITH_INCORRECT_ENROLLMENT_NOTICE",
@@ -45,10 +48,16 @@
   "publication_authorized": false,
   "evidence": "docs/VALIDATION_3.0.1.md",
   "private_logs": "development/rpm/draft-301/",
-  "next_action": "Create v3.0.1 tag on the verified final fedora45-port source commit, then exactly one unpublished GitHub draft (draft=true, prerelease=false) containing only signed revision4 binary and SRPM; authenticate, download and verify both uploaded assets and retain postflight evidence. Never publish or modify main/development.",
+  "next_action": "No further release action authorized. Keep v3.0.1 unpublished; main/development alignment and any publication remain exclusively user decisions. The operational closure cache is outside the tagged RPM source archive.",
   "signed_fingerprint": "5FB20F583C831729D5FF073FE99ADAE5B7EA4918",
   "signed_sha256": {
     "rpmbuild/RPMS/x86_64/goodix-manager-3.0.1-4.fc44.x86_64.rpm": "037994371e8bae489f36d08503e42e9c0817e635f00589aabd6d8ecffab446ba",
     "rpmbuild/SRPMS/goodix-manager-3.0.1-4.fc44.src.rpm": "97ae94aef62eab333d0707ed0d7c66fecb25da2098e70f0c655330811be165a8"
-  }
+  },
+  "tag": "v3.0.1",
+  "tag_commit": "b69821952211cad753c5a2599a0c3cd140cea0ff",
+  "draft_release_id": 434891329,
+  "draft_release_url": "https://github.com/sorguido/goodix-27c6-5125/releases/tag/untagged-27a9d4ea490c95f4ea9e",
+  "draft_release_created": true,
+  "draft_postflight_evidence": "development/rpm/draft-301/authenticated-postflight.json"
 }
