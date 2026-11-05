@@ -14,7 +14,7 @@ and factory data.
 ## Supported configuration
 
 - Fedora KDE on x86_64, release 44 or newer, with local user accounts. Fedora
-  44 and 45 have operator-reported functional tests; later releases depend on
+  44 and 45 have reported functional tests; later releases depend on
   compatible system components and runtime checks.
 - Goodix USB `27c6:5125`, recognized firmware `GF_ST411SEC_APP_12509` and
   `GF_ST411SEC_APP_12508`.
