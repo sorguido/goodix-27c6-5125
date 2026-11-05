@@ -53,8 +53,8 @@ The 3.0.0 RPM is locked to Fedora 44; 3.0.1 removes that package restriction.
 You do not need to uninstall the driver first. Apply the driver update in
 Goodix Manager if offered and follow any restart instruction. This
 3.0.0 → 3.0.1 update keeps the ChicagoHS fingerprint format: existing enrollments
-remain usable without registering again. Fedora 44 and 45 have operator-reported
-functional tests. Later Fedora compatibility depends on the required system
+remain usable without registering again.
+Later Fedora compatibility depends on the required system
 components and runtime checks; see [3.0.1 validation](VALIDATION_3.0.1.md).
 The 3.0.1 draft is not publicly downloadable until it is published.
 
