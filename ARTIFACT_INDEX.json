@@ -12,7 +12,8 @@
     "technical_reference": "TECHNICAL_MANUAL.md",
     "provenance": "docs/LICENSING_AND_PROVENANCE.md",
     "private_workspace": "development/",
-    "diagnostic_statement": "diagnostic_statement.md"
+    "diagnostic_statement": "development/diagnostic/diagnostic_statement.md",
+    "diagnostic_design_workspace": "development/diagnostic/"
   },
   "phase_routes": {
     "CH0": [
@@ -39,11 +40,16 @@
       "development/private-root/analysis/CHICAGO_RC_2026-10-21/"
     ],
     "DIAG0": [
-      "diagnostic_statement.md",
+      "development/diagnostic/diagnostic_statement.md",
+      "development/diagnostic/Goodix_Diagnostic_Center_mockup.html",
+      "development/diagnostic/Goodix_Diagnostic_navigation.png",
+      "development/diagnostic/mockup icon to be used.png",
       "CORROBORATIONS.md"
     ],
     "DIAG1": [
-      "diagnostic_statement.md",
+      "development/diagnostic/diagnostic_statement.md",
+      "development/diagnostic/Goodix_Diagnostic_Center_mockup.html",
+      "development/diagnostic/Goodix_Diagnostic_navigation.png",
       "packaging/rpm/manager/main.py",
       "packaging/rpm/helper.py",
       "deployment/install.py",
@@ -56,6 +62,12 @@
       "deployment/install.py"
     ],
     "DIAG3": [
+      "development/diagnostic/Goodix_Diagnostic_Center_mockup.html",
+      "development/diagnostic/Goodix_Diagnostic_navigation.png",
+      "development/diagnostic/mockup icon to be used.png",
+      "development/diagnostic/Goodix_Diagnostic_overview_screens.png",
+      "development/diagnostic/Goodix_Diagnostic_workflow_screens.png",
+      "development/diagnostic/diagnostic_statement.md",
       "packaging/rpm/manager/Main.qml",
       "packaging/rpm/manager/main.py",
       "packaging/rpm/manager/test_ui.py",
@@ -70,5 +82,14 @@
       "docs/INSTALLATION.md"
     ]
   },
-  "routing_rule": "Leggere i file canonici e lo stato; caricare solo la route di fase pertinente. DIAG0 usa diagnostic_statement.md come fonte unica del desiderata; CORROBORATIONS.md resta un indice di evidenze, non una specifica. Non ripetere contenuti tra i file."
+  "routing_rule": "Leggere i canonici e lo stato; caricare solo la route pertinente. I materiali in development/diagnostic/ sono gitignored, esistono solo nel checkout dell'utente: verificare la presenza prima di usarli; non interpretarli come raggiungibili da GitHub. Per DIAG3, il mockup HTML e il diagramma di navigazione approvati guidano GUI e UX, non costituiscono prova di funzionalità tecnica. CORROBORATIONS.md è solo indice di evidenze esterne.",
+  "diagnostic_gui_references": {
+    "availability": "LOCAL_ONLY_GITIGNORED_VERIFY_ON_WORKSTATION",
+    "priority": "APPROVED_VISUAL_GUIDANCE_NOT_BACKEND_SPEC",
+    "interactive_mockup": "development/diagnostic/Goodix_Diagnostic_Center_mockup.html",
+    "navigation_diagram": "development/diagnostic/Goodix_Diagnostic_navigation.png",
+    "visual_concept_board": "development/diagnostic/mockup icon to be used.png",
+    "overview_screens": "development/diagnostic/Goodix_Diagnostic_overview_screens.png",
+    "workflow_screens": "development/diagnostic/Goodix_Diagnostic_workflow_screens.png"
+  }
 }

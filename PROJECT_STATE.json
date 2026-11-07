@@ -5,13 +5,13 @@
   "branch": "diagnostic",
   "execution_path": "PRIMARY",
   "phase": "DIAG0",
-  "phase_status": "DOCUMENTATION_ONLY_READY_FOR_REVIEW",
-  "primary_artifact": "diagnostic_statement.md",
+  "phase_status": "DOCUMENTATION_ROUTED_PENDING_LOCAL_ASSET_VERIFICATION",
+  "primary_artifact": "development/diagnostic/diagnostic_statement.md",
   "completed_gates": [
     "DIAG0_DESIDERATA_RECORDED"
   ],
   "pending_gates": [
-    "DIAG0_HUMAN_REVIEW",
+    "DIAG0_LOCAL_ARTIFACT_VERIFICATION",
     "DIAG1_AUTHORIZATION"
   ],
   "host_modified": false,
@@ -19,7 +19,10 @@
   "usb_access": false,
   "runtime_changes": false,
   "relevant_artifacts": [
-    "diagnostic_statement.md",
+    "development/diagnostic/diagnostic_statement.md",
+    "development/diagnostic/Goodix_Diagnostic_Center_mockup.html",
+    "development/diagnostic/Goodix_Diagnostic_navigation.png",
+    "development/diagnostic/mockup icon to be used.png",
     "ROADMAP.md",
     "CORROBORATIONS.md",
     "ARTIFACT_INDEX.json",
@@ -30,7 +33,7 @@
   "relevant_corroborations": [
     "C4"
   ],
-  "next_action": "Presentare la documentazione del ramo diagnostic all'utente. Non iniziare matrice DIAG1, codice/UI o test live senza nuova autorizzazione; la milestone 3.0.1 precedente resta invariata.",
+  "next_action": "Nel checkout locale, verificare l'esistenza e la leggibilità dei file sotto development/diagnostic/; usare HTML e diagramma come riferimento GUI approvato. Nessuna possibilità di consultazione remota GitHub dei file gitignored. Non iniziare DIAG1 o implementazione senza autorizzazione.",
   "last_verified_head": null,
   "observed_remote_base_head": "4bc1f308071768b4f8045e58b4d12937bfa8ada2",
   "documentation_only": true,
@@ -96,5 +99,7 @@
     "draft_release_url": "https://github.com/sorguido/goodix-27c6-5125/releases/tag/untagged-27a9d4ea490c95f4ea9e",
     "draft_release_created": true,
     "draft_postflight_evidence": "development/rpm/draft-301/authenticated-postflight.json"
-  }
+  },
+  "gui_reference": "USER_APPROVED_MOCKUP_LOCAL_ASSETS_NOT_VERIFIED_REMOTELY",
+  "local_context_availability": "GITIGNORED_NOT_AVAILABLE_IN_GITHUB"
 }

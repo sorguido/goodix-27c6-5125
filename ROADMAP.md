@@ -3,7 +3,7 @@
 
 ## Obiettivo e ambito
 
-Evolvere `Copy diagnostics` in un centro diagnostico on-demand per l'integrazione Goodix 27c6:5125 su Fedora KDE: controlli leggibili, identificazione di incompatibilità note e rapporti mirati ai problemi di installazione e uso quotidiano. Il desiderata completo, inclusi privacy, esclusioni e confine fra diagnosi e riparazione, appartiene a **[`diagnostic_statement.md`](diagnostic_statement.md)**. `AGENTS.md` rimane l'autorità per gli invarianti permanenti.
+Evolvere `Copy diagnostics` in un centro diagnostico on-demand per l'integrazione Goodix 27c6:5125 su Fedora KDE: controlli leggibili, identificazione di incompatibilità note e rapporti mirati ai problemi di installazione e uso quotidiano. Il desiderata completo, inclusi privacy, esclusioni e confine fra diagnosi e riparazione, appartiene a **[`diagnostic_statement.md`](development/diagnostic/diagnostic_statement.md)**. `AGENTS.md` rimane l'autorità per gli invarianti permanenti.
 
 **Percorso primario:** riusare helper, stato e journal esistenti; introdurre la minima estensione read-only, deterministica e verificabile. Nessuna modifica preventiva al motore ChicagoHS, trasporto, pairing, PAM, installer fail-closed o configurazione stock. Eventuali alternative più invasive sono fallback da valutare solo dopo evidenza dell'insufficienza del percorso primario e decisione umana specifica.
 
@@ -11,10 +11,10 @@ La draft 3.0.1 e i risultati ChicagoHS appartengono alla milestone precedente: n
 
 ## State machine — fase diagnostica
 
-### DIAG0 — Dichiarazione degli obiettivi (DOCUMENTATION ONLY)
-- **PURPOSE:** consolidare la visione e il caso motivante #55, senza progettare la UI o modificare il driver.
-- **PRIMARY_ARTIFACT:** `diagnostic_statement.md`.
-- **EXIT_GATE:** desiderata versionato, linkato dal routing; `CORROBORATIONS.md` registra la sola evidenza esterna; nessuna modifica di codice o host.
+### DIAG0 — Dichiarazione degli obiettivi e riferimenti GUI (DOCUMENTATION ONLY)
+- **PURPOSE:** consolidare la visione, il caso motivante #55 e il concept GUI approvato, senza modificare il driver.
+- **PRIMARY_ARTIFACT:** `development/diagnostic/diagnostic_statement.md` (locale, gitignored).
+- **EXIT_GATE:** desiderata e riferimenti GUI collegati nel routing; presenza e leggibilità degli artefatti locali verificate dall'agente con accesso al checkout; `CORROBORATIONS.md` registra la sola evidenza esterna; nessuna modifica di codice o host.
 - **NEXT:** DIAG1, solo dopo autorizzazione dell'utente.
 
 ### DIAG1 — Matrice diagnostica (DESIGN)
@@ -30,8 +30,8 @@ La draft 3.0.1 e i risultati ChicagoHS appartengono alla milestone precedente: n
 - **NEXT:** DIAG3.
 
 ### DIAG3 — Centro diagnostico e rapporti (IMPLEMENTATION)
-- **PURPOSE:** esporre controlli su richiesta, messaggi discriminanti e generatori di rapporti mirati senza fare del Manager un riparatore del sistema.
-- **PRIMARY_ARTIFACT:** Manager/helper con test UI e di sicurezza, secondo il design autorizzato.
+- **PURPOSE:** esporre controlli su richiesta, messaggi discriminanti e generatori di rapporti mirati senza fare del Manager un riparatore del sistema. Mantenere navigazione, linguaggio non tecnico e stile KDE/Goodix Manager del mockup approvato; modifiche motivate solo da fattibilità, sicurezza o qualità dell'esperienza utente.
+- **PRIMARY_ARTIFACT:** Manager/helper con test UI e di sicurezza. Riferimenti visuali locali: [mockup HTML](development/diagnostic/Goodix_Diagnostic_Center_mockup.html), [diagramma di navigazione](development/diagnostic/Goodix_Diagnostic_navigation.png) e [tavola concept](development/diagnostic/mockup icon to be used.png). L'HTML è un **prototipo grafico**, non una specifica di backend né una prova che i controlli funzionino.
 - **EXIT_GATE:** controlli statici utilizzabili anche prima dell'installazione; test dinamici solo espliciti; consenso preventivo per raccolte potenzialmente sensibili; anteprima locale; nessun upload/telemetria.
 - **NEXT:** DIAG4.
 
@@ -46,6 +46,10 @@ La draft 3.0.1 e i risultati ChicagoHS appartengono alla milestone precedente: n
 - **PRIMARY_ARTIFACT:** decisione di accettazione basata sulle evidenze.
 - **EXIT_GATE:** review finale e autorizzazione umana esplicita per test live, merge e pubblicazione, ciascuno secondo `AGENTS.md`.
 - **NEXT:** milestone conclusa solo con prove sufficienti; altrimenti CORRECTIVE o BLOCKED.
+
+## Disponibilità dei riferimenti progettuali
+
+I materiali in `development/diagnostic/` sono **gitignored e locali**, non pubblicati né recuperabili da GitHub. Prima di iniziare DIAG1/DIAG3, l'agente che opera sul checkout deve verificarne la presenza e leggerli tramite `ARTIFACT_INDEX.json`. Un agente remoto privo di accesso a quella cartella deve segnalare l'assenza del contesto e **non inventare** i contenuti del mockup. La GUI approvata orienta la presentazione; comportamento, privilegi e diagnostica devono essere qualificati separatamente.
 
 ## Stato autorizzato alla data del documento
 

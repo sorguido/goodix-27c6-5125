@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # CORROBORATIONS.md — Prior art ed evidenze esterne
 
-Indice sintetico di fonti ed evidenze esterne per la roadmap. **Una fonte non prova da sola la compatibilità o una causa generale di failure del Goodix 27c6:5125.** I requisiti della nuova diagnostica appartengono a [diagnostic_statement.md](diagnostic_statement.md), non a questo indice. Caricare le fonti solo quando pertinenti.
+Indice sintetico di fonti ed evidenze esterne per la roadmap. **Una fonte non prova da sola la compatibilità o una causa generale di failure del Goodix 27c6:5125.** I requisiti della nuova diagnostica appartengono a [diagnostic_statement.md](development/diagnostic/diagnostic_statement.md), non a questo indice. Caricare le fonti solo quando pertinenti.
 
 ## C1 | PRIMARY / UPSTREAM_SOURCE
 
@@ -34,5 +34,5 @@ Indice sintetico di fonti ed evidenze esterne per la roadmap. **Una fonte non pr
 - **Fonte:** [issue #55 — “The operation failed” on Fedora 45](https://github.com/sorguido/goodix-27c6-5125/issues/55), segnalazione dell'utente, output dei controlli e conclusione del maintainer (6–7 novembre 2026).
 - **Claim osservato:** sull'host segnalato erano presenti un drop-in `fprintd.service.d/keepalive.conf` con `--no-timeout` e file essenziali mancanti nel pacchetto Fedora `libfprint`. L'override non riconosciuto è sufficiente a far rifiutare in sicurezza l'installazione dal preflight canonico; il Manager mostrava un errore generico.
 - **Limite:** singolo caso reale, non stima di frequenza né prova che tutti i fallimenti di installazione abbiano questa causa. Il possibile rapporto fra file mancanti e precedente exit 127 di fprintd richiederebbe conferma dai journal; non assumere causalità ulteriore.
-- **Dettaglio:** issue e allegati collegati nella conversazione GitHub; non copiarvi output sensibili. Desiderata e criteri di progettazione: `diagnostic_statement.md`.
+- **Dettaglio:** issue e allegati collegati nella conversazione GitHub; non copiarvi output sensibili. Desiderata e criteri di progettazione: `development/diagnostic/diagnostic_statement.md` (solo locale, gitignored).
 - **Rilevanza:** DIAG0–DIAG4, soprattutto messaggi discriminanti e preflight read-only.
