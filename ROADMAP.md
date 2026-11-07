@@ -1,99 +1,52 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# ROADMAP.md — Goodix 27c6:5125
+# ROADMAP.md — Goodix Manager: diagnostica (`diagnostic`)
 
-## Obiettivo
+## Obiettivo e ambito
 
-Concludere la qualificazione del motore ChicagoHS nativo e preparare la
-**versione 3.0.0 del driver canonico** Goodix 27c6:5125 per Fedora 44 KDE.
-ChicagoHS **sostituisce SIGFM su `main`**, non costituisce una seconda
-edizione da mantenere in parallelo. `porting_ChicagoHS` è esclusivamente
-il ramo temporaneo di lavoro: dopo i test di uso quotidiano e l'approvazione
-umana, le modifiche verranno integrate in `main` e il ramo temporaneo potrà
-essere eliminato. Fino a tale autorizzazione, commit e push ordinari restano
-circoscritti al ramo di preparazione; non anticipare merge o release.
-Gli invarianti di AGENTS.md restano applicabili.
+Evolvere `Copy diagnostics` in un centro diagnostico on-demand per l'integrazione Goodix 27c6:5125 su Fedora KDE: controlli leggibili, identificazione di incompatibilità note e rapporti mirati ai problemi di installazione e uso quotidiano. Il desiderata completo, inclusi privacy, esclusioni e confine fra diagnosi e riparazione, appartiene a **[`diagnostic_statement.md`](diagnostic_statement.md)**. `AGENTS.md` rimane l'autorità per gli invarianti permanenti.
 
-Trasporto USB/TLS, firmware APP12509/APP12508, pairing, stock fprintd,
-integrazione KDE e password fallback conservano il comportamento della baseline.
-Chicago sostituisce il solo motore biometrico: nessun fallback Milan/SIGFM,
-trasporto SPI, DLL, calibrazione Windows o dati privati necessari alla build.
-La precedente versione SIGFM resta rintracciabile nei tag storici (per
-esempio `v2.2.1`), non su `main` dopo il merge. Il rollback a SIGFM richiede
-rimozione esplicita di ChicagoHS e checkout della release storica.
+**Percorso primario:** riusare helper, stato e journal esistenti; introdurre la minima estensione read-only, deterministica e verificabile. Nessuna modifica preventiva al motore ChicagoHS, trasporto, pairing, PAM, installer fail-closed o configurazione stock. Eventuali alternative più invasive sono fallback da valutare solo dopo evidenza dell'insufficienza del percorso primario e decisione umana specifica.
 
-## Percorso software autorizzato
+La draft 3.0.1 e i risultati ChicagoHS appartengono alla milestone precedente: non sono oggetto di questo ramo. Non anticipare merge, pubblicazione, nuova release o modifiche host.
 
-1. **CH0 — Baseline.** Verificare pin upstream
-   `010a665f54089a1632b1ab7be588b316ace934e2`, provenienza per file e contratti
-   rispetto alle evidenze offline già esistenti. EXIT_GATE: fonti computazionali
-   necessarie identificabili, redistribuibili e riproducibili senza materiale OEM.
-2. **CH1 — Backend e identità.** Importare le unità necessarie; calibrazione
-   generate dal background U16 80×64 12-bit, stato temporale originale,
-   preprocessing/feature/enrollment 12-stage/type24/verify/identify originali.
-   Nessun tuning o learning. Contenitore versionato legato al sensore ottenuto
-   nel normale preflight qualificato; verificare la semantica, non presumere
-   unicità universale di un prefisso OTP. EXIT_GATE: test positivi/negativi,
-   corruzione, incompatibilità e cleanup; replay privato CH0 equivalente.
-3. **CH2 — Runtime libfprint.** Collegare le azioni ordinarie e il lifecycle,
-   retry/error mapping, FpPrint e gallerie di stock fprintd; nuovo enrollment
-   obbligatorio, nessuna conversione/cancellazione di template storici.
-   EXIT_GATE: azioni implementate e regressioni offline; ogni dipendenza
-   realmente non qualificata deve fallire chiusa ed essere dichiarata.
-4. **CH3 — Distribuzione.** Adeguare il solo percorso canonico
-   `install.sh → deployment/install.py → production/build-public.py`;
-   inventario/hash/licenze, payload Chicago-only, update/reinstall e transizione
-   da Milan/SIGFM/installazioni parziali. Conservare i soli `goodix-uninstall`
-   e `goodix-force-remove`, anche senza clone/rete/USB/receipt integra.
-   Entrambi preservano pairing, PSK, template e stato persistente. Nessun purge.
-   EXIT_GATE: build da snapshot privo di development, ABI/dependency checks,
-   fixture install/update/rollback/recovery e documentazione coerente.
-5. **CH4 — Review e consegna software.** Review indipendente di codice, diff,
-   licenze, segreti, parità con la precedente implementazione SIGFM e prove.
-   Correggere e ripetere i controlli pertinenti. EXIT_GATE: tutti i requisiti
-   software dimostrati, commit/push ordinario sul ramo temporaneo, rapporto
-   privato con SHA, PASS/NOT_RUN e istruzioni VM/rollback.
+## State machine — fase diagnostica
 
-## Accettazione finale
+### DIAG0 — Dichiarazione degli obiettivi (DOCUMENTATION ONLY)
+- **PURPOSE:** consolidare la visione e il caso motivante #55, senza progettare la UI o modificare il driver.
+- **PRIMARY_ARTIFACT:** `diagnostic_statement.md`.
+- **EXIT_GATE:** desiderata versionato, linkato dal routing; `CORROBORATIONS.md` registra la sola evidenza esterna; nessuna modifica di codice o host.
+- **NEXT:** DIAG1, solo dopo autorizzazione dell'utente.
 
-`CHICAGOHS_SOFTWARE_RC_READY_FOR_VM=PASS` richiede tutti gli EXIT_GATE software,
-un runtime completo e sorgenti pubblicabili autosufficienti. Il corpus CH0 deve
-riprodurre 35/35 admissions, 12/12 stadi, 3 genuine MATCH, 3 impostor NO_MATCH
-e 2 partial NO_MATCH senza tuning. Documentare la continuità con i
-comportamenti precedenti per trasporto, pairing, firmware, multiutente,
-integrazione desktop e recovery, distinguendo
-sempre prove offline da prove reali. Una limitazione reale non risolta produce
-BLOCKED, mai un PASS presunto; proseguire comunque sulle attività indipendenti.
+### DIAG1 — Matrice diagnostica (DESIGN)
+- **PURPOSE:** scegliere controlli pertinenti, profili di log, fonti, privilegi, costo, dati sensibili, limiti di interpretazione e comportamenti read-only; distinguere disponibilità delle prove da esito positivo.
+- **PRIMARY_ARTIFACT:** un artefatto decisionale di fase, da creare soltanto all'avvio di DIAG1.
+- **EXIT_GATE:** matrice completa per le aree prioritarie, copertura ragionata delle failure più significative, raccolte delimitate, profili A–E e decisione documentata sui rischi; approvazione umana del perimetro.
+- **NEXT:** DIAG2.
 
-## Qualificazione funzionale, migrazione e rilascio 3.0.0
+### DIAG2 — Contratti e osservabilità (DESIGN / IMPLEMENTATION)
+- **PURPOSE:** mappare il codice esistente e definire/aggiungere soltanto le sonde e i codici stabili indispensabili a localizzare la fase del fallimento; preservare helper ristretto, autorizzazioni e fail-closed.
+- **PRIMARY_ARTIFACT:** contratto diagnostico verificabile e relativo codice/test.
+- **EXIT_GATE:** casi noti (in particolare blocco override fprintd e integrità libfprint) classificabili senza falsi PASS; nessun segreto o dato protetto esportabile; regressioni pertinenti PASS.
+- **NEXT:** DIAG3.
 
-La prima qualificazione live supervisionata del 21 ottobre 2026 ha prodotto
-PASS funzionali osservati per enrollment KDE, verify MATCH e NO_MATCH,
-KScreenLocker, sudo, PolicyKit, Plasma Login, riavvio, fallback password e
-ping-pong Windows/Linux. Non equivale a studio FAR/FRR, qualifica multiutente
-o dimostrazione esaustiva del pairing su tutti i dispositivi. Le evidenze
-pubblicabili e i limiti sono indicati in [VALIDATION.md](docs/VALIDATION.md).
+### DIAG3 — Centro diagnostico e rapporti (IMPLEMENTATION)
+- **PURPOSE:** esporre controlli su richiesta, messaggi discriminanti e generatori di rapporti mirati senza fare del Manager un riparatore del sistema.
+- **PRIMARY_ARTIFACT:** Manager/helper con test UI e di sicurezza, secondo il design autorizzato.
+- **EXIT_GATE:** controlli statici utilizzabili anche prima dell'installazione; test dinamici solo espliciti; consenso preventivo per raccolte potenzialmente sensibili; anteprima locale; nessun upload/telemetria.
+- **NEXT:** DIAG4.
 
-Prima dell'integrazione definitiva in `main` e della release 3.0.0:
+### DIAG4 — Correlazione eventi e qualificazione (TEST / REVIEW)
+- **PURPOSE:** qualificare install/update, runtime sano e degradato, login e casi intermittenti, con journal incompleti/non persistenti e rifiuti sicuri.
+- **PRIMARY_ARTIFACT:** evidenze di test e review indipendente, non diario nel manuale.
+- **EXIT_GATE:** distinzione dimostrata fra `NO_MATCH`, mancata acquisizione/FDT, trasporto e autenticazione; nessuna modifica non autorizzata al sistema; comportamento corretto con errori, dati mancanti e autorizzazioni negate; regressioni e recovery pertinenti PASS.
+- **NEXT:** DIAG5.
 
-1. Completare il periodo previsto di **uso quotidiano**, includendo i primi
-   login dopo avvio a freddo e registrando anomalie senza indebolire i gate.
-2. Qualificare su VM con **installazione SIGFM 2.x reale e dati già presenti**
-   il passaggio diretto all'installer ChicagoHS: rimozione del runtime vecchio,
-   assenza di residui OpenCV, preservazione byte-per-byte dello stato pairing
-   e dei template, nuovo enrollment e password fallback. Esercitare il
-   rollback in caso d'errore e il downgrade deliberato al tag storico.
-3. Completare l'audit disponibile dei log su E0, readback e TLS; distinguere
-   la coesistenza Windows osservata dalla prova della sequenza di pairing.
-4. Verificare identificazione e multiutente live quando autorizzati, percorso
-   di recovery, compatibilità licenze e documentazione senza rimandi a
-   `porting_ChicagoHS` come canale utenti finale.
-5. Solo su decisione umana, integrare su `main`, pubblicare la release
-   **3.0.0** e rimuovere il ramo temporaneo; nessuna esecuzione automatica
-   di questi passaggi.
+### DIAG5 — Accettazione e release (HUMAN GATE)
+- **PURPOSE:** ottenere approvazione del comportamento effettivo su Fedora KDE, della privacy e della compatibilità prima dell'integrazione.
+- **PRIMARY_ARTIFACT:** decisione di accettazione basata sulle evidenze.
+- **EXIT_GATE:** review finale e autorizzazione umana esplicita per test live, merge e pubblicazione, ciascuno secondo `AGENTS.md`.
+- **NEXT:** milestone conclusa solo con prove sufficienti; altrimenti CORRECTIVE o BLOCKED.
 
-Il manuale tecnico documenta esclusivamente le proprietà durevoli del
-dispositivo e della sua integrazione Fedora. Non contiene il diario dei
-test, le istruzioni passo-passo dell'esecuzione o la cronaca delle prove.
-Evidenze operative, rapporti di sviluppo e materiale sensibile restano
-nei percorsi privati gitignored; la documentazione pubblica di validazione
-riporta soltanto risultati aggregati, limiti e conoscenza verificata.
+## Stato autorizzato alla data del documento
+
+**Solo DIAG0 documentale.** Non iniziare DIAG1 né alcuna implementazione senza il relativo passaggio autorizzato. `PROJECT_STATE.json` è una cache non autoritativa: Git ed evidenze prevalgono. `TECHNICAL_MANUAL.md` resta reference tecnica durevole, non registro di test o di orchestrazione.

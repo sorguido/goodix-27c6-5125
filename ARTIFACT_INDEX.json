@@ -11,7 +11,8 @@
     "artifact_index": "ARTIFACT_INDEX.json",
     "technical_reference": "TECHNICAL_MANUAL.md",
     "provenance": "docs/LICENSING_AND_PROVENANCE.md",
-    "private_workspace": "development/"
+    "private_workspace": "development/",
+    "diagnostic_statement": "diagnostic_statement.md"
   },
   "phase_routes": {
     "CH0": [
@@ -36,7 +37,38 @@
       "docs/VALIDATION.md",
       "docs/LICENSING_AND_PROVENANCE.md",
       "development/private-root/analysis/CHICAGO_RC_2026-10-21/"
+    ],
+    "DIAG0": [
+      "diagnostic_statement.md",
+      "CORROBORATIONS.md"
+    ],
+    "DIAG1": [
+      "diagnostic_statement.md",
+      "packaging/rpm/manager/main.py",
+      "packaging/rpm/helper.py",
+      "deployment/install.py",
+      "docs/SECURITY.md"
+    ],
+    "DIAG2": [
+      "packaging/rpm/manager/model.py",
+      "packaging/rpm/manager/main.py",
+      "packaging/rpm/helper.py",
+      "deployment/install.py"
+    ],
+    "DIAG3": [
+      "packaging/rpm/manager/Main.qml",
+      "packaging/rpm/manager/main.py",
+      "packaging/rpm/manager/test_ui.py",
+      "docs/SECURITY.md"
+    ],
+    "DIAG4": [
+      "docs/VALIDATION.md",
+      "docs/SECURITY.md"
+    ],
+    "DIAG5": [
+      "docs/VALIDATION.md",
+      "docs/INSTALLATION.md"
     ]
   },
-  "routing_rule": "Leggere i file canonici e lo stato; caricare poi solo gli artefatti pertinenti. C1 e C2 rimandano a fonti esterne: non duplicare dossier senza necessità."
+  "routing_rule": "Leggere i file canonici e lo stato; caricare solo la route di fase pertinente. DIAG0 usa diagnostic_statement.md come fonte unica del desiderata; CORROBORATIONS.md resta un indice di evidenze, non una specifica. Non ripetere contenuti tra i file."
 }

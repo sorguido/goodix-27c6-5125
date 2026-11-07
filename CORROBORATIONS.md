@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# CORROBORATIONS.md — Motori biometrici nativi (Milan e Chicago)
+# CORROBORATIONS.md — Prior art ed evidenze esterne
 
-Indice di fonti esterne per la roadmap. **Nessuna delle fonti prova da sola la compatibilità del Goodix 27c6:5125.** Consultare i dettagli esterni solo quando pertinenti al task.
+Indice sintetico di fonti ed evidenze esterne per la roadmap. **Una fonte non prova da sola la compatibilità o una causa generale di failure del Goodix 27c6:5125.** I requisiti della nuova diagnostica appartengono a [diagnostic_statement.md](diagnostic_statement.md), non a questo indice. Caricare le fonti solo quando pertinenti.
 
 ## C1 | PRIMARY / UPSTREAM_SOURCE
 
@@ -28,3 +28,11 @@ Indice di fonti esterne per la roadmap. **Nessuna delle fonti prova da sola la c
 - **Limiti:** il solo dispositivo hardware qualificato dall'autore è **GDIX51C0 su SPI**, non il Goodix **27c6:5125 USB**. Identità parziale di profilo/DLL/formati non prova equivalenza di frame, orientamento/regroup, OTP, ImageBase, preprocessing, template o accuratezza del matching sul 5125. I test di parità Windows sono dichiarati dall'autore e non sono un nostro risultato.
 - **Licenza/provenienza:** README/LICENSE indicano LGPL-2.1-or-later per i sorgenti originali, salvo eccezioni. Verificare `PROVENANCE.md` e gli header/licenze **dei file effettivamente riusati** prima di eventuale import o pubblicazione; nessuna presunzione di compatibilità licenze.
 - **Rilevanza:** M3 (audit Chicago, eventuale harness e confronto decisionale); M4–M6 soltanto se Chicago risulta il candidato selezionato. Nessuna installazione o provisioning SPI.
+
+## C4 | USER_REPORT / ENVIRONMENT_INSTALL_BLOCK
+
+- **Fonte:** [issue #55 — “The operation failed” on Fedora 45](https://github.com/sorguido/goodix-27c6-5125/issues/55), segnalazione dell'utente, output dei controlli e conclusione del maintainer (6–7 novembre 2026).
+- **Claim osservato:** sull'host segnalato erano presenti un drop-in `fprintd.service.d/keepalive.conf` con `--no-timeout` e file essenziali mancanti nel pacchetto Fedora `libfprint`. L'override non riconosciuto è sufficiente a far rifiutare in sicurezza l'installazione dal preflight canonico; il Manager mostrava un errore generico.
+- **Limite:** singolo caso reale, non stima di frequenza né prova che tutti i fallimenti di installazione abbiano questa causa. Il possibile rapporto fra file mancanti e precedente exit 127 di fprintd richiederebbe conferma dai journal; non assumere causalità ulteriore.
+- **Dettaglio:** issue e allegati collegati nella conversazione GitHub; non copiarvi output sensibili. Desiderata e criteri di progettazione: `diagnostic_statement.md`.
+- **Rilevanza:** DIAG0–DIAG4, soprattutto messaggi discriminanti e preflight read-only.
