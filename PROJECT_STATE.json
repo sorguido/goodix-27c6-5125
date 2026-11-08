@@ -4,39 +4,67 @@
   "project": "Goodix 27c6:5125 — Goodix Manager diagnostics",
   "branch": "diagnostic",
   "execution_path": "PRIMARY",
-  "phase": "DIAG0",
-  "phase_status": "DOCUMENTATION_ROUTED_PENDING_LOCAL_ASSET_VERIFICATION",
-  "primary_artifact": "development/diagnostic/diagnostic_statement.md",
+  "phase": "DIAG4",
+  "phase_status": "OFFLINE_COMPLETE_STOP_BEFORE_RPM_AND_FEDORA45_VM",
+  "primary_artifact": "docs/DIAGNOSTICS_VALIDATION.md",
   "completed_gates": [
-    "DIAG0_DESIDERATA_RECORDED"
+    "DIAG0_DESIDERATA_RECORDED",
+    "DIAG0_LOCAL_ARTIFACT_VERIFICATION",
+    "DIAG0_INDEPENDENT_REVIEW",
+    "DIAG0_EXIT_GATE",
+    "DIAG1_AUTHORIZATION",
+    "DIAG1_MATRIX_REVIEW",
+    "DIAG1_EXIT_GATE",
+    "DIAG2_READER_OFFLINE_VERIFICATION",
+    "DIAG2_INDEPENDENT_REVIEW",
+    "DIAG2_OFFLINE_EXIT_GATE",
+    "DIAG3_GUI_AND_MOCKUP_REVIEW",
+    "DIAG3_INDEPENDENT_REVIEW",
+    "DIAG3_OFFLINE_EXIT_GATE",
+    "DIAG4_OFFLINE_COVERAGE",
+    "DIAG4_FINAL_INDEPENDENT_REVIEW"
   ],
   "pending_gates": [
-    "DIAG0_LOCAL_ARTIFACT_VERIFICATION",
-    "DIAG1_AUTHORIZATION"
+    "RPM_AND_FEDORA45_VM_AUTHORIZATION",
+    "DIAG4_REAL_TARGET_QUALIFICATION",
+    "DIAG5_ACCEPTANCE"
   ],
   "host_modified": false,
   "host_runtime_modified": false,
   "usb_access": false,
   "runtime_changes": false,
   "relevant_artifacts": [
+    "docs/DIAGNOSTICS.md",
     "development/diagnostic/diagnostic_statement.md",
     "development/diagnostic/Goodix_Diagnostic_Center_mockup.html",
     "development/diagnostic/Goodix_Diagnostic_navigation.png",
-    "development/diagnostic/mockup icon to be used.png",
+    "development/diagnostic/mokeup icon to be used.png",
+    "development/diagnostic/Goodix_Diagnostic_overview_screens.png",
+    "development/diagnostic/Goodix_Diagnostic_workflow_screens.png",
     "ROADMAP.md",
     "CORROBORATIONS.md",
     "ARTIFACT_INDEX.json",
     "packaging/rpm/manager/main.py",
     "packaging/rpm/helper.py",
-    "deployment/install.py"
+    "deployment/install.py",
+    "packaging/rpm/manager/diagnostics.py",
+    "packaging/rpm/manager/test_diagnostics.py",
+    "packaging/rpm/manager/reader.py",
+    "packaging/rpm/manager/test_reader.py",
+    "packaging/rpm/manager/DiagnosticPage.qml",
+    "packaging/rpm/manager/test_diagnostics_ui.py",
+    "packaging/rpm/manager/test_qml_cache.py",
+    "development/diagnostic-qualification/",
+    "docs/DIAGNOSTICS_VALIDATION.md",
+    "development/diagnostic-qualification/screens/"
   ],
   "relevant_corroborations": [
     "C4"
   ],
-  "next_action": "Nel checkout locale, verificare l'esistenza e la leggibilità dei file sotto development/diagnostic/; usare HTML e diagramma come riferimento GUI approvato. Nessuna possibilità di consultazione remota GitHub dei file gitignored. Non iniziare DIAG1 o implementazione senza autorizzazione.",
-  "last_verified_head": null,
+  "next_action": "STOP: attendere nuova autorizzazione specifica prima di packaging RPM e campagna VM Fedora 45; non avviarli. Qualificazione DIAG4 sul target reale e DIAG5/live richiedono autorizzazione separata. Il manifest staging non include ancora i nuovi file e richiede futura revisione packaging.",
+  "last_verified_head": "78a592475058f1b48f795883d19e9d18114f7d3e",
   "observed_remote_base_head": "4bc1f308071768b4f8045e58b4d12937bfa8ada2",
-  "documentation_only": true,
+  "documentation_only": false,
   "previous_milestone": {
     "schema_version": 1,
     "authoritative": false,
@@ -100,6 +128,55 @@
     "draft_release_created": true,
     "draft_postflight_evidence": "development/rpm/draft-301/authenticated-postflight.json"
   },
-  "gui_reference": "USER_APPROVED_MOCKUP_LOCAL_ASSETS_NOT_VERIFIED_REMOTELY",
-  "local_context_availability": "GITIGNORED_NOT_AVAILABLE_IN_GITHUB"
+  "gui_reference": "USER_APPROVED_HTML_BINDING_STRUCTURE_NAVIGATION_STYLE_MANAGER_COHERENCE",
+  "local_context_availability": "ALL_SIX_LOCAL_ARTIFACTS_READABLE_GITIGNORED",
+  "local_artifact_verification": {
+    "status": "OBSERVED_PRESENT_READABLE",
+    "artifacts": [
+      "development/diagnostic/Goodix_Diagnostic_Center_mockup.html",
+      "development/diagnostic/Goodix_Diagnostic_navigation.png",
+      "development/diagnostic/Goodix_Diagnostic_overview_screens.png",
+      "development/diagnostic/Goodix_Diagnostic_workflow_screens.png",
+      "development/diagnostic/diagnostic_statement.md",
+      "development/diagnostic/mokeup icon to be used.png"
+    ],
+    "validation": "Testi UTF-8 leggibili integralmente; quattro PNG validi. Lettura integrale dei materiali e ispezione visiva completate dal PM.",
+    "reference_note": "Il concept board precedente contiene una sidebar; HTML, diagramma e tavole successive definiscono il percorso a tre scelte. Riferimento vincolante: mockup HTML; non reinterpretarlo in base al concept precedente.",
+    "gui_implementation_comparison": "DIAG3_ACCEPTED_EXPLICIT_HTML_NAVIGATION_BOARDS_CURRENT_MANAGER_COMPARISON_WITH_JUSTIFIED_QT_TIME_READER_ADAPTATIONS"
+  },
+  "independent_review": "ACCEPT_AND_CONTINUE_DIAG4_OFFLINE_FINAL",
+  "offline_authorization": {
+    "phases": [
+      "DIAG1",
+      "DIAG2",
+      "DIAG3",
+      "DIAG4"
+    ],
+    "advance_after_technical_gates_and_review": true,
+    "stop_before": [
+      "RPM_PACKAGING",
+      "FEDORA45_VM_CAMPAIGN"
+    ],
+    "live_authorized": false
+  },
+  "verification": {
+    "diagnostic_collector": "PASS_24_OFFLINE_TESTS",
+    "reader": "PASS_21_OFFLINE_TESTS_INCLUDING_2_PRIVATE_QT_DBUS_CASES",
+    "gui_mockup_comparison": "ACCEPT_AND_CONTINUE_DIAG3_EXPLICIT_REVIEW",
+    "live_sensor_host_and_vm": "NOT_PERFORMED",
+    "rpm_packaging": "NOT_STARTED_STOP_BOUNDARY",
+    "controller": "PASS_11_OFFLINE_TESTS",
+    "controller_and_qml_flows": "PASS_18_UNIQUE_TESTS_11_CONTROLLER_7_QTEST",
+    "targeted_final_reader_header_flow": "PASS_1_REPEAT_NOT_ADDED_TO_UNIQUE_TOTAL",
+    "helper_regression": "PASS_28_OFFLINE_TESTS_UNCHANGED_SOURCE",
+    "model_regression": "PASS_17_OFFLINE_TESTS_UNCHANGED_SOURCE",
+    "network_ui_regression": "PASS_15_SYNTHETIC_TESTS",
+    "unique_unit_integration_cases": 123,
+    "existing_manager_palettes": "PASS_LIGHT_AND_DARK_13_RENDER_STATES_PER_RUN",
+    "qml_cache": "PASS_BOTH_QML_MTIMES_UNCHANGED_DIAGNOSTIC_QML_SIZE_ALSO_UNCHANGED",
+    "approved_assets": "PASS_6_SHA256_UNCHANGED",
+    "synthetic_screens": "13_GITIGNORED_NOT_APPROVED_REFERENCES",
+    "rpm_staging_new_files": "NOT_UPDATED_FUTURE_PACKAGING_PREREQUISITE",
+    "final_independent_review": "ACCEPT_AND_CONTINUE_DIAG4_OFFLINE_ONLY"
+  }
 }

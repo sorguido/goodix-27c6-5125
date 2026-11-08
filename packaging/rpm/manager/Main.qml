@@ -11,8 +11,10 @@ Kirigami.ApplicationWindow {
     height: 780
     minimumWidth: 520
     minimumHeight: 560
+    pageStack.defaultColumnWidth: width
     property var info: backend.view
     property string requestedAction: ""
+    property bool closePending: false
     readonly property bool driverOperationActive: info.busy && ["install", "update", "remove"].indexOf(info.operation) !== -1
     // Bind all system groups at startup and on paletteChanged; no application theme override.
     SystemPalette { id: systemPalette; colorGroup: SystemPalette.Active }
@@ -80,6 +82,18 @@ Kirigami.ApplicationWindow {
         if (info.busy) {
             close.accepted = false
             busyDialog.open()
+        } else if (!backend.request_close()) {
+            close.accepted = false
+            window.closePending = true
+        }
+    }
+    Connections {
+        target: backend
+        function onChanged() {
+            if (window.closePending && backend.closeReady) {
+                window.closePending = false
+                window.close()
+            }
         }
     }
     pageStack.initialPage: Kirigami.ScrollablePage {
@@ -172,19 +186,19 @@ Kirigami.ApplicationWindow {
                             text: info.upgradeLegacy ? "Upgrade to " + info.payload : info.action === "update" ? "Apply Update" : "Install"
                             icon.name: info.action === "update" ? "system-software-update" : "list-add"
                             highlighted: true
-                            enabled: !info.busy && info.action !== ""
+                            enabled: !info.busy && !info.diagnosticBusy && info.action !== ""
                             onClicked: { window.requestedAction = info.action; confirmDialog.open() }
                         }
                         Controls.Button { implicitHeight: 38;
                             text: "Verify status"
                             icon.name: "view-refresh"
-                            enabled: !info.busy
+                            enabled: !info.busy && !info.diagnosticBusy
                             onClicked: backend.refresh()
                         }
                         Controls.Button { implicitHeight: 38;
                             text: "Remove"
                             icon.name: "edit-delete"
-                            enabled: !info.busy && info.canRemove
+                            enabled: !info.busy && !info.diagnosticBusy && info.canRemove
                             onClicked: { window.requestedAction = "remove"; confirmDialog.open() }
                         }
                     }
@@ -231,12 +245,14 @@ Kirigami.ApplicationWindow {
                 Controls.Button { implicitHeight: 38; text: "Report a bug"; icon.name: "tools-report-bug"; onClicked: backend.report_bug() }
                 Item { Layout.fillWidth: true }
                 Controls.Button { implicitHeight: 38;
-                    text: "Copy diagnostics"
-                    icon.name: "edit-copy"
-                    onClicked: { backend.copy_diagnostics(); copiedLabel.text = "Diagnostics copied"; copiedTimer.restart() }
+                    objectName: "openDiagnosticCenter"
+                    text: "Diagnostic Center"
+                    icon.name: "view-statistics"
+                    highlighted: true
+                    enabled: !info.busy && !info.diagnosticBusy
+                    onClicked: window.pageStack.push(diagnosticComponent, {managerWindow: window})
                 }
             }
-            Controls.Label { id: copiedLabel; Layout.fillWidth: true; horizontalAlignment: Text.AlignRight; opacity: 0.7 }
             Controls.Label {
                 text: "Installing the Manager package does not activate the driver. Removing the driver keeps this app available. Password login and recovery remain essential."
                 wrapMode: Text.WordWrap
@@ -245,7 +261,6 @@ Kirigami.ApplicationWindow {
             }
         }
     }
-    Timer { id: copiedTimer; interval: 3000; onTriggered: copiedLabel.text = "" }
     Controls.Dialog {
         id: confirmDialog
         anchors.centerIn: parent

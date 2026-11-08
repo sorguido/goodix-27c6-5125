@@ -19,7 +19,7 @@ La draft 3.0.1 e i risultati ChicagoHS appartengono alla milestone precedente: n
 
 ### DIAG1 — Matrice diagnostica (DESIGN)
 - **PURPOSE:** scegliere controlli pertinenti, profili di log, fonti, privilegi, costo, dati sensibili, limiti di interpretazione e comportamenti read-only; distinguere disponibilità delle prove da esito positivo.
-- **PRIMARY_ARTIFACT:** un artefatto decisionale di fase, da creare soltanto all'avvio di DIAG1.
+- **PRIMARY_ARTIFACT:** `docs/DIAGNOSTICS.md`, matrice e decisioni diagnostiche basate sul codice corrente.
 - **EXIT_GATE:** matrice completa per le aree prioritarie, copertura ragionata delle failure più significative, raccolte delimitate, profili A–E e decisione documentata sui rischi; approvazione umana del perimetro.
 - **NEXT:** DIAG2.
 
@@ -31,7 +31,7 @@ La draft 3.0.1 e i risultati ChicagoHS appartengono alla milestone precedente: n
 
 ### DIAG3 — Centro diagnostico e rapporti (IMPLEMENTATION)
 - **PURPOSE:** esporre controlli su richiesta, messaggi discriminanti e generatori di rapporti mirati senza fare del Manager un riparatore del sistema. Mantenere navigazione, linguaggio non tecnico e stile KDE/Goodix Manager del mockup approvato; modifiche motivate solo da fattibilità, sicurezza o qualità dell'esperienza utente.
-- **PRIMARY_ARTIFACT:** Manager/helper con test UI e di sicurezza. Riferimenti visuali locali: [mockup HTML](development/diagnostic/Goodix_Diagnostic_Center_mockup.html), [diagramma di navigazione](development/diagnostic/Goodix_Diagnostic_navigation.png) e [tavola concept](development/diagnostic/mockup icon to be used.png). L'HTML è un **prototipo grafico**, non una specifica di backend né una prova che i controlli funzionino.
+- **PRIMARY_ARTIFACT:** Manager/helper con test UI e di sicurezza. Riferimenti visuali locali: [mockup HTML](development/diagnostic/Goodix_Diagnostic_Center_mockup.html), [diagramma di navigazione](development/diagnostic/Goodix_Diagnostic_navigation.png) e [tavola concept](development/diagnostic/mokeup icon to be used.png). L'HTML è un **prototipo grafico**, non una specifica di backend né una prova che i controlli funzionino. Struttura, navigazione, stile e coerenza con Goodix Manager del mockup approvato sono vincolanti; il Reviewer deve confrontarli esplicitamente con la GUI realizzata e motivare eventuali scostamenti.
 - **EXIT_GATE:** controlli statici utilizzabili anche prima dell'installazione; test dinamici solo espliciti; consenso preventivo per raccolte potenzialmente sensibili; anteprima locale; nessun upload/telemetria.
 - **NEXT:** DIAG4.
 
@@ -53,4 +53,8 @@ I materiali in `development/diagnostic/` sono **gitignored e locali**, non pubbl
 
 ## Stato autorizzato alla data del documento
 
-**Solo DIAG0 documentale.** Non iniziare DIAG1 né alcuna implementazione senza il relativo passaggio autorizzato. `PROJECT_STATE.json` è una cache non autoritativa: Git ed evidenze prevalgono. `TECHNICAL_MANUAL.md` resta reference tecnica durevole, non registro di test o di orchestrazione.
+Per questo Goal sul ramo `diagnostic`, l'Utente ha autorizzato esplicitamente lo sviluppo **offline DIAG1–DIAG4**, inclusi matrice, implementazione e test, con avanzamento fra le fasi dopo soddisfacimento dei rispettivi criteri tecnici e review indipendente, senza ulteriori approvazioni intermedie. Questa eccezione circoscritta soddisfa i passaggi di autorizzazione fra tali fasi; non elimina gli EXIT_GATE tecnici né autorizza prove live o affermazioni di compatibilità reale basate su test offline. `AGENTS.md` resta invariato.
+
+**STOP prima di packaging RPM e campagna VM Fedora 45.** Restano esclusi esecuzione di accessi al sensore/USB reale, sudo e test privilegiati, installazione o modifica del runtime host, accesso a dati protetti, modifiche del motore biometrico o del pairing, modifiche all'autenticazione o alla configurazione Fedora, merge, release e pubblicazione. È inclusa l'implementazione del normale test runtime fprintd con consenso esplicito e cleanup, verificata esclusivamente con bus e dispositivi fittizi; nessun test biometrico viene eseguito in questa campagna. Eventuali criteri che richiedono il target reale restano non qualificati e vanno dichiarati come tali. DIAG5 e la qualificazione reale richiedono decisione separata.
+
+`PROJECT_STATE.json` è una cache non autoritativa: Git ed evidenze prevalgono. `TECHNICAL_MANUAL.md` resta reference tecnica durevole, non registro di test o di orchestrazione.

@@ -43,7 +43,9 @@
       "development/diagnostic/diagnostic_statement.md",
       "development/diagnostic/Goodix_Diagnostic_Center_mockup.html",
       "development/diagnostic/Goodix_Diagnostic_navigation.png",
-      "development/diagnostic/mockup icon to be used.png",
+      "development/diagnostic/mokeup icon to be used.png",
+      "development/diagnostic/Goodix_Diagnostic_overview_screens.png",
+      "development/diagnostic/Goodix_Diagnostic_workflow_screens.png",
       "CORROBORATIONS.md"
     ],
     "DIAG1": [
@@ -53,43 +55,78 @@
       "packaging/rpm/manager/main.py",
       "packaging/rpm/helper.py",
       "deployment/install.py",
-      "docs/SECURITY.md"
+      "docs/SECURITY.md",
+      "docs/DIAGNOSTICS.md"
     ],
     "DIAG2": [
       "packaging/rpm/manager/model.py",
       "packaging/rpm/manager/main.py",
       "packaging/rpm/helper.py",
-      "deployment/install.py"
+      "deployment/install.py",
+      "docs/DIAGNOSTICS.md",
+      "packaging/rpm/manager/diagnostics.py",
+      "packaging/rpm/manager/reader.py",
+      "packaging/rpm/manager/test_diagnostics.py",
+      "packaging/rpm/manager/test_reader.py",
+      "packaging/rpm/manager/test_diagnostics_ui.py"
     ],
     "DIAG3": [
       "development/diagnostic/Goodix_Diagnostic_Center_mockup.html",
       "development/diagnostic/Goodix_Diagnostic_navigation.png",
-      "development/diagnostic/mockup icon to be used.png",
+      "development/diagnostic/mokeup icon to be used.png",
       "development/diagnostic/Goodix_Diagnostic_overview_screens.png",
       "development/diagnostic/Goodix_Diagnostic_workflow_screens.png",
       "development/diagnostic/diagnostic_statement.md",
       "packaging/rpm/manager/Main.qml",
       "packaging/rpm/manager/main.py",
       "packaging/rpm/manager/test_ui.py",
-      "docs/SECURITY.md"
+      "docs/SECURITY.md",
+      "docs/DIAGNOSTICS.md",
+      "packaging/rpm/manager/DiagnosticPage.qml",
+      "packaging/rpm/manager/diagnostics.py",
+      "packaging/rpm/manager/reader.py",
+      "packaging/rpm/manager/test_diagnostics_ui.py",
+      "packaging/rpm/manager/test_qml_cache.py",
+      "development/diagnostic-qualification/"
     ],
     "DIAG4": [
       "docs/VALIDATION.md",
-      "docs/SECURITY.md"
+      "docs/SECURITY.md",
+      "docs/DIAGNOSTICS.md",
+      "packaging/rpm/manager/diagnostics.py",
+      "packaging/rpm/manager/reader.py",
+      "packaging/rpm/manager/test_diagnostics.py",
+      "packaging/rpm/manager/test_reader.py",
+      "packaging/rpm/manager/test_diagnostics_ui.py",
+      "packaging/rpm/manager/test_ui.py",
+      "packaging/rpm/manager/test_qml_cache.py",
+      "development/diagnostic-qualification/",
+      "docs/DIAGNOSTICS_VALIDATION.md"
     ],
     "DIAG5": [
       "docs/VALIDATION.md",
-      "docs/INSTALLATION.md"
+      "docs/INSTALLATION.md",
+      "docs/DIAGNOSTICS_VALIDATION.md"
     ]
   },
   "routing_rule": "Leggere i canonici e lo stato; caricare solo la route pertinente. I materiali in development/diagnostic/ sono gitignored, esistono solo nel checkout dell'utente: verificare la presenza prima di usarli; non interpretarli come raggiungibili da GitHub. Per DIAG3, il mockup HTML e il diagramma di navigazione approvati guidano GUI e UX, non costituiscono prova di funzionalità tecnica. CORROBORATIONS.md è solo indice di evidenze esterne.",
   "diagnostic_gui_references": {
-    "availability": "LOCAL_ONLY_GITIGNORED_VERIFY_ON_WORKSTATION",
-    "priority": "APPROVED_VISUAL_GUIDANCE_NOT_BACKEND_SPEC",
+    "availability": "ALL_SIX_LOCAL_ARTIFACTS_VERIFIED_READABLE_GITIGNORED",
+    "priority": "APPROVED_HTML_BINDING_STRUCTURE_NAVIGATION_STYLE_MANAGER_COHERENCE_NOT_BACKEND_SPEC",
     "interactive_mockup": "development/diagnostic/Goodix_Diagnostic_Center_mockup.html",
     "navigation_diagram": "development/diagnostic/Goodix_Diagnostic_navigation.png",
-    "visual_concept_board": "development/diagnostic/mockup icon to be used.png",
+    "visual_concept_board": "development/diagnostic/mokeup icon to be used.png",
     "overview_screens": "development/diagnostic/Goodix_Diagnostic_overview_screens.png",
-    "workflow_screens": "development/diagnostic/Goodix_Diagnostic_workflow_screens.png"
+    "workflow_screens": "development/diagnostic/Goodix_Diagnostic_workflow_screens.png",
+    "concept_scope": "Il concept board precedente contiene una sidebar; seguire il mockup HTML e i successivi diagramma e tavole con percorso a tre scelte.",
+    "review_requirement": "DIAG3: confronto esplicito GUI realizzata con HTML, diagramma, tavole e Goodix Manager accettato dal Reviewer; adattamenti motivati Qt/palette, intervallo ISO e consenso/cancel/tre tentativi lettore. Riferimenti approvati invariati; output sintetici separati."
+  },
+  "diagnostic_qualification_outputs": {
+    "directory": "development/diagnostic-qualification/",
+    "screens": "development/diagnostic-qualification/screens/",
+    "status": "SYNTHETIC_GENERATED_OFFLINE_EVIDENCE_NOT_APPROVED_DESIGN_REFERENCES",
+    "png_count": 13,
+    "validation_record": "docs/DIAGNOSTICS_VALIDATION.md",
+    "purpose": "Screenshot sintetici generati per qualificazione offline; distinti dagli artefatti progettuali approvati in development/diagnostic/; non provano comportamento live."
   }
 }
