@@ -87,7 +87,9 @@
       "packaging/rpm/manager/reader.py",
       "packaging/rpm/manager/test_diagnostics_ui.py",
       "packaging/rpm/manager/test_qml_cache.py",
-      "development/diagnostic-qualification/"
+      "development/diagnostic-qualification/",
+      "packaging/rpm/manager/diagnostic-icons/",
+      "development/diagnostic-qualification/corrective/screens/"
     ],
     "DIAG4": [
       "docs/VALIDATION.md",
@@ -101,7 +103,12 @@
       "packaging/rpm/manager/test_ui.py",
       "packaging/rpm/manager/test_qml_cache.py",
       "development/diagnostic-qualification/",
-      "docs/DIAGNOSTICS_VALIDATION.md"
+      "docs/DIAGNOSTICS_VALIDATION.md",
+      "packaging/rpm/stage.py",
+      "packaging/rpm/test_stage.py",
+      "packaging/rpm/goodix-manager.spec.in",
+      "packaging/rpm/manager/diagnostic-icons/",
+      "development/diagnostic-qualification/corrective/screens/"
     ],
     "DIAG5": [
       "docs/VALIDATION.md",
@@ -112,21 +119,23 @@
   "routing_rule": "Leggere i canonici e lo stato; caricare solo la route pertinente. I materiali in development/diagnostic/ sono gitignored, esistono solo nel checkout dell'utente: verificare la presenza prima di usarli; non interpretarli come raggiungibili da GitHub. Per DIAG3, il mockup HTML e il diagramma di navigazione approvati guidano GUI e UX, non costituiscono prova di funzionalità tecnica. CORROBORATIONS.md è solo indice di evidenze esterne.",
   "diagnostic_gui_references": {
     "availability": "ALL_SIX_LOCAL_ARTIFACTS_VERIFIED_READABLE_GITIGNORED",
-    "priority": "APPROVED_HTML_BINDING_STRUCTURE_NAVIGATION_STYLE_MANAGER_COHERENCE_NOT_BACKEND_SPEC",
+    "priority": "HTML_STRUCTURE_NAVIGATION_PNG_CONCEPT_ICON_STYLE",
     "interactive_mockup": "development/diagnostic/Goodix_Diagnostic_Center_mockup.html",
     "navigation_diagram": "development/diagnostic/Goodix_Diagnostic_navigation.png",
     "visual_concept_board": "development/diagnostic/mokeup icon to be used.png",
     "overview_screens": "development/diagnostic/Goodix_Diagnostic_overview_screens.png",
     "workflow_screens": "development/diagnostic/Goodix_Diagnostic_workflow_screens.png",
-    "concept_scope": "Il concept board precedente contiene una sidebar; seguire il mockup HTML e i successivi diagramma e tavole con percorso a tre scelte.",
-    "review_requirement": "DIAG3: confronto esplicito GUI realizzata con HTML, diagramma, tavole e Goodix Manager accettato dal Reviewer; adattamenti motivati Qt/palette, intervallo ISO e consenso/cancel/tre tentativi lettore. Riferimenti approvati invariati; output sintetici separati."
+    "concept_scope": "Lo stile icone deve seguire mokeup icon to be used.png; la sidebar del concept non sostituisce struttura e navigazione del mockup HTML.",
+    "review_requirement": "Review correttiva finale ACCEPT_AND_CONTINUE: tutti7punti verificati, layout/navigazione HTML e stile/morfologia icone PNG a24px dark/light accettati.52testPASS; nessun build/installRPM, VM o test live."
   },
   "diagnostic_qualification_outputs": {
     "directory": "development/diagnostic-qualification/",
-    "screens": "development/diagnostic-qualification/screens/",
+    "screens": "development/diagnostic-qualification/corrective/screens/",
     "status": "SYNTHETIC_GENERATED_OFFLINE_EVIDENCE_NOT_APPROVED_DESIGN_REFERENCES",
-    "png_count": 13,
+    "png_count": 19,
     "validation_record": "docs/DIAGNOSTICS_VALIDATION.md",
-    "purpose": "Screenshot sintetici generati per qualificazione offline; distinti dagli artefatti progettuali approvati in development/diagnostic/; non provano comportamento live."
+    "purpose": "Capture sintetiche correttive, inclusi disponibilità temporale, fallimenti raccolta e icone24px dark/light; separate dai13output baseline e dai riferimenti approvati. Non provano comportamento live.",
+    "baseline_screens": "development/diagnostic-qualification/screens/",
+    "baseline_png_count": 13
   }
 }

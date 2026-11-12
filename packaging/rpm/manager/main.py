@@ -38,7 +38,8 @@ class DiagnosticWorker(QThread):
             value = self.task(self.cancel)
         except Exception:
             # Neither exceptions nor subprocess output cross the UI boundary.
-            value = {'reportReady': False, 'reportError': 'Diagnostic data could not be collected.'}
+            value = {'checks': [], 'overview': 'No new diagnostic results are available', 'generatedAt': '',
+                     'reportReady': False, 'reportError': 'Diagnostic data could not be collected.'}
         self.result.emit(self.generation, value)
 
 
@@ -293,6 +294,7 @@ class Controller(QObject):
                 'readerCanStart': reader['canStart'],
                 'busy': self._diagnostic_thread is not None or reader['busy'],
                 'collecting': self._diagnostic_thread is not None,
+                'installationTimeAvailable': diagnostic_tools.installation_reference(self._diagnostic_snapshot()) is not None,
                 'statusObservedAt': self.status_observed_at,
                 'lastOperation': dict(self.last_operation)}
 
@@ -309,6 +311,7 @@ class Controller(QObject):
         if self._shutdown_requested or self.busy or self.diagnostics['busy']:
             return False
         self.invalidate_diagnostic_report()
+        self._clear_diagnostic_results('Collecting new diagnostic evidence…')
         cancel = Event()
         self._diagnostic_cancel = cancel
         worker = DiagnosticWorker(self._diagnostic_generation, task, cancel, self)
@@ -327,7 +330,12 @@ class Controller(QObject):
         for key in self._diagnostic_data:
             if key in value:
                 self._diagnostic_data[key] = value[key]
+        if value.get('reportError') and not value.get('checks'):
+            self._clear_diagnostic_results('No new diagnostic results are available')
         self.changed.emit()
+
+    def _clear_diagnostic_results(self, overview):
+        self._diagnostic_data.update(checks=[], overview=overview, generatedAt='')
 
     def _diagnostic_snapshot(self):
         if not self.status_observed_at and not self.last_operation:
@@ -338,6 +346,9 @@ class Controller(QObject):
 
     @Slot()
     def _diagnostic_worker_finished(self):
+        if self._diagnostic_cancel is not None and self._diagnostic_cancel.is_set():
+            self._clear_diagnostic_results('Collection cancelled. No new diagnostic results are available.')
+            self._diagnostic_data['reportError'] = 'Collection was cancelled. No new report was created.'
         worker, self._diagnostic_thread = self._diagnostic_thread, None
         self._diagnostic_cancel = None
         if worker is not None:
@@ -355,6 +366,7 @@ class Controller(QObject):
             return
         if consent is not True:
             self.invalidate_diagnostic_report()
+            self._clear_diagnostic_results('No new diagnostic results are available')
             self._diagnostic_data['reportError'] = 'Consent is required before collecting a report.'
             self.changed.emit()
             return
@@ -396,7 +408,9 @@ class Controller(QObject):
     @Slot()
     def cancel_diagnostics(self):
         self.invalidate_diagnostic_report()
+        self._clear_diagnostic_results('No new diagnostic results are available')
         self.reader.cancel()
+        self.changed.emit()
 
     @Property(bool, notify=changed)
     def closeReady(self):

@@ -1,23 +1,79 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Diagnostic Center: offline qualification
 
-The Diagnostic Center implementation on branch `diagnostic` passed the offline
-checks below. This qualifies software contracts and synthetic UI behavior, not
-real Fedora installation, authentication, reader safety or biometric performance.
-DIAG3 independent review accepted the implemented GUI against the approved
-mockup. Final independent review accepted DIAG4 offline consolidation
-(`ACCEPT_AND_CONTINUE` for the offline scope only).
+The initial Diagnostic Center implementation is committed on branch `diagnostic`
+at `dbdff8dc70f33cd8cc6a9b141942ad3371a28080`. The current corrective changes are
+in the working tree on that commit. Evidence from the initial qualification and
+from this corrective pass is distinguished below. Offline checks qualify software
+contracts and synthetic UI behavior, not real Fedora installation, authentication,
+reader safety or biometric performance.
 
 Scope: the user authorized DIAG1–DIAG4 offline and required a stop before RPM
-packaging and the Fedora 45 VM campaign. No sensor, protected biometric/pairing
+packaging and the Fedora 45 VM campaign. The subsequent corrective request permits
+updating staging code and manifests, while retaining the stop before an RPM build
+or installation. No sensor, protected biometric/pairing
 data, root operation, host runtime or Fedora authentication configuration was
-used or changed. No commit, merge, release or publication was performed.
+used or changed. No new commit, merge, release or publication was performed by the
+corrective pass.
 
-## Automated evidence
+## Corrective offline evidence
 
-The PM and independent Reviewer verified these results during this Goal. Commands
-are run from the repository root. All host sources, lifecycle operations and
-public-network responses in the tests are synthetic or mocked.
+| Checks in this corrective pass | Result | Evidence |
+| --- | --- | --- |
+| Collector and shared installation-time contract | 27 PASS | `python3 -m unittest discover -s packaging/rpm/manager -p test_diagnostics.py`; includes concurrent Security findings and subsecond future timestamps |
+| Manager staging contract | 3 PASS | `python3 packaging/rpm/test_stage.py -v`; temporary fixtures and isolated imports of staged modules, without building a payload or RPM |
+| Controller and diagnostic QML | 22 PASS (13 Controller, 9 QML) | `python3 packaging/rpm/manager/test_diagnostics_ui.py --render-dir development/diagnostic-qualification/corrective/screens`; final availability/cancellation guards included |
+| Manager palette/layout regression | PASS | `python3 packaging/rpm/manager/test_ui.py --initial-palette dark` and the same command with `--initial-palette light`; 13 in-memory render states per run |
+| QML disk-cache regression | PASS | `python3 packaging/rpm/manager/test_qml_cache.py`; both QML pages load current bytes, with SVG resources available |
+
+The first three corrective rows contain **52 distinct unit/integration cases**
+(`27 + 3 + 22`). Palette/cache script gates and the Reviewer's three targeted repeats are
+separate; they are not added to this count or to the historical baseline total.
+
+Staging now explicitly includes `diagnostics.py`, `reader.py`,
+`DiagnosticPage.qml` and fourteen local SVG icons alongside the existing Manager
+files. Tests verify the exact allowlist, modes, exclusion of unrelated files,
+isolated module imports and the existing recursive Manager `%files` ownership.
+The future spec adds the staging contract test. These are source/fixture checks,
+not a package build or installation result.
+
+The Security group retains SELinux mode and software metadata findings together,
+including concurrent anomalies and unavailable sources, with separate stable
+codes and readable details in the UI and report. The shared pure
+`installation_reference()` accepts only a usable, timezone-aware, nonfuture
+install/update time; remove-only, malformed and unavailable references cannot
+enable the latest-installation choice. The collector validates the same window.
+New collection, failure, denial and cancellation clear previous checks, overview
+and collection timestamp; failure remains explicit instead of displaying old
+results as fresh. Descriptions do not claim D-Bus, SELinux policy or file-label
+coverage beyond the observations actually collected.
+
+The independent Reviewer checked all seven points against the corrective request,
+including the HTML layout/navigation and the icon style of
+`development/diagnostic/mokeup icon to be used.png`, without blocking findings.
+Final independent review accepted the complete corrective pass
+(`ACCEPT_AND_CONTINUE`), with 52 cases PASS and no blocking findings. Layout and
+navigation match the HTML reference; icon morphology/style match the PNG at
+24 pixels in dark/light palettes. Icon style follows the PNG reference; this does not
+introduce the concept board's earlier sidebar into the HTML navigation.
+
+Nineteen current synthetic captures are in
+`development/diagnostic-qualification/corrective/screens/`, including latest-time
+availability, failed recollection and 24-pixel icon contacts in both palettes.
+The Reviewer explicitly compared overview/check/problem/reader views and the
+corrective views/icon contacts with the approved references. All these PNGs are
+Git-ignored generated evidence, not approved source artwork or real-host results.
+The icon comparison includes fingerprint, gear, USB and checklist morphology at
+24 pixels, rounded line style and readable palette contrast in dark/light mode.
+
+## Baseline qualification retained
+
+The PM and independent Reviewer accepted the initial DIAG3/DIAG4 offline
+qualification recorded in the committed baseline. The following results are
+retained prior evidence; they do not mean that every baseline test was rerun in
+this corrective pass. Commands are run from the repository root. Host sources,
+lifecycle operations and public-network responses in these tests are synthetic
+or mocked.
 
 | Checks | Result | Evidence command / scope |
 | --- | --- | --- |
@@ -30,7 +86,7 @@ public-network responses in the tests are synthetic or mocked.
 | Existing Manager light/dark and compact layout | PASS | `python3 packaging/rpm/manager/test_ui.py --initial-palette dark` and `python3 packaging/rpm/manager/test_ui.py --initial-palette light`; 13 render states per run |
 | QML disk-cache regression | PASS | `python3 packaging/rpm/manager/test_qml_cache.py`; fresh process reads current Manager and Diagnostic Center bytes despite old disk caches |
 
-There are **123 distinct unit/integration cases** in the first six rows
+There were **123 distinct unit/integration cases** in the baseline's first six rows
 (`24 + 21 + 18 + 28 + 17 + 15`). Rendering/cache script gates and repeated targeted
 checks are reported separately and are not added to that count. After the final
 reader-header label correction, the affected QML flow was rerun separately: one
@@ -62,9 +118,9 @@ for the Diagnostic Center substitution. The Manager seed removes a control and
 therefore has a different byte length; a same-size Manager replacement is not
 claimed by this test.
 
-## Explicit comparison with approved GUI references
+## Baseline comparison with approved GUI references
 
-The independent Reviewer compared the realized GUI with the approved local HTML,
+During initial qualification, the independent Reviewer compared the realized GUI with the approved local HTML,
 navigation diagram and overview/workflow boards, and with the current Goodix
 Manager. Result: **ACCEPT_AND_CONTINUE for DIAG3 offline**.
 
@@ -110,16 +166,19 @@ window-manager shortcut behavior remains unqualified.
 - Save failure is reported and may leave a partial 0600 file. The exporter does
   not unlink a pathname after I/O failure because another process may have
   replaced it. Cancelling the file dialog creates no file.
-- RPM staging manifests intentionally have **not** been updated for the new
-  Python modules and `DiagnosticPage.qml`. Reviewing and updating packaging is a
-  prerequisite for a future package, not a completed distribution check.
+- Manager staging code/manifests are now corrected and fixture-tested. Actual RPM
+  build, package-content verification, installation and Fedora 45 VM qualification
+  remain unperformed and require separate authorization.
 
-The branch and HEAD remain `diagnostic` /
-`78a592475058f1b48f795883d19e9d18114f7d3e`; implementation is in the working tree.
+The branch and HEAD are `diagnostic` /
+`dbdff8dc70f33cd8cc6a9b141942ad3371a28080`. The initial implementation is committed;
+only the corrective delta is uncommitted. The former `78a5924` reference described
+the earlier qualification epoch and is not the current HEAD.
 The PM rechecked all six approved local assets against their initial SHA-256
 inventory: unchanged. The previous-milestone cache is unchanged. Governance files
-`AGENTS.md`/`START.md`, helper, deployment, driver, production and RPM staging code
-were not modified by this Goal; `ROADMAP.md` has only the authorized scope update.
+`AGENTS.md`/`START.md`/`ROADMAP.md`, helper, deployment, driver and production code
+were not modified in the corrective pass. RPM staging/spec source changes are
+explicitly authorized corrections; no build or activation followed them.
 
 **Stop before RPM packaging and the Fedora 45 VM campaign.** DIAG4 real-target
 qualification and DIAG5/live acceptance remain pending separate authorization.

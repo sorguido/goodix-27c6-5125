@@ -389,6 +389,26 @@ def time_arguments(window, since='', until='', now=None):
     return ['--since=@' + str(int(start.timestamp())), '--until=@' + str(int(end.timestamp()))]
 
 
+def installation_reference(snapshot, now=None):
+    """One pure availability/window contract shared by the GUI and collector."""
+    now = now or _now()
+    try:
+        operation = snapshot_metadata(snapshot, now)['lastOperation']
+        if not operation or operation['action'] not in {'install', 'update'}:
+            return None
+        # The presentation snapshot normalizes to seconds. Use its validated
+        # raw timestamp so a subsecond future value is refused.
+        moment = _timestamp(snapshot['lastOperation']['observedAt'])
+        if moment > now:
+            return None
+        since = (moment - timedelta(minutes=5)).isoformat()
+        until = min(now, moment + timedelta(minutes=5)).isoformat()
+        time_arguments('custom', since, until, now)
+        return {'since': since, 'until': until}
+    except (ValueError, TypeError, OverflowError):
+        return None
+
+
 def event_category(message, source):
     """Exact source markers only; never copy message fragments or biometric counts."""
     if not isinstance(message, str) or len(message) > 16384:
@@ -569,28 +589,47 @@ class Collector:
         else:
             auth = row('auth', 'not_checked', 'pam_selector_' + selector_state, 'Integration partially checked',
                        'The vendor Plasma PAM file belongs to its Fedora package. The project selector is ' + ('byte-for-byte verified' if selector_state == 'checked' else 'absent; the project login integration is not activated') + '. sudo/polkit behavior and login remain unverified.')
+        security_findings = []
+
+        def security_finding(outcome, code, summary, detail, source):
+            security_findings.append(dict(outcome=outcome, code=code, summary=summary,
+                                          detail=detail, source=source, evidence='OBSERVED'))
+
         enforcement = self.command(['/usr/sbin/getenforce'])
         if enforcement.code == 'ok' and enforcement.returncode == 0 and not enforcement.stderr_present and enforcement.stdout.strip() == 'Enforcing':
-            security = row('security', 'not_checked', 'security_partial', 'SELinux Enforcing',
-                           'SELinux reports Enforcing. Protected state labels, permissions and policy behavior were not inspected.')
+            security_finding('not_checked', 'security_partial', 'SELinux Enforcing',
+                             'SELinux reports Enforcing; this does not verify policy behavior.', 'selinux_mode')
         elif enforcement.code == 'ok' and enforcement.returncode == 0 and not enforcement.stderr_present and enforcement.stdout.strip() in {'Permissive', 'Disabled'}:
-            security = row('security', 'anomaly', 'selinux_not_enforcing', 'SELinux is not Enforcing',
-                           'The observed SELinux mode differs from the required baseline. No setting was changed.')
+            security_finding('anomaly', 'selinux_not_enforcing', 'SELinux is not Enforcing',
+                             'SELinux reports ' + enforcement.stdout.strip() + ', which differs from the required Enforcing mode. No setting was changed.', 'selinux_mode')
         else:
-            security = unavailable('security', 'selinux_unavailable')
+            security_finding('unavailable', 'selinux_unavailable', 'SELinux mode unavailable',
+                             'The SELinux mode could not be checked. No positive result is claimed.', 'selinux_mode')
         try:
             metadata = self.metadata()
             if len(metadata) != len(SOFTWARE_PATHS) or any(v not in {'trusted', 'absent', 'changed', 'unavailable'} for v in metadata):
                 raise ValueError('invalid metadata')
             if 'changed' in metadata:
-                security = row('security', 'anomaly', 'software_permissions_changed', 'Software permissions need attention',
-                               'An ordinary software path or its parent has unexpected ownership, permissions or type. Protected data paths were not accessed.')
-            elif 'unavailable' in metadata:
-                security['detail'] += ' Some ordinary software path metadata was unavailable.'
-            else:
-                security['detail'] += ' Existing ordinary software paths have trusted root ownership/type/mode; absent paths were not verified. File labels remain unverified.'
+                security_finding('anomaly', 'software_permissions_changed', 'Software permissions need attention',
+                                 'An ordinary software path or its parent has unexpected ownership, permissions or type.', 'software_metadata')
+            if 'unavailable' in metadata:
+                security_finding('unavailable', 'software_metadata_unavailable', 'Some file checks unavailable',
+                                 'Some ordinary software path metadata was unavailable.', 'software_metadata')
+            if 'absent' in metadata:
+                security_finding('not_checked', 'software_paths_absent', 'Some software paths are absent',
+                                 'Absent ordinary software paths were not checked for ownership or permissions.', 'software_metadata')
+            if 'trusted' in metadata:
+                security_finding('pass', 'software_metadata_checked', 'Existing file metadata checked',
+                                 'Some inspected ordinary software paths have trusted root ownership, type and permissions.', 'software_metadata')
         except (OSError, ValueError):
-            security['detail'] += ' Ordinary software path metadata was unavailable.'
+            security_finding('unavailable', 'software_metadata_unavailable', 'File checks unavailable',
+                             'Ordinary software path metadata was unavailable.', 'software_metadata')
+        severity = {'anomaly': 3, 'unavailable': 2, 'not_checked': 1, 'pass': 0}
+        primary = max(security_findings, key=lambda f: severity[f['outcome']])
+        security = row('security', primary['outcome'], primary['code'],
+                       'Security settings need attention' if sum(f['outcome'] == 'anomaly' for f in security_findings) > 1 else primary['summary'],
+                       ' '.join(f['detail'] for f in security_findings) + ' Protected data paths were not accessed; file labels and authentication behavior remain unverified.')
+        security['findings'] = security_findings
         try:
             if self.cancel is not None and self.cancel.is_set():
                 raise OSError('cancelled')
@@ -604,6 +643,8 @@ class Collector:
         observed_at = self.now().isoformat(timespec='seconds')
         for check in checks:
             check['observedAt'] = observed_at
+            for finding in check.get('findings', []):
+                finding['observedAt'] = observed_at
         overview = ('One or more observed problems need attention' if any(c['outcome'] == 'anomaly' for c in checks) else
                     'Some checks are unavailable or incomplete' if any(c['outcome'] != 'pass' for c in checks) else
                     'No known configuration problems found in the completed checks')
@@ -624,12 +665,10 @@ class Collector:
         try:
             provenance = snapshot_metadata(status_snapshot, self.now())
             if time_window == 'installation':
-                operation = provenance['lastOperation']
-                if not operation:
+                reference = installation_reference(status_snapshot, self.now())
+                if reference is None:
                     raise ValueError('installation time unavailable')
-                moment = _timestamp(operation['observedAt'])
-                args = time_arguments('custom', (moment - timedelta(minutes=5)).isoformat(),
-                                      min(self.now(), moment + timedelta(minutes=5)).isoformat(), self.now())
+                args = time_arguments('custom', reference['since'], reference['until'], self.now())
             else:
                 args = time_arguments(time_window, since, until, self.now())
         except (ValueError, TypeError, OverflowError):
@@ -675,7 +714,13 @@ class Collector:
         if time_window == 'custom':
             lines.append('Requested range: ' + _timestamp(since).isoformat() + ' to ' + _timestamp(until).isoformat())
         for check in data['checks']:
-            lines.extend([check['title'] + ': ' + check['outcome'] + ' [' + check['code'] + ']', check['detail']])
+            lines.append(check['title'] + ': ' + check['outcome'] + ' [' + check['code'] + ']')
+            if check.get('findings'):
+                for finding in check['findings']:
+                    lines.append('  ' + finding['outcome'] + ' [' + finding['code'] + ']: ' + finding['detail'])
+                lines.append('Protected data paths were not accessed; file labels and authentication behavior remain unverified.')
+            else:
+                lines.append(check['detail'])
         if history is not None:
             lines.extend(['', 'History availability: ' + history['availability'],
                           'Unclassified records: ' + str(history['unclassified']),

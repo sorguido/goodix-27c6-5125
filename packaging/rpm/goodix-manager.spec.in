@@ -39,6 +39,7 @@ the runtime. Existing runtime and standalone recovery commands remain available.
 
 %check
 /usr/bin/python3 -I -B packaging/rpm/test_packaging.py
+/usr/bin/python3 -I -B packaging/rpm/test_stage.py
 /usr/bin/python3 -I -B packaging/rpm/test_helper.py
 /usr/bin/python3 -I -B packaging/rpm/test_compat_transactions.py
 /usr/bin/python3 -I -B packaging/rpm/manager/test_model.py

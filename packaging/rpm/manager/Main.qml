@@ -247,7 +247,7 @@ Kirigami.ApplicationWindow {
                 Controls.Button { implicitHeight: 38;
                     objectName: "openDiagnosticCenter"
                     text: "Diagnostic Center"
-                    icon.name: "view-statistics"
+                    icon.source: Qt.resolvedUrl("diagnostic-icons/diagnostic-pulse.svg")
                     highlighted: true
                     enabled: !info.busy && !info.diagnosticBusy
                     onClicked: window.pageStack.push(diagnosticComponent, {managerWindow: window})

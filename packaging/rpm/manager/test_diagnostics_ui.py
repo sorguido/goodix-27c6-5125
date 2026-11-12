@@ -10,6 +10,7 @@ from threading import Event
 import time
 import unittest
 from unittest.mock import patch
+from datetime import datetime, timedelta, timezone
 
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -19,6 +20,8 @@ from PySide6.QtQml import QQmlApplicationEngine, QQmlEngine, QQmlExpression
 from PySide6.QtQuick import QQuickWindow
 from PySide6.QtQuickControls2 import QQuickStyle
 from PySide6.QtTest import QTest
+from PySide6.QtGui import QColor, QImage, QPainter
+from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QApplication
 from test_ui import system_palette
 
@@ -231,6 +234,50 @@ class ControllerTests(unittest.TestCase):
             shutdown.assert_called_once()
         self.assertFalse(self.controller.diagnostics['readerBusy'])
         self.assertTrue(self.controller.closeReady)
+
+    def test_new_failure_denial_and_cancel_clear_previous_check_results(self):
+        previous = report_result(checks=[{'id': 'service', 'title': 'Fingerprint service',
+            'outcome': 'pass', 'summary': 'Package configuration checked', 'detail': 'Previous result', 'code': 'service_checked'}],
+            overview='Previous completed checks')
+        self.collect_checks.return_value = previous
+        self.controller.run_diagnostics()
+        self.wait(lambda: not self.controller.diagnostics['busy'])
+        self.assertTrue(self.controller.diagnostics['checks'])
+        self.collect_checks.side_effect = RuntimeError('PRIVATE_FAILURE_DETAIL')
+        self.controller.run_diagnostics()
+        self.assertEqual(self.controller.diagnostics['checks'], [])
+        self.assertEqual(self.controller.diagnostics['generatedAt'], '')
+        self.wait(lambda: not self.controller.diagnostics['busy'])
+        self.assertIn('No new', self.controller.diagnostics['overview'])
+        self.assertIn('could not be collected', self.controller.diagnostics['reportError'])
+        self.assertNotIn('PRIVATE_FAILURE', str(self.controller.diagnostics))
+        for action in ('denied', 'invalid', 'cancel'):
+            self.controller._diagnostic_data.update(previous)
+            if action == 'denied':
+                self.controller.create_diagnostic_report('login', 'current', False, False, '', '')
+            elif action == 'invalid':
+                self.collect_report.return_value = {'reportReady': False, 'reportText': '', 'reportError': 'Invalid time selection.'}
+                self.controller.create_diagnostic_report('login', 'custom', False, True, 'invalid', '')
+                self.wait(lambda: not self.controller.diagnostics['busy'])
+            else:
+                self.controller.cancel_diagnostics()
+            self.assertEqual(self.controller.diagnostics['checks'], [], action)
+            self.assertEqual(self.controller.diagnostics['generatedAt'], '', action)
+            self.assertFalse(self.controller.diagnostics['reportReady'], action)
+
+    def test_installation_time_requires_a_valid_session_install_or_update(self):
+        self.assertFalse(self.controller.diagnostics['installationTimeAvailable'])
+        now = datetime.now(timezone.utc)
+        def operation(action='install', stamp=None):
+            return {'action': action, 'result': 'failed', 'message_code': 'operation_failed',
+                    'observedAt': stamp or (now - timedelta(minutes=5)).isoformat()}
+        for action in ('install', 'update'):
+            self.controller.last_operation = operation(action)
+            self.assertTrue(self.controller.diagnostics['installationTimeAvailable'], action)
+        for item in (operation('remove'), operation(stamp='malformed'),
+                     operation(stamp=(now + timedelta(seconds=1)).isoformat())):
+            self.controller.last_operation = item
+            self.assertFalse(self.controller.diagnostics['installationTimeAvailable'], item)
 
 
 class UiTests(unittest.TestCase):
@@ -517,6 +564,130 @@ class UiTests(unittest.TestCase):
         self.wait(lambda: not self.controller.diagnostics['busy'])
         self.assertFalse(self.controller.diagnostics['reportReady'])
         self.assertTrue(self.item('openDiagnosticCenter').property('visible'))
+
+    def test_installation_time_missing_available_and_invalid_follow_real_ui(self):
+        self.open_center()
+        self.click('chooseProblem')
+        self.click('problemInstall')
+        combo = self.item('reportTime')
+        self.assertEqual(combo.property('count'), 5)
+        self.assertEqual(combo.property('currentIndex'), 0)
+        self.assertTrue(self.item('installationTimeNotice').property('visible'))
+        self.snapshot('13-install-time-unavailable-dark')
+        self.click('continueReport')
+        self.click('reportConsent')
+        self.click('createReport')
+        self.wait(lambda: self.screen() == 'preview')
+        self.assertEqual(self.collect_report.call_args.args[1], 'current')
+        self.click('previewBack')
+        self.click('diagnosticBack')
+        operation = {'action': 'update', 'result': 'failed', 'message_code': 'operation_failed',
+                     'observedAt': (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()}
+        self.controller.last_operation = operation
+        self.controller.changed.emit()
+        self.click('problemInstall')
+        self.assertEqual(combo.property('count'), 6)
+        self.assertEqual(combo.property('currentIndex'), 5)
+        self.assertFalse(self.item('installationTimeNotice').property('visible'))
+        self.snapshot('14-install-time-available-dark')
+        # A reference can become unavailable while this same preparation form
+        # remains open. The active selection must become a usable alternative.
+        self.controller.last_operation = {}
+        self.controller.changed.emit()
+        self.app.processEvents()
+        self.assertEqual(combo.property('count'), 5)
+        self.assertEqual(combo.property('currentIndex'), 0)
+        self.assertTrue(self.item('installationTimeNotice').property('visible'))
+        self.controller.last_operation = operation
+        self.controller.changed.emit()
+        self.app.processEvents()
+        self.choose_time(5)
+        self.click('continueReport')
+        self.click('reportConsent')
+        self.click('createReport')
+        self.wait(lambda: self.screen() == 'preview')
+        self.assertEqual(self.collect_report.call_args.args[1], 'installation')
+        for item in (dict(operation, action='remove'), dict(operation, observedAt='malformed'),
+                     dict(operation, observedAt=(datetime.now(timezone.utc) + timedelta(days=1)).isoformat())):
+            self.click('previewBack')
+            self.click('diagnosticBack')
+            self.controller.last_operation = item
+            self.controller.changed.emit()
+            self.click('problemInstall')
+            self.assertEqual(combo.property('count'), 5)
+            self.assertEqual(combo.property('currentIndex'), 0)
+            self.assertTrue(self.item('installationTimeNotice').property('visible'))
+            self.click('continueReport')
+            self.click('reportConsent')
+            self.click('createReport')
+            self.wait(lambda: self.screen() == 'preview')
+            self.assertEqual(self.collect_report.call_args.args[1], 'current')
+
+    def test_failed_recollection_drops_previous_green_results_and_icons_are_vectors(self):
+        previous = report_result(checks=[{'id': 'service', 'title': 'Fingerprint service',
+            'outcome': 'pass', 'summary': 'Service configuration checked', 'detail': 'Previous result', 'code': 'service_checked'}],
+            overview='Previous successful check')
+        self.collect_checks.return_value = previous
+        self.open_center()
+        self.click('overviewRunChecks')
+        self.wait(lambda: not self.controller.diagnostics['busy'])
+        self.assertEqual(self.item('overviewFinding').property('text'), 'Previous successful check')
+        self.collect_checks.side_effect = RuntimeError('PRIVATE_NEW_FAILURE')
+        self.click('overviewRunChecks')
+        self.wait(lambda: not self.controller.diagnostics['busy'])
+        self.assertIn('No new', self.item('overviewFinding').property('text'))
+        self.assertEqual(self.controller.diagnostics['checks'], [])
+        self.assertEqual(self.controller.diagnostics['generatedAt'], '')
+        self.snapshot('15-recollection-failed-dark')
+        for name in ('diagnostic-pulse', 'fingerprint', 'gear', 'layers', 'usb', 'checklist', 'flask'):
+            icon = self.item('diagnosticIcon-' + name)
+            self.assertTrue(icon.property('valid'), name)
+            self.assertTrue(icon.property('isMask'), name)
+            self.assertIn('/diagnostic-icons/' + name + '.svg', str(icon.property('source')))
+        self.click('chooseChecks')
+        self.assertIn('No new', self.item('checksNotice').property('message'))
+        self.assertIn('could not be collected', self.item('checksNotice').property('message'))
+        for key, absent in [('service', 'D-Bus'), ('security', 'labels')]:
+            self.click('check-' + key)
+            detail = self.item('detail-' + key).property('text')
+            self.assertNotIn(absent, detail)
+        self.snapshot('16-checks-recollection-failed-dark')
+        self.click('diagnosticBack')
+        self.controller._diagnostic_data.update(previous)
+        self.controller.changed.emit()
+        self.app.processEvents()
+        # The real idle ReaderSession.cancel does not emit changed. The
+        # Controller itself must notify the view after clearing old evidence.
+        with patch.object(self.controller.reader, 'cancel', return_value=None):
+            self.controller.cancel_diagnostics()
+        self.app.processEvents()
+        self.assertIn('No new', self.item('overviewFinding').property('text'))
+        self.assertEqual(self.controller.diagnostics['checks'], [])
+        # A local 24px contact sheet makes the approved PNG's icon stroke style
+        # directly reviewable without modifying or extracting any reference image.
+        assets = sorted(Path(__file__).with_name('diagnostic-icons').glob('*.svg'))
+        self.assertEqual(len(assets), 14)
+        for dark in (True, False):
+            sheet = QImage(560, 240, QImage.Format.Format_ARGB32_Premultiplied)
+            sheet.fill(QColor('#202326' if dark else '#eff0f1'))
+            painter = QPainter(sheet)
+            painter.setPen(QColor('#eff0f1' if dark else '#232629'))
+            for index, asset in enumerate(assets):
+                renderer = QSvgRenderer(str(asset))
+                self.assertTrue(renderer.isValid(), asset.name)
+                tile = QImage(24, 24, QImage.Format.Format_ARGB32_Premultiplied)
+                tile.fill(Qt.GlobalColor.transparent)
+                ink = QPainter(tile)
+                renderer.render(ink)
+                ink.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+                ink.fillRect(tile.rect(), QColor('#8ed8f5' if dark else '#086da2'))
+                ink.end()
+                x, y = (index % 4) * 140 + 12, (index // 4) * 60 + 12
+                painter.drawImage(x, y, tile)
+                painter.drawText(x, y + 43, asset.stem)
+            painter.end()
+            if RENDER_DIR:
+                self.assertTrue(sheet.save(str(RENDER_DIR / ('17-icons-24px-' + ('dark' if dark else 'light') + '.png'))))
 
 
 if __name__ == '__main__':

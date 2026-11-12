@@ -15,7 +15,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from diagnostics import (Collector, DROPIN_BYTES, MAX_REPORT, PROJECT_DROPIN, Result,
                          Runner, event_category, parse_events, parse_service,
-                         package_query, rpm_verification, save_report,
+                         installation_reference, package_query, rpm_verification, save_report,
                          snapshot_metadata, time_arguments)
 from model import Status
 
@@ -168,6 +168,46 @@ class DiagnosticTests(unittest.TestCase):
         collector.metadata = lambda: ['unavailable', 'trusted', 'absent', 'trusted']
         self.assertIn('unavailable', collector.checks()['checks'][4]['detail'])
 
+    def test_security_retains_concurrent_selinux_and_permissions_anomalies_with_partial_source(self):
+        f = Fixtures()
+        f.results[('/usr/sbin/getenforce',)] = Result(stdout='Permissive\n')
+        collector = f.collector()
+        collector.metadata = lambda: ['changed', 'unavailable', 'absent', 'trusted']
+        report = collector.report('system', 'current', False, True)
+        security = next(c for c in report['checks'] if c['id'] == 'security')
+        findings = {item['code']: item for item in security['findings']}
+        self.assertEqual(security['outcome'], 'anomaly')
+        self.assertEqual(findings['selinux_not_enforcing']['outcome'], 'anomaly')
+        self.assertEqual(findings['software_permissions_changed']['outcome'], 'anomaly')
+        self.assertEqual(findings['software_metadata_unavailable']['outcome'], 'unavailable')
+        self.assertEqual(findings['software_paths_absent']['outcome'], 'not_checked')
+        for text in ('Permissive', 'unexpected ownership', 'metadata was unavailable'):
+            self.assertIn(text, security['detail'])
+            self.assertIn(text, report['reportText'])
+        for code in ('selinux_not_enforcing', 'software_permissions_changed', 'software_metadata_unavailable'):
+            self.assertIn('[' + code + ']', report['reportText'])
+        self.assertEqual(findings['selinux_not_enforcing']['source'], 'selinux_mode')
+        self.assertEqual(findings['software_permissions_changed']['source'], 'software_metadata')
+
+    def test_security_source_failure_never_replaces_an_observed_problem(self):
+        f = Fixtures()
+        f.results[('/usr/sbin/getenforce',)] = Result(code='source_unavailable')
+        collector = f.collector()
+        collector.metadata = lambda: ['changed', 'trusted', 'absent', 'absent']
+        report = collector.report('system', 'current', False, True)
+        security = next(c for c in report['checks'] if c['id'] == 'security')
+        self.assertEqual(security['code'], 'software_permissions_changed')
+        self.assertEqual(security['outcome'], 'anomaly')
+        self.assertIn('selinux_unavailable', {f['code'] for f in security['findings']})
+        f.results[('/usr/sbin/getenforce',)] = Result(stdout='Disabled\n')
+        collector.metadata = lambda: (_ for _ in ()).throw(PermissionError('SECRET source failure'))
+        report = collector.report('system', 'current', False, True)
+        security = next(c for c in report['checks'] if c['id'] == 'security')
+        self.assertEqual(security['code'], 'selinux_not_enforcing')
+        self.assertIn('software_metadata_unavailable', {f['code'] for f in security['findings']})
+        self.assertNotIn('SECRET', report['reportText'])
+        self.assertIn('metadata was unavailable', report['reportText'])
+
     def test_consent_and_selection_are_validated_before_any_collection(self):
         for args in [('system', 'current', False, False), ('unknown', 'current', False, True),
                      ('system', '--root=/private', False, True), ('system', 'installation', False, True),
@@ -190,6 +230,27 @@ class DiagnosticTests(unittest.TestCase):
         for invalid in ({'status': 'arbitrary'}, snapshot(action='install', result='rolled_back', message_code='operation_failed', observedAt=NOW.isoformat())):
             with self.assertRaises(ValueError):
                 snapshot_metadata(invalid, NOW)
+
+    def test_installation_choice_and_collector_share_effective_window_validation(self):
+        valid = snapshot(action='install', result='failed', message_code='operation_failed', observedAt=NOW.isoformat())
+        reference = installation_reference(valid, NOW)
+        self.assertIsNotNone(reference)
+        self.assertTrue(time_arguments('custom', now=NOW, **reference))
+        self.assertTrue(Fixtures().collector().report('install', 'installation', False, True, status_snapshot=valid)['reportReady'])
+        for changes in ({'action': 'remove'},
+                        {'observedAt': (NOW + timedelta(minutes=1)).isoformat()},
+                        {'observedAt': (NOW + timedelta(microseconds=1)).isoformat()},
+                        {'observedAt': (NOW + timedelta(microseconds=500000)).isoformat()},
+                        {'observedAt': '2026-11-08T20:00:00'},
+                        {'observedAt': 'not a timestamp'}):
+            invalid = snapshot(**(valid['lastOperation'] | changes))
+            self.assertIsNone(installation_reference(invalid, NOW))
+            f = Fixtures()
+            self.assertFalse(f.collector().report('install', 'installation', False, True, status_snapshot=invalid)['reportReady'])
+            self.assertEqual(f.calls, [])
+        before_epoch = {'status': None, 'observedAt': '', 'lastOperation': dict(valid['lastOperation'], observedAt='1970-01-01T00:01:00+00:00')}
+        self.assertIsNone(installation_reference(before_epoch, datetime(1970, 1, 1, 0, 1, tzinfo=timezone.utc)))
+        self.assertIsNone(installation_reference(None, NOW))
 
     def test_profiles_use_fixed_sources_and_no_network_or_privileged_commands(self):
         for profile in ('system', 'install', 'recognition', 'login', 'other'):

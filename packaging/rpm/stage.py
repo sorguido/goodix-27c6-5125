@@ -13,11 +13,25 @@ spec = importlib.util.spec_from_file_location('builder', ROOT / 'production/buil
 builder = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(builder)
 
+MANAGER_FILES = ('main.py', 'model.py', 'diagnostics.py', 'reader.py',
+                 'Main.qml', 'DiagnosticPage.qml')
+MANAGER_ICONS = ('diagnostic-pulse.svg', 'fingerprint.svg', 'gear.svg', 'layers.svg',
+                 'usb.svg', 'checklist.svg', 'sliders.svg', 'flask.svg', 'document.svg',
+                 'monitor.svg', 'download.svg', 'more.svg', 'shield.svg', 'chevron-down.svg')
+
 
 def copy(source, target, mode=0o644):
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(source, target)
     target.chmod(mode)
+
+
+def install_manager(source, target):
+    """Stage the explicit desktop allowlist, never tests or private source files."""
+    for name in MANAGER_FILES:
+        copy(source / name, target / name, 0o755 if name == 'main.py' else 0o644)
+    for name in MANAGER_ICONS:
+        copy(source / 'diagnostic-icons' / name, target / 'diagnostic-icons' / name)
 
 
 def install(payload, root, release):
@@ -37,9 +51,7 @@ def install(payload, root, release):
             content = path.read_bytes()
             if content.startswith(b'#!/usr/bin/env python3\n'):
                 path.write_bytes(b'#!/usr/bin/python3 -I\n' + content.split(b'\n', 1)[1])
-    for name in ('main.py', 'model.py', 'Main.qml'):
-        copy(ROOT / 'packaging/rpm/manager' / name, base / 'manager' / name,
-             0o755 if name == 'main.py' else 0o644)
+    install_manager(ROOT / 'packaging/rpm/manager', base / 'manager')
     metadata = dict(schema=1, version=builder.project_version(), release=int(release),
                     fedora=44, arch='x86_64', source_id=manifest['source_id'])
     (base / 'package.json').write_text(json.dumps(metadata, sort_keys=True) + '\n')

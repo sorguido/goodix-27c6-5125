@@ -5,7 +5,7 @@
   "branch": "diagnostic",
   "execution_path": "PRIMARY",
   "phase": "DIAG4",
-  "phase_status": "OFFLINE_COMPLETE_STOP_BEFORE_RPM_AND_FEDORA45_VM",
+  "phase_status": "CORRECTIVE_OFFLINE_COMPLETE_STOP_BEFORE_RPM_INSTALL_VM_LIVE",
   "primary_artifact": "docs/DIAGNOSTICS_VALIDATION.md",
   "completed_gates": [
     "DIAG0_DESIDERATA_RECORDED",
@@ -22,7 +22,8 @@
     "DIAG3_INDEPENDENT_REVIEW",
     "DIAG3_OFFLINE_EXIT_GATE",
     "DIAG4_OFFLINE_COVERAGE",
-    "DIAG4_FINAL_INDEPENDENT_REVIEW"
+    "DIAG4_FINAL_INDEPENDENT_REVIEW",
+    "DIAGNOSTIC_CORRECTIVE_FINAL_REVIEW"
   ],
   "pending_gates": [
     "RPM_AND_FEDORA45_VM_AUTHORIZATION",
@@ -56,13 +57,18 @@
     "packaging/rpm/manager/test_qml_cache.py",
     "development/diagnostic-qualification/",
     "docs/DIAGNOSTICS_VALIDATION.md",
-    "development/diagnostic-qualification/screens/"
+    "development/diagnostic-qualification/screens/",
+    "packaging/rpm/stage.py",
+    "packaging/rpm/test_stage.py",
+    "packaging/rpm/goodix-manager.spec.in",
+    "packaging/rpm/manager/diagnostic-icons/",
+    "development/diagnostic-qualification/corrective/screens/"
   ],
   "relevant_corroborations": [
     "C4"
   ],
-  "next_action": "STOP: attendere nuova autorizzazione specifica prima di packaging RPM e campagna VM Fedora 45; non avviarli. Qualificazione DIAG4 sul target reale e DIAG5/live richiedono autorizzazione separata. Il manifest staging non include ancora i nuovi file e richiede futura revisione packaging.",
-  "last_verified_head": "78a592475058f1b48f795883d19e9d18114f7d3e",
+  "next_action": "STOP: attendere autorizzazione specifica prima di build/packaging RPM, installazione, VM Fedora 45 e test live. Passata correttiva offline completa e accettata; staging/manifests sorgente verificati soltanto con fixture, nessun pacchetto prodotto. DIAG4 sul target reale e DIAG5 restano non qualificati.",
+  "last_verified_head": "dbdff8dc70f33cd8cc6a9b141942ad3371a28080",
   "observed_remote_base_head": "4bc1f308071768b4f8045e58b4d12937bfa8ada2",
   "documentation_only": false,
   "previous_milestone": {
@@ -128,7 +134,7 @@
     "draft_release_created": true,
     "draft_postflight_evidence": "development/rpm/draft-301/authenticated-postflight.json"
   },
-  "gui_reference": "USER_APPROVED_HTML_BINDING_STRUCTURE_NAVIGATION_STYLE_MANAGER_COHERENCE",
+  "gui_reference": "HTML_STRUCTURE_NAVIGATION_PNG_CONCEPT_ICON_STYLE",
   "local_context_availability": "ALL_SIX_LOCAL_ARTIFACTS_READABLE_GITIGNORED",
   "local_artifact_verification": {
     "status": "OBSERVED_PRESENT_READABLE",
@@ -141,10 +147,10 @@
       "development/diagnostic/mokeup icon to be used.png"
     ],
     "validation": "Testi UTF-8 leggibili integralmente; quattro PNG validi. Lettura integrale dei materiali e ispezione visiva completate dal PM.",
-    "reference_note": "Il concept board precedente contiene una sidebar; HTML, diagramma e tavole successive definiscono il percorso a tre scelte. Riferimento vincolante: mockup HTML; non reinterpretarlo in base al concept precedente.",
-    "gui_implementation_comparison": "DIAG3_ACCEPTED_EXPLICIT_HTML_NAVIGATION_BOARDS_CURRENT_MANAGER_COMPARISON_WITH_JUSTIFIED_QT_TIME_READER_ADAPTATIONS"
+    "reference_note": "HTML, diagramma e tavole guidano struttura e navigazione a tre scelte; mokeup icon to be used.png è il riferimento vincolante dello stile icone. Nessuna sidebar aggiunta dal concept.",
+    "gui_implementation_comparison": "ACCEPT_AND_CONTINUE_CORRECTIVE_HTML_LAYOUT_NAVIGATION_AND_PNG_ICON_STYLE_24PX_DARK_LIGHT"
   },
-  "independent_review": "ACCEPT_AND_CONTINUE_DIAG4_OFFLINE_FINAL",
+  "independent_review": "ACCEPT_AND_CONTINUE_DIAGNOSTIC_CORRECTIVE_FINAL",
   "offline_authorization": {
     "phases": [
       "DIAG1",
@@ -160,23 +166,27 @@
     "live_authorized": false
   },
   "verification": {
-    "diagnostic_collector": "PASS_24_OFFLINE_TESTS",
-    "reader": "PASS_21_OFFLINE_TESTS_INCLUDING_2_PRIVATE_QT_DBUS_CASES",
-    "gui_mockup_comparison": "ACCEPT_AND_CONTINUE_DIAG3_EXPLICIT_REVIEW",
-    "live_sensor_host_and_vm": "NOT_PERFORMED",
-    "rpm_packaging": "NOT_STARTED_STOP_BOUNDARY",
-    "controller": "PASS_11_OFFLINE_TESTS",
-    "controller_and_qml_flows": "PASS_18_UNIQUE_TESTS_11_CONTROLLER_7_QTEST",
-    "targeted_final_reader_header_flow": "PASS_1_REPEAT_NOT_ADDED_TO_UNIQUE_TOTAL",
-    "helper_regression": "PASS_28_OFFLINE_TESTS_UNCHANGED_SOURCE",
-    "model_regression": "PASS_17_OFFLINE_TESTS_UNCHANGED_SOURCE",
-    "network_ui_regression": "PASS_15_SYNTHETIC_TESTS",
-    "unique_unit_integration_cases": 123,
-    "existing_manager_palettes": "PASS_LIGHT_AND_DARK_13_RENDER_STATES_PER_RUN",
-    "qml_cache": "PASS_BOTH_QML_MTIMES_UNCHANGED_DIAGNOSTIC_QML_SIZE_ALSO_UNCHANGED",
+    "diagnostic_collector": "PASS_27_CORRECTIVE_TESTS_INCLUDING_SUBSECOND_FUTURE_TIMESTAMP",
+    "manager_staging": "PASS_3_TEMP_FIXTURE_TESTS_NO_BUILD_OR_INSTALL",
+    "controller_and_qml_flows": "PASS_22_CORRECTIVE_TESTS_13_CONTROLLER_9_QML",
+    "unique_unit_integration_cases": 52,
+    "existing_manager_palettes": "PASS_DARK_AND_LIGHT_13_IN_MEMORY_RENDER_STATES_PER_RUN",
+    "qml_cache": "PASS_CURRENT_MANAGER_AND_DIAGNOSTIC_QML_WITH_SVG_RESOURCES",
+    "gui_mockup_comparison": "PASS_HTML_LAYOUT_AND_PNG_ICON_MORPHOLOGY_STYLE_24PX_DARK_LIGHT_INDEPENDENT_REVIEW",
     "approved_assets": "PASS_6_SHA256_UNCHANGED",
-    "synthetic_screens": "13_GITIGNORED_NOT_APPROVED_REFERENCES",
-    "rpm_staging_new_files": "NOT_UPDATED_FUTURE_PACKAGING_PREREQUISITE",
-    "final_independent_review": "ACCEPT_AND_CONTINUE_DIAG4_OFFLINE_ONLY"
+    "synthetic_screens": "19_CORRECTIVE_GITIGNORED_SYNTHETIC_OUTPUTS_SEPARATE_FROM_13_BASELINE_CAPTURES",
+    "rpm_staging_new_files": "SOURCE_AND_SPEC_CORRECTED_FIXTURE_VERIFIED_NO_RPM_BUILD",
+    "reader": "UNCHANGED_BASELINE_EVIDENCE_NOT_RERUN_IN_CORRECTIVE_PASS",
+    "live_sensor_host_and_vm": "NOT_PERFORMED",
+    "rpm_packaging": "NOT_PERFORMED_STOP_BOUNDARY",
+    "final_independent_review": "ACCEPT_AND_CONTINUE_ALL_7_CORRECTIVE_POINTS_OFFLINE_ONLY",
+    "reviewer_targeted_repeats": "PASS_3_REPEATS_NOT_ADDED_TO_52_UNIQUE_CASES"
+  },
+  "implementation_status": "BASELINE_COMMITTED_CORRECTIVE_DELTA_IN_WORKTREE",
+  "baseline_qualification": {
+    "commit": "dbdff8dc70f33cd8cc6a9b141942ad3371a28080",
+    "unique_unit_integration_cases": 123,
+    "review": "ACCEPT_AND_CONTINUE_DIAG4_OFFLINE_FINAL",
+    "evidence_scope": "PRIOR_QUALIFICATION_NOT_ALL_RERUN_IN_CORRECTIVE_PASS"
   }
 }

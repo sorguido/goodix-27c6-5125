@@ -99,8 +99,11 @@ the center, selecting a problem or toggling extended details does not collect.
 validated interval of at most 24 hours. “Most recent installation attempt” uses
 only known dated operation evidence, with a five-minute window on each side of
 the observed result time (bounded by the present); this is not the full duration
-of a potentially long installation. If no dated operation is retained, ask for a
-time window or report unavailable. Never silently replace a previous-boot request with current
+of a potentially long installation. The shared pure `installation_reference()`
+only enables this choice for a usable, nonfuture install/update timestamp in the
+current session; removal alone is not an installation reference. Without that
+evidence the GUI omits the choice and offers a valid time window instead. The
+collector applies the same interval validation. Never silently replace a previous-boot request with current
 boot. Missing boot, partial visibility, nonpersistent journal and empty results
 must remain distinguishable where the source supports that distinction; otherwise
 report history coverage unknown. No chronology guarantee from message text alone.
@@ -168,8 +171,10 @@ Follow the approved HTML: existing Manager entry → dashboard with four status
 summaries and three action cards → checks/details, problem choice, or reader page.
 Problem choice → time/options → privacy consent → report summary/preview → local
 Copy/Save. Preserve back navigation, plain English and existing KDE/Manager visual
-language, cards, spacing, hierarchy and icon system. The earlier concept board's
-sidebar does not replace this HTML navigation. Use the existing system palette;
+language, cards, spacing and hierarchy. Icon style follows the binding
+`mokeup icon to be used.png` reference, with local rounded line-art SVGs; the HTML's
+placeholder symbols are not the icon reference. The concept board's
+sidebar does not replace the HTML navigation. Use the existing system palette;
 dark mockup colors must not break the current Manager's light-theme behavior.
 Demo controls, sample results and synthetic success are not production features.
 The reader page implements ordinary verification with explicit consent; all
@@ -202,6 +207,10 @@ separate dated lifecycle result; absent retained evidence stays unavailable.
 Package integrity distinguishes missing/changed files, unverifiable `?` attributes,
 and query/timeout/permission/output failures. #55 findings are independent;
 an override path is displayed only in the bounded known fprintd drop-in namespace.
+The Security group exposes a bounded `findings` list, preserving SELinux and
+ordinary-software metadata outcomes independently. The primary group outcome
+uses the most severe finding; its readable details and the report retain the
+remaining anomalies and unavailable sources rather than overwriting them.
 
 Plasma selector matching is byte-for-byte via the SHA-256 of the reviewed
 `deployment/plasma-login-opt-in/plasmalogin.pam`, with a fixture linking the

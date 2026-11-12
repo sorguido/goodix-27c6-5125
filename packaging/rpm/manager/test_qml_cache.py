@@ -81,6 +81,7 @@ def regression():
         for name in ('main.py', 'model.py', 'diagnostics.py', 'reader.py',
                      'io.github.sorguido.GoodixManager.svg'):
             shutil.copyfile(HERE / name, application / name)
+        shutil.copytree(HERE / 'diagnostic-icons', application / 'diagnostic-icons')
         current = (HERE / 'Main.qml').read_bytes()
         older = b''.join(line for line in current.splitlines(keepends=True)
                          if b'text: "Report a bug";' not in line)

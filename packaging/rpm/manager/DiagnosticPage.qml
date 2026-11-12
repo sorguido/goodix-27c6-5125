@@ -18,10 +18,11 @@ Kirigami.ScrollablePage {
     property string exportNotice: ""
     readonly property bool available: !diagnostic.busy && !backend.view.busy
     readonly property var profileNames: ({system: "System status", install: "Installation or update failed", login: "Fingerprint sign-in problem", recognition: "Fingerprint recognition problem", other: "Other problem"})
-    readonly property var timeChoices: ["During the current startup", "During the previous startup", "Within the last 30 minutes", "Earlier today", "Choose a date and time range", "Most recent installation attempt"]
-    readonly property var timeValues: ["current", "previous", "last30", "today", "custom", "installation"]
-    readonly property var checkDescriptions: ({driver: "Installation and file integrity", components: "Fedora libfprint, fprintd, dependencies and library files", service: "Service configuration, overrides and D-Bus", auth: "Fedora Plasma, PAM and authentication", security: "SELinux, file permissions and required labels", reader: "Is the Goodix USB device detected?"})
-    readonly property var checkGlyphs: ({driver: "◉", components: "▤", service: "⚙", auth: "▣", security: "♢", reader: "♧"})
+    readonly property var timeChoices: ["During the current startup", "During the previous startup", "Within the last 30 minutes", "Earlier today", "Choose a date and time range"].concat(diagnostic.installationTimeAvailable ? ["Most recent installation attempt"] : [])
+    readonly property var timeValues: ["current", "previous", "last30", "today", "custom"].concat(diagnostic.installationTimeAvailable ? ["installation"] : [])
+    readonly property var checkDescriptions: ({driver: "Manager package files and previously checked driver status", components: "Fedora libfprint, fprintd and fprintd-pam package files", service: "Service configuration and overrides; no connection test", auth: "Plasma sign-in files (partial check)", security: "SELinux mode and ordinary software path permissions", reader: "Goodix USB detection; no reader operation"})
+    readonly property var checkIcons: ({driver: "fingerprint", components: "layers", service: "gear", auth: "layers", security: "shield", reader: "usb"})
+    readonly property color iconColor: surface.hslLightness < 0.5 ? "#8ed8f5" : "#086da2"
     readonly property color ink: managerWindow.inkColor
     readonly property color surface: managerWindow.surfaceColor
     readonly property color card: managerWindow.cardColor
@@ -33,6 +34,7 @@ Kirigami.ScrollablePage {
     background: Rectangle { color: page.surface }
     Component.onDestruction: if (backend) backend.cancel_diagnostics()
     onVisibleChanged: if (!visible && diagnostic.busy) backend.cancel_diagnostics()
+    onTimeChoicesChanged: if (timeSelection && (timeSelection.currentIndex < 0 || timeSelection.currentIndex >= timeChoices.length)) timeSelection.currentIndex = 0
 
     function showScreen(next) {
         screen = next
@@ -47,7 +49,7 @@ Kirigami.ScrollablePage {
         invalidateReport()
         profile = selected
         prepareOrigin = origin
-        timeSelection.currentIndex = selected === "install" ? 5 : 0
+        timeSelection.currentIndex = selected === "install" && diagnostic.installationTimeAvailable ? 5 : 0
         extendedDetails.checked = false
         showScreen("prepare")
     }
@@ -82,10 +84,20 @@ Kirigami.ScrollablePage {
         }
     }
 
+    component DiagnosticIcon: Kirigami.Icon {
+        property string iconName
+        objectName: "diagnosticIcon-" + iconName
+        source: iconName ? Qt.resolvedUrl("diagnostic-icons/" + iconName + ".svg") : ""
+        color: page.iconColor
+        isMask: true
+        implicitWidth: 28
+        implicitHeight: 28
+        Accessible.ignored: true
+    }
     component ActionButton: Controls.Button { implicitHeight: 38 }
 
     component HeadingBlock: RowLayout {
-        property string symbol
+        property string iconName
         property string heading
         property string description
         Layout.fillWidth: true
@@ -94,7 +106,7 @@ Kirigami.ScrollablePage {
             Layout.preferredWidth: 49; Layout.preferredHeight: 49
             radius: 12
             color: "#086da2"
-            Controls.Label { anchors.centerIn: parent; text: parent.parent.symbol; color: "white"; font.pixelSize: 27; Accessible.ignored: true }
+            DiagnosticIcon { anchors.centerIn: parent; iconName: parent.parent.iconName; color: "white"; width: 30; height: 30 }
         }
         ColumnLayout {
             Layout.fillWidth: true
@@ -116,7 +128,7 @@ Kirigami.ScrollablePage {
         contentItem: Controls.Label { text: parent.message; wrapMode: Text.WordWrap; color: page.ink; opacity: .85 }
     }
     component ChoiceCard: Controls.Button {
-        property string symbol
+        property string iconName
         property string heading
         property string description
         Layout.fillWidth: true
@@ -127,13 +139,13 @@ Kirigami.ScrollablePage {
         background: Rectangle { color: parent.hovered ? Qt.lighter(managerWindow.palette.button, 1.12) : managerWindow.palette.button; radius: 12; border.color: parent.activeFocus || parent.hovered ? managerWindow.palette.highlight : page.line }
         contentItem: ColumnLayout {
             spacing: 8
-            Controls.Label { text: parent.parent.symbol; color: managerWindow.palette.highlight; font.pixelSize: 27; Accessible.ignored: true }
+            DiagnosticIcon { iconName: parent.parent.iconName; Layout.preferredWidth: 28; Layout.preferredHeight: 28 }
             Controls.Label { text: parent.parent.heading; font.pixelSize: 17; font.weight: Font.DemiBold; color: page.ink; wrapMode: Text.WordWrap; Layout.fillWidth: true }
             Controls.Label { text: parent.parent.description; color: page.ink; opacity: .78; wrapMode: Text.WordWrap; Layout.fillWidth: true }
         }
     }
     component IssueCard: Controls.Button {
-        property string symbol
+        property string iconName
         property string heading
         property string description
         Layout.fillWidth: true
@@ -144,7 +156,7 @@ Kirigami.ScrollablePage {
         background: Rectangle { color: parent.hovered ? Qt.lighter(managerWindow.palette.button, 1.12) : managerWindow.palette.button; radius: 12; border.color: parent.activeFocus || parent.hovered ? managerWindow.palette.highlight : page.line }
         contentItem: RowLayout {
             spacing: 13
-            Controls.Label { text: parent.parent.symbol; color: managerWindow.palette.highlight; font.pixelSize: 27; Accessible.ignored: true }
+            DiagnosticIcon { iconName: parent.parent.iconName; Layout.preferredWidth: 28; Layout.preferredHeight: 28 }
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 8
@@ -194,7 +206,7 @@ Kirigami.ScrollablePage {
             visible: page.screen === "dashboard"
             Layout.fillWidth: true
             spacing: 21
-            HeadingBlock { objectName: "diagnosticHero"; symbol: "⌁"; heading: "Diagnostic Center"; description: "Check your system, understand problems, and prepare reports for support." }
+            HeadingBlock { objectName: "diagnosticHero"; iconName: "diagnostic-pulse"; heading: "Diagnostic Center"; description: "Check your system, understand problems, and prepare reports for support." }
             Panel {
                 contentItem: ColumnLayout {
                     spacing: 16
@@ -224,13 +236,13 @@ Kirigami.ScrollablePage {
                         Layout.fillWidth: true
                         columnSpacing: 15; rowSpacing: 15
                         Repeater {
-                            model: [{key: "driver", title: "Driver", glyph: "◉"}, {key: "service", title: "Services", glyph: "⚙"}, {key: "auth", title: "Sign-in", glyph: "▤"}, {key: "reader", title: "Reader", glyph: "♧"}]
+                            model: [{key: "driver", title: "Driver", icon: "fingerprint"}, {key: "service", title: "Services", icon: "gear"}, {key: "auth", title: "Sign-in", icon: "layers"}, {key: "reader", title: "Reader", icon: "usb"}]
                             ColumnLayout {
                                 required property var modelData
                                 Layout.fillWidth: true
                                 Layout.minimumWidth: 100
                                 spacing: 7
-                                Controls.Label { text: modelData.glyph; color: managerWindow.palette.highlight; font.pixelSize: 25; Layout.alignment: Qt.AlignHCenter; Accessible.ignored: true }
+                                DiagnosticIcon { iconName: modelData.icon; Layout.alignment: Qt.AlignHCenter; Layout.preferredWidth: 28; Layout.preferredHeight: 28 }
                                 Controls.Label { text: modelData.title; font.weight: Font.DemiBold; Layout.alignment: Qt.AlignHCenter }
                                 Controls.Label { text: page.statusFor(modelData.key); opacity: .75; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
                             }
@@ -243,9 +255,9 @@ Kirigami.ScrollablePage {
                 columns: page.width > 760 ? 3 : 1
                 Layout.fillWidth: true
                 columnSpacing: 13; rowSpacing: 13
-                ChoiceCard { objectName: "chooseChecks"; symbol: "◫"; heading: "Check my system"; description: "Check the main components and find configuration problems."; onClicked: page.showScreen("checks") }
-                ChoiceCard { objectName: "chooseProblem"; symbol: "☷"; heading: "I have a problem"; description: "Tell us what happened. We'll help you collect the right information."; onClicked: page.showScreen("choose") }
-                ChoiceCard { objectName: "chooseReader"; symbol: "◉"; heading: "Test the reader"; description: "Check the fingerprint reader on request, using the normal driver path."; onClicked: page.showScreen("test") }
+                ChoiceCard { objectName: "chooseChecks"; iconName: "checklist"; heading: "Check my system"; description: "Check the main components and find configuration problems."; onClicked: page.showScreen("checks") }
+                ChoiceCard { objectName: "chooseProblem"; iconName: "layers"; heading: "I have a problem"; description: "Tell us what happened. We'll help you collect the right information."; onClicked: page.showScreen("choose") }
+                ChoiceCard { objectName: "chooseReader"; iconName: "flask"; heading: "Test the reader"; description: "Check the fingerprint reader on request, using the normal driver path."; onClicked: page.showScreen("test") }
             }
             Notice { message: "Checks never change Fedora settings or repair your system automatically. Reports stay on your computer until you choose to share them." }
         }
@@ -253,20 +265,20 @@ Kirigami.ScrollablePage {
             visible: page.screen === "checks"
             Layout.fillWidth: true
             spacing: 18
-            HeadingBlock { symbol: "◫"; heading: "System checks"; description: "Check the components required for fingerprint authentication." }
-            Notice { message: page.diagnostic.generatedAt ? "Checked: " + page.diagnostic.generatedAt + ". " + page.diagnostic.overview : "No checks have been run yet. Choose Run checks to inspect current system evidence without opening the reader." }
+            HeadingBlock { iconName: "checklist"; heading: "System checks"; description: "Inspect package files, selected settings and available device information. This does not test sign-in." }
+            Notice { objectName: "checksNotice"; message: page.diagnostic.generatedAt ? "Checked: " + page.diagnostic.generatedAt + ". " + page.diagnostic.overview : page.diagnostic.overview + (page.diagnostic.reportError ? "\n" + page.diagnostic.reportError : "\nRun checks to inspect current system evidence without opening the reader.") }
             Panel {
                 padding: 0
                 contentItem: ColumnLayout {
                     spacing: 0
                     Repeater {
                         model: page.diagnostic.checks.length ? page.diagnostic.checks : [
-                            {id: "driver", title: "Goodix driver", summary: "Not checked", outcome: "not_checked", detail: "Installation and file integrity"},
-                            {id: "components", title: "Fingerprint components", summary: "Not checked", outcome: "not_checked", detail: "Fedora libfprint, fprintd, dependencies and library files"},
-                            {id: "service", title: "Fingerprint service", summary: "Not checked", outcome: "not_checked", detail: "Service configuration, overrides and D-Bus"},
-                            {id: "auth", title: "Sign-in integration", summary: "Not checked", outcome: "not_checked", detail: "Fedora Plasma, PAM and authentication"},
-                            {id: "security", title: "Security settings", summary: "Not checked", outcome: "not_checked", detail: "SELinux, file permissions and required labels"},
-                            {id: "reader", title: "Fingerprint reader", summary: "Not checked", outcome: "not_checked", detail: "Is the Goodix USB device detected?"}]
+                            {id: "driver", title: "Goodix driver", summary: "Not checked", outcome: "not_checked", detail: page.checkDescriptions.driver},
+                            {id: "components", title: "Fingerprint components", summary: "Not checked", outcome: "not_checked", detail: page.checkDescriptions.components},
+                            {id: "service", title: "Fingerprint service", summary: "Not checked", outcome: "not_checked", detail: page.checkDescriptions.service},
+                            {id: "auth", title: "Sign-in integration", summary: "Not checked", outcome: "not_checked", detail: page.checkDescriptions.auth},
+                            {id: "security", title: "Security settings", summary: "Not checked", outcome: "not_checked", detail: page.checkDescriptions.security},
+                            {id: "reader", title: "Fingerprint reader", summary: "Not checked", outcome: "not_checked", detail: page.checkDescriptions.reader}]
                         ColumnLayout {
                             id: checkDelegate
                             required property var modelData
@@ -281,7 +293,7 @@ Kirigami.ScrollablePage {
                                 onClicked: checkDelegate.expanded = !checkDelegate.expanded
                                 contentItem: RowLayout {
                                     spacing: 14
-                                    Controls.Label { text: page.checkGlyphs[checkDelegate.modelData.id]; color: managerWindow.palette.highlight; font.pixelSize: 22; Accessible.ignored: true }
+                                    DiagnosticIcon { iconName: page.checkIcons[checkDelegate.modelData.id]; Layout.preferredWidth: 26; Layout.preferredHeight: 26 }
                                     ColumnLayout {
                                         Layout.fillWidth: true
                                         Controls.Label { text: checkDelegate.modelData.title; font.weight: Font.DemiBold; wrapMode: Text.WordWrap; Layout.fillWidth: true }
@@ -294,7 +306,7 @@ Kirigami.ScrollablePage {
                                         border.color: page.statusColor(checkDelegate.modelData.outcome)
                                         Controls.Label { id: statusLabel; anchors.centerIn: parent; width: Math.min(140, implicitWidth); text: checkDelegate.modelData.summary; color: page.ink; font.pixelSize: 12; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter }
                                     }
-                                    Controls.Label { text: checkDelegate.expanded ? "⌃" : "⌄"; color: page.statusColor(checkDelegate.modelData.outcome); Accessible.ignored: true }
+                                    DiagnosticIcon { iconName: "chevron-down"; rotation: checkDelegate.expanded ? 180 : 0; Layout.preferredWidth: 16; Layout.preferredHeight: 16 }
                                 }
                             }
                             Controls.Label { objectName: "detail-" + checkDelegate.modelData.id; visible: checkDelegate.expanded; text: checkDelegate.modelData.detail; wrapMode: Text.WordWrap; Layout.fillWidth: true; Layout.margins: 18; opacity: .8 }
@@ -316,15 +328,15 @@ Kirigami.ScrollablePage {
             visible: page.screen === "choose"
             Layout.fillWidth: true
             spacing: 20
-            HeadingBlock { symbol: "☷"; heading: "What isn't working?"; description: "Choose the option closest to your problem. No technical knowledge needed." }
+            HeadingBlock { iconName: "sliders"; heading: "What isn't working?"; description: "Choose the option closest to your problem. No technical knowledge needed." }
             GridLayout {
                 columns: page.width > 760 ? 2 : 1
                 Layout.fillWidth: true
                 columnSpacing: 12; rowSpacing: 12
-                IssueCard { objectName: "problemInstall"; symbol: "↓"; heading: "Installation or update failed"; description: "Driver couldn't be installed, updated or removed."; onClicked: page.prepareReport("install", "choose") }
-                IssueCard { objectName: "problemLogin"; symbol: "▣"; heading: "I can't sign in with a fingerprint"; description: "Problems at the login screen, when unlocking, with sudo or with polkit."; onClicked: page.prepareReport("login", "choose") }
-                IssueCard { objectName: "problemRecognition"; symbol: "◉"; heading: "Fingerprint isn't recognized"; description: "Finger not detected, no match, interrupted scan or retry issue."; onClicked: page.prepareReport("recognition", "choose") }
-                IssueCard { objectName: "problemOther"; symbol: "⋯"; heading: "Something else"; description: "Collect a broad system report when none of the above applies."; onClicked: page.prepareReport("other", "choose") }
+                IssueCard { objectName: "problemInstall"; iconName: "download"; heading: "Installation or update failed"; description: "Driver couldn't be installed, updated or removed."; onClicked: page.prepareReport("install", "choose") }
+                IssueCard { objectName: "problemLogin"; iconName: "monitor"; heading: "I can't sign in with a fingerprint"; description: "Problems at the login screen, when unlocking, with sudo or with polkit."; onClicked: page.prepareReport("login", "choose") }
+                IssueCard { objectName: "problemRecognition"; iconName: "fingerprint"; heading: "Fingerprint isn't recognized"; description: "Finger not detected, no match, interrupted scan or retry issue."; onClicked: page.prepareReport("recognition", "choose") }
+                IssueCard { objectName: "problemOther"; iconName: "more"; heading: "Something else"; description: "Collect a broad system report when none of the above applies."; onClicked: page.prepareReport("other", "choose") }
             }
             Notice { message: "The report type is chosen automatically from your answer. Extended details can be included only if you request them." }
         }
@@ -333,12 +345,13 @@ Kirigami.ScrollablePage {
             Layout.fillWidth: true
             spacing: 18
             StepBar {}
-            HeadingBlock { symbol: "▤"; heading: "Prepare a diagnostic report"; description: "Selected problem: " + page.profileNames[page.profile] + ". We'll prepare the most relevant information." }
+            HeadingBlock { iconName: "document"; heading: "Prepare a diagnostic report"; description: "Selected problem: " + page.profileNames[page.profile] + ". We'll prepare the most relevant information." }
             Panel {
                 contentItem: ColumnLayout {
                     spacing: 12
                     Controls.Label { text: "When did it happen?"; font.weight: Font.DemiBold }
                     Controls.ComboBox { objectName: "reportTime"; id: timeSelection; implicitHeight: 41; model: page.timeChoices; Layout.fillWidth: true; enabled: page.available; onCurrentIndexChanged: page.invalidateReport(); Accessible.name: "When did it happen?" }
+                    Controls.Label { objectName: "installationTimeNotice"; visible: page.profile === "install" && !page.diagnostic.installationTimeAvailable; text: "A valid time for an installation or update attempt is not available in this session. Select a startup or time range."; opacity: .8; wrapMode: Text.WordWrap; Layout.fillWidth: true }
                     Controls.Label { text: "If older events were not preserved by Fedora, the report will say so."; opacity: .72; wrapMode: Text.WordWrap; Layout.fillWidth: true }
                     Controls.Label { visible: timeSelection.currentIndex === 4; text: "Enter start and end timestamps including the timezone (maximum 24 hours)."; wrapMode: Text.WordWrap; Layout.fillWidth: true }
                     Controls.TextField { objectName: "reportSince"; id: reportSince; visible: timeSelection.currentIndex === 4; placeholderText: "Start: 2026-11-08T09:00:00+01:00"; Layout.fillWidth: true; enabled: page.available; onTextChanged: page.invalidateReport(); Accessible.name: "Start date and time with timezone" }
@@ -368,7 +381,7 @@ Kirigami.ScrollablePage {
             Layout.fillWidth: true
             spacing: 18
             StepBar {}
-            HeadingBlock { symbol: "▤"; heading: "Review your report"; description: "Read the summary before deciding whether to save or share the details." }
+            HeadingBlock { iconName: "document"; heading: "Review your report"; description: "Read the summary before deciding whether to save or share the details." }
             Panel {
                 contentItem: ColumnLayout {
                     spacing: 12
@@ -424,12 +437,12 @@ Kirigami.ScrollablePage {
             visible: page.screen === "test"
             Layout.fillWidth: true
             spacing: 20
-            HeadingBlock { symbol: "◉"; heading: "Test the fingerprint reader"; description: "A guided check using the normal fingerprint verification path." }
+            HeadingBlock { iconName: "fingerprint"; heading: "Test the fingerprint reader"; description: "A guided check using the normal fingerprint verification path." }
             Rectangle {
                 Layout.alignment: Qt.AlignHCenter
                 Layout.preferredWidth: 185; Layout.preferredHeight: 185
                 color: "transparent"; radius: 93; border.width: 3; border.color: page.line
-                Image { anchors.centerIn: parent; source: "io.github.sorguido.GoodixManager.svg"; sourceSize.width: 100; sourceSize.height: 100; Accessible.ignored: true }
+                DiagnosticIcon { anchors.centerIn: parent; iconName: "fingerprint"; width: 100; height: 100 }
             }
             Kirigami.Heading { objectName: "readerHeading"; text: page.diagnostic.readerBusy ? "Reader test in progress" : page.diagnostic.readerState === "match" ? "Fingerprint matched" : !page.diagnostic.readerCanStart ? "Reader test stopped" : "Ready to check the reader"; color: page.ink; font.pixelSize: 24; Layout.alignment: Qt.AlignHCenter; wrapMode: Text.WordWrap }
             Controls.Label { objectName: "readerMessage"; text: page.diagnostic.readerMessage; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; Layout.fillWidth: true }
