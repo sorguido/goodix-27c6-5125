@@ -118,14 +118,19 @@ The six static check groups are common context. Event selection is narrower:
 
 Out-of-scope recognized events are counted as omitted, separately from unknown
 messages. Missing or empty history is not a positive diagnostic result. Events
-retain chronological order within their verified boot/time scope.
+retain chronological order across the requested interval. When events span
+multiple boots, numbered startup-session markers retain their session context
+without exporting journal boot IDs. Events from different startup sessions do
+not establish causal relationships.
 
 **Time:** allow current boot, previous boot, last 30 minutes, today, or an explicit
 validated interval of at most 24 hours. Custom input uses a calendar and local
 hours/minutes, converted internally into timezone-aware timestamps. Nonexistent
 and ambiguous local times at daylight-saving transitions are refused with a
 clear correction message. The backend still enforces start before end, the
-24-hour maximum and the existing future-time tolerance. Changing the selected
+24-hour maximum and the existing future-time tolerance. The same validation
+disables Continue to report and explains invalid custom intervals beside the
+fields before the consent dialog opens. Changing the selected
 date or time invalidates the old preview; each new collection requires consent.
 “Most recent installation attempt” uses
 only known dated operation evidence, with a five-minute window on each side of
@@ -175,12 +180,15 @@ range of readable protected data. No anonymity guarantee.
 
 Keep report data in memory until the user reviews it and selects Copy/Save. Save
 locally with restrictive 0600 permissions, refusing symlink/special-file targets
-and silent overwrites; cancel leaves no report file. Clipboard copy is explicit
+and silent overwrites. Confirming replacement in the normal save dialog writes
+the new report atomically; denying replacement or cancelling leaves the old file
+unchanged. Success or failure appears beside the export actions without clearing
+the preview. Clipboard copy is explicit
 and the notice explains clipboard visibility. No upload/telemetry/network calls
 from diagnostics, no persistent daemon or global logging change.
-An I/O error while saving reports failure and may leave a partial 0600 file.
-The exporter deliberately does not unlink by pathname on error, preserving a
-replacement file that another process may have created at that path.
+The writer uses a private temporary file in the destination directory and only
+replaces the destination after writing and syncing it. Errors before replacement
+preserve the old file and remove the temporary file.
 
 Each check carries stable `id`, `outcome` (`pass`, `anomaly`, `not_checked`,
 `unavailable`), `code`, `source`, observation time and a bounded human explanation
@@ -258,8 +266,9 @@ phase/kind values; healthy audit counters never imply an error or success.
 Trusted systemd unit metadata identifies service sources. Sender-controlled
 `SYSLOG_IDENTIFIER` alone cannot establish a source; sudo additionally requires
 the trusted executable and command attributes. Only microsecond timestamp,
-known source and category cross the boundary. Source boot identity is used
-internally to reject mixed-boot chronology and is not exported. Matching events
+known source and category cross the boundary, plus anonymous session numbers
+when needed. Source boot identity is used internally to distinguish startup
+sessions and is not exported. Matching events
 remain observations; cause attribution stays UNKNOWN.
 
 `test_diagnostics.py` covers the collector with injected files, runner, enumeration,

@@ -15,6 +15,7 @@ import selectors
 import signal
 import stat
 import subprocess
+import tempfile
 import time
 
 from model import MESSAGES, Status
@@ -454,7 +455,6 @@ def parse_events(result, profile, extended=False):
     events = []
     unknown = 0
     omitted = 0
-    boot = None
     lines = result.stdout.splitlines()
     if len(lines) > 1001:
         return {'availability': 'output_limit', 'events': [], 'unclassified': 0}
@@ -477,12 +477,6 @@ def parse_events(result, profile, extended=False):
             if source is None or profile == 'recognition' and source != 'fprintd':
                 unknown += 1
                 continue
-            # Keep the history boundary before profile filtering. Removing
-            # irrelevant successes must not hide a mixed-boot input.
-            if boot is None:
-                boot = item_boot
-            elif boot != item_boot:
-                return {'availability': 'mixed_boot_history', 'events': [], 'unclassified': 0}
             category = event_category(item.get('MESSAGE'), source)
             if category == 'security_denial' and not extended:
                 category = None
@@ -495,17 +489,27 @@ def parse_events(result, profile, extended=False):
                     continue
                 seconds, micros = divmod(int(timestamp), 1000000)
                 timestamp = datetime.fromtimestamp(seconds, timezone.utc).replace(microsecond=micros).isoformat(timespec='microseconds')
-                events.append({'time': timestamp, 'source': source, 'category': category})
+                events.append({'time': timestamp, 'source': source, 'category': category,
+                               '_boot': item_boot})
             else:
                 unknown += 1
         except (ValueError, TypeError, OverflowError, OSError):
             return {'availability': 'history_output_invalid', 'events': [], 'unclassified': 0}
     events.sort(key=lambda e: e['time'])
+    # Keep boot membership only while assigning chronological, local labels.
+    # Neither returned event data nor report text contains the original IDs.
+    sessions = {}
+    for event in events:
+        sessions.setdefault(event['_boot'], len(sessions) + 1)
+    for event in events:
+        session = sessions[event.pop('_boot')]
+        if len(sessions) > 1:
+            event['session'] = session
     availability = ('history_truncated' if len(lines) > 1000 else
                     'partial_history' if result.stderr_present else
                     'visible_history' if lines else 'no_visible_events')
     return {'availability': availability, 'events': events, 'unclassified': unknown,
-            'omitted': omitted}
+            'omitted': omitted, 'session_count': len(sessions)}
 
 
 class Collector:
@@ -745,7 +749,18 @@ class Collector:
                 lines.append('No installation-specific event evidence is available from these history sources. '
                              'Fingerprint results and runtime capture/transport events are not installation evidence. '
                              'Static checks and the separately dated cached operation remain context.')
+            multiple_sessions = history.get('session_count', 0) > 1
+            if multiple_sessions:
+                lines.append('Events from different startup sessions do not establish causal links between those sessions.')
+            previous_session = None
+            shown_sessions = set()
             for event in history['events']:
+                if multiple_sessions and event['session'] != previous_session:
+                    session = event['session']
+                    lines.append('Startup session ' + str(session) +
+                                 (' (continued)' if session in shown_sessions else ''))
+                    shown_sessions.add(session)
+                    previous_session = session
                 lines.append(event['time'] + ' ' + event['source'] + ': ' + event['category'])
             lines.append('Temporal ordering is observed; causal attribution remains UNKNOWN.')
             if extended:
@@ -769,15 +784,29 @@ def collect_report(profile, time_window, extended, consent, since='', until='', 
 
 
 def save_report(path, text):
-    """Explicit export: a new ordinary 0600 file, never replace an existing target."""
+    """Export after the save dialog's confirmation, atomically and privately."""
     if not isinstance(text, str) or not text.startswith('GOODIX MANAGER DIAGNOSTIC REPORT\n') or len(text.encode()) > MAX_REPORT:
         raise ValueError('invalid report')
     target = Path(path)
-    fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
-    # Never unlink by pathname after an I/O error: another process may have
-    # replaced it. A partial 0600 file can remain; the caller reports failure.
-    with os.fdopen(fd, 'wb') as stream:
-        os.fchmod(stream.fileno(), 0o600)
-        stream.write(text.encode())
-        stream.flush()
-        os.fsync(stream.fileno())
+
+    def check_target():
+        try:
+            mode = target.lstat().st_mode
+        except FileNotFoundError:
+            return
+        if not stat.S_ISREG(mode):
+            raise OSError('report destination must be a regular file')
+
+    check_target()
+    fd, temporary = tempfile.mkstemp(prefix='.goodix-report-', dir=target.parent)
+    try:
+        with os.fdopen(fd, 'wb') as stream:
+            os.fchmod(stream.fileno(), 0o600)
+            stream.write(text.encode())
+            stream.flush()
+            os.fsync(stream.fileno())
+        check_target()
+        # Replacing a directory entry never follows a destination symlink.
+        os.replace(temporary, target)
+    finally:
+        Path(temporary).unlink(missing_ok=True)

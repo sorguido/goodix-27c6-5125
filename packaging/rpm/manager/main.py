@@ -5,7 +5,7 @@ import json
 import os
 from pathlib import Path
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from threading import Event
 
@@ -410,20 +410,20 @@ class Controller(QObject):
         if self._diagnostic_data['reportReady'] and not self.diagnostics['busy']:
             QGuiApplication.clipboard().setText(self._diagnostic_data['reportText'])
 
-    @Slot()
+    @Slot(result=str)
     def save_diagnostic_report(self):
         if not self._diagnostic_data['reportReady'] or self.diagnostics['busy']:
-            return
+            return ''
         destination, _ = QFileDialog.getSaveFileName(None, 'Save diagnostic report',
             'goodix-diagnostic-report.txt', 'Text report (*.txt)')
         if not destination:
-            return
+            return ''
         try:
+            # The normal Qt dialog has already confirmed any replacement.
             diagnostic_tools.save_report(destination, self._diagnostic_data['reportText'])
-            self._diagnostic_data['reportError'] = 'Report saved locally with private permissions.'
+            return 'Report saved locally with private permissions.'
         except (OSError, ValueError):
-            self._diagnostic_data['reportError'] = 'Report could not be saved. Choose a new file in a writable folder.'
-        self.changed.emit()
+            return 'Report could not be saved. Check the file and folder permissions and try again.'
 
     @Slot(bool)
     def start_reader_test(self, consent):
@@ -446,6 +446,27 @@ class Controller(QObject):
     def report_local_time(self, year, month, day, hour, minute):
         return local_report_time(year, month, day, hour, minute,
                                  bytes(QTimeZone.systemTimeZoneId()).decode('utf-8'))
+
+    @Slot(str, str, result=str)
+    def report_time_error(self, since, until):
+        """Validate before consent with the collector's definitive contract."""
+        now = datetime.now(timezone.utc)
+        try:
+            diagnostic_tools.time_arguments('custom', since, until, now)
+            return ''
+        except (ValueError, TypeError, OverflowError):
+            try:
+                start, end = datetime.fromisoformat(since), datetime.fromisoformat(until)
+                if start.tzinfo is not None and end.tzinfo is not None:
+                    if end <= start:
+                        return 'The end must be later than the start.'
+                    if end - start > timedelta(hours=24):
+                        return 'Choose a range of at most 24 hours.'
+                    if end > now + timedelta(minutes=5):
+                        return 'The end cannot be more than five minutes in the future.'
+            except (ValueError, TypeError, OverflowError):
+                pass
+            return 'Choose valid start and end dates and local times.'
 
     @Slot()
     def cancel_diagnostics(self):

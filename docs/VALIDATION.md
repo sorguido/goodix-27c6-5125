@@ -28,6 +28,14 @@ An RPM-only Manager update does not run this correction; a runtime already at
 3.1.1 may not offer Update. No forced update, separate repair action or additional
 live qualification is implied.
 
+The `3.1.1-5.fc44` candidate additionally corrects confirmed report replacement,
+history spanning multiple startups and invalid custom ranges reaching the consent
+dialog. Offline tests cover atomic private export and failure preservation,
+anonymous startup-session boundaries with retained counters, and range validation
+before consent (including the exact 24-hour boundary and existing DST rules).
+These software checks do not qualify installation or physical-reader behavior;
+the maintainer must retest the three report flows on the target desktop.
+
 The [3.0.1 validation record](VALIDATION_3.0.1.md) separately tracks historical
 packaging checks, operator-reported Fedora 44/45 tests and remaining limits.
 The observations below concern earlier versions unless explicitly stated.

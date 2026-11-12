@@ -14,6 +14,9 @@ This candidate also improves everyday diagnostics:
 
 - Start a **New test** after a safely completed reader-test session, with fresh consent.
 - Choose a custom period using a calendar and local hours and minutes.
+- Invalid custom periods are explained before you are asked to consent.
+- Reports spanning a restart preserve events with separate startup-session markers.
+- Confirming replacement in Save report writes the new report atomically, with the result shown beside the export buttons.
 - Get reports focused on the selected problem, with clear messages when useful evidence is missing.
 - Open Home at a height suited to its content, while keeping your manual window size during use.
 - See clearer messages when system settings cannot be read. Driver installation and updates now keep the service settings folder readable, including folders left restricted by an earlier installation.

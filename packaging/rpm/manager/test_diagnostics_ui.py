@@ -4,6 +4,7 @@
 import argparse
 import json
 import os
+import stat
 from pathlib import Path
 import sys
 import tempfile
@@ -62,7 +63,7 @@ class FakeReader(QObject):
 def report_result(**updates):
     result = {'checks': [], 'overview': 'Some checks could not be completed',
               'generatedAt': '2026-11-08T12:00:00Z', 'reportReady': True,
-              'reportText': 'OFFLINE SYNTHETIC REPORT\nNo host data collected.\n',
+              'reportText': 'GOODIX MANAGER DIAGNOSTIC REPORT\nOFFLINE SYNTHETIC REPORT\nNo host data collected.\n',
               'reportTitle': 'System status', 'reportSummary': 'Read-only synthetic evidence.',
               'reportError': ''}
     result.update(updates)
@@ -178,17 +179,49 @@ class ControllerTests(unittest.TestCase):
             self.controller.save_diagnostic_report()
             self.assertEqual(dialog.call_count, 1)
 
-    def test_save_dialog_cancel_and_existing_file_failure_are_safe(self):
+    def test_save_dialog_cancel_or_denied_overwrite_preserves_the_file_and_preview(self):
         self.create_report()
-        with patch.object(manager.QFileDialog, 'getSaveFileName', return_value=('', '')), \
-             patch.object(manager.diagnostic_tools, 'save_report') as save:
-            self.controller.save_diagnostic_report()
-            save.assert_not_called()
+        preview = self.controller.diagnostics['reportText']
+        with tempfile.TemporaryDirectory() as directory:
+            previous = Path(directory) / 'report.txt'
+            previous.write_text('Previous report')
+            for action in ('cancel', 'deny overwrite'):
+                with self.subTest(action=action), \
+                     patch.object(manager.QFileDialog, 'getSaveFileName', return_value=('', '')), \
+                     patch.object(manager.diagnostic_tools, 'save_report') as save:
+                    self.assertEqual(self.controller.save_diagnostic_report(), '')
+                    save.assert_not_called()
+                    self.assertEqual(previous.read_text(), 'Previous report')
+                    self.assertEqual(self.controller.diagnostics['reportText'], preview)
+                    self.assertTrue(self.controller.diagnostics['reportReady'])
+
+    def test_confirmed_dialog_selection_reaches_real_writer_and_replaces_private_report(self):
+        self.create_report()
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory) / 'existing.txt'
+            destination.write_text('Previous report')
+            destination.chmod(0o644)
+            with patch.object(manager.QFileDialog, 'getSaveFileName', return_value=(str(destination), 'Text report (*.txt)')) as dialog, \
+                 patch.object(manager.diagnostic_tools, 'save_report', wraps=manager.diagnostic_tools.save_report) as writer:
+                message = self.controller.save_diagnostic_report()
+                writer.assert_called_once_with(str(destination), self.controller.diagnostics['reportText'])
+                self.assertNotIn('options', dialog.call_args.kwargs, 'Keep Qt default overwrite confirmation')
+            self.assertIn('saved locally', message)
+            self.assertEqual(destination.read_bytes(), self.controller.diagnostics['reportText'].encode())
+            self.assertEqual(stat.S_IMODE(destination.stat().st_mode), 0o600)
+            self.assertEqual(self.controller.diagnostics['reportError'], '')
+
+    def test_save_failure_returns_failure_and_keeps_the_preview(self):
+        self.create_report()
+        preview = self.controller.diagnostics['reportText']
         with patch.object(manager.QFileDialog, 'getSaveFileName', return_value=('/fake/existing.txt', '')), \
-             patch.object(manager.diagnostic_tools, 'save_report', side_effect=FileExistsError):
-            self.controller.save_diagnostic_report()
-            self.assertIn('Choose a new file', self.controller.diagnostics['reportError'])
+             patch.object(manager.diagnostic_tools, 'save_report', side_effect=OSError):
+            message = self.controller.save_diagnostic_report()
+            self.assertIn('could not be saved', message)
+            self.assertNotIn('saved locally', message)
             self.assertTrue(self.controller.diagnostics['reportReady'])
+            self.assertEqual(self.controller.diagnostics['reportText'], preview)
+            self.assertEqual(self.controller.diagnostics['reportError'], '')
 
     def test_exceptions_do_not_export_internal_output(self):
         self.collect_checks.side_effect = RuntimeError('PROTECTED_TOKEN_MUST_NOT_ESCAPE')
@@ -530,6 +563,37 @@ class UiTests(unittest.TestCase):
         self.assertIn('missing files', missing.property('text'))
         self.snapshot('07-preview-issue55-real-collector-dark')
 
+    def test_save_feedback_is_visible_at_export_controls_after_success_and_failure(self):
+        self.open_center()
+        self.click('chooseProblem')
+        self.click('problemOther')
+        self.click('continueReport')
+        self.click('reportConsent')
+        self.click('createReport')
+        self.wait(lambda: self.screen() == 'preview')
+        preview = self.item('reportPreview').property('text')
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory) / 'report.txt'
+            destination.write_text('Previous report')
+            with patch.object(manager.QFileDialog, 'getSaveFileName', return_value=(str(destination), '')):
+                self.click('saveReport')
+                self.assertIn('saved locally', self.item('reportExportNotice').property('text'))
+                self.assertEqual(destination.read_bytes(), preview.encode())
+                self.assertEqual(stat.S_IMODE(destination.stat().st_mode), 0o600)
+                with patch.object(manager.diagnostic_tools, 'save_report', side_effect=OSError('PRIVATE_ERROR')):
+                    self.click('saveReport')
+                notice = self.item('reportExportNotice')
+                self.assertTrue(notice.property('visible'))
+                self.assertIn('could not be saved', notice.property('text'))
+                self.assertNotIn('saved locally', notice.property('text'))
+                self.assertNotIn('PRIVATE_ERROR', notice.property('text'))
+                point = notice.mapToScene(QPointF(0, notice.height() / 2))
+                self.assertTrue(0 <= point.y() < self.window.height(), 'Feedback must be in the visible viewport')
+                self.assertEqual(destination.read_bytes(), preview.encode())
+                self.assertEqual(self.item('reportPreview').property('text'), preview)
+                self.assertTrue(self.controller.diagnostics['reportReady'])
+                self.snapshot('21-report-export-error-visible-dark')
+
     def test_reader_requires_consent_and_cancel_is_explicit(self):
         self.open_center()
         self.click('chooseReader')
@@ -656,15 +720,58 @@ class UiTests(unittest.TestCase):
             self.assertFalse(self.controller.diagnostics['reportReady'])
             select('reportSince', 7, 10, 0)
             select('reportUntil', 8, 10, 1)
-            self.click('continueReport')
-            self.click('reportConsent')
-            self.click('createReport')
-            self.wait(lambda: not self.controller.diagnostics['busy'])
+            self.collect_report.reset_mock()
+            self.assertFalse(self.item('continueReport').property('enabled'))
+            self.assertFalse(self.item('privacyDialog').property('visible'))
+            self.collect_report.assert_not_called()
             self.assertFalse(self.controller.diagnostics['reportReady'])
-            self.assertIn('24 hours', self.controller.diagnostics['reportError'])
+            self.assertIn('24 hours', self.item('reportRangeError').property('text'))
             self.app.setPalette(system_palette(False))
             self.window.setWidth(560)
             self.snapshot('20-custom-time-compact-light')
+
+    def test_custom_invalid_ranges_stop_before_consent_and_noncustom_choices_are_unchanged(self):
+        fixed_now = datetime(2026, 11, 12, 12, tzinfo=timezone.utc)
+        with patch.object(manager.QTimeZone, 'systemTimeZoneId', return_value=b'Europe/Rome'), \
+             patch.object(manager, 'datetime', wraps=datetime) as clock:
+            clock.now.return_value = fixed_now
+            self.open_center()
+            self.click('chooseProblem')
+            self.click('problemLogin')
+            self.choose_time(4)
+            def select(start_day, start_hour, end_day, end_hour):
+                self.qml_value('reportSince.selectedDate = new Date(2026, 10, %d); reportSince.hour = %d; reportSince.minute = 0; '
+                               'reportUntil.selectedDate = new Date(2026, 10, %d); reportUntil.hour = %d; reportUntil.minute = 0; undefined' %
+                               (start_day, start_hour, end_day, end_hour))
+                self.app.processEvents()
+            for args, message in (((7, 10, 8, 11), '24 hours'),
+                                  ((7, 10, 7, 9), 'later than'),
+                                  ((12, 13, 12, 14), 'future')):
+                with self.subTest(range=args):
+                    select(*args)
+                    self.assertFalse(self.item('continueReport').property('enabled'))
+                    self.assertTrue(self.item('reportRangeError').property('visible'))
+                    self.assertIn(message, self.item('reportRangeError').property('text'))
+                    self.assertFalse(self.item('privacyDialog').property('visible'))
+                    self.collect_report.assert_not_called()
+            for args in ((7, 10, 8, 10), (7, 10, 7, 11)):
+                with self.subTest(valid_range=args):
+                    select(*args)
+                    self.assertTrue(self.item('continueReport').property('enabled'))
+                    self.assertFalse(self.item('reportRangeError').property('visible'))
+                    self.click('continueReport')
+                    self.assertTrue(self.item('privacyDialog').property('visible'))
+                    self.collect_report.assert_not_called()
+                    self.click('cancelConsent')
+            select(7, 10, 8, 11)
+            self.assertFalse(self.item('continueReport').property('enabled'))
+            for index in range(4):
+                self.choose_time(index)
+                self.assertTrue(self.item('continueReport').property('enabled'))
+                self.assertFalse(self.item('reportRangeError').property('visible'))
+                self.click('continueReport')
+                self.assertTrue(self.item('privacyDialog').property('visible'))
+                self.click('cancelConsent')
 
     def test_denied_report_and_light_compact_render(self):
         self.collect_report.return_value = report_result(reportReady=False, reportText='', reportError='History is unavailable: permission denied.')

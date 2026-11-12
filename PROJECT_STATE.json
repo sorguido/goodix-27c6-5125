@@ -4,9 +4,9 @@
   "project": "Goodix 27c6:5125 — Goodix Manager diagnostics",
   "branch": "diagnostic",
   "execution_path": "PRIMARY",
-  "phase": "DRAFT_RELEASE_3_1_1_DROPIN_PERMISSIONS",
-  "phase_status": "DRAFT_ONLY_MAINTAINER_FEDORA45_RETEST_REQUIRED",
-  "primary_artifact": "development/rpm/dropin-0755-v3.1.1/FINAL_REPORT.md",
+  "phase": "DRAFT_RELEASE_3_1_1_DIAGNOSTIC_CORRECTIONS_5",
+  "phase_status": "IN_PROGRESS_OFFLINE_CORRECTIONS",
+  "primary_artifact": "development/rpm/diagnostic-corrections-5/FINAL_REPORT.md",
   "completed_gates": [
     "DIAG0_DESIDERATA_RECORDED",
     "DIAG0_LOCAL_ARTIFACT_VERIFICATION",
@@ -39,7 +39,10 @@
     "DROPIN4_SAME_DRAFT_FINAL_GATE_AND_REVIEW"
   ],
   "pending_gates": [
-    "MAINTAINER_FEDORA45_RETEST_NEW_4",
+    "CORRECTIVE5_OFFLINE_REVIEW",
+    "CORRECTIVE5_CANONICAL_BUILD_SIGNATURES",
+    "CORRECTIVE5_TAG_LEASE_AND_VERIFIED_DRAFT_REPLACEMENT",
+    "MAINTAINER_FEDORA45_RETEST_NEW_5",
     "DIAG4_REAL_TARGET_QUALIFICATION",
     "DIAG5_ACCEPTANCE",
     "MAINTAINER_PUBLICATION_DECISION"
@@ -81,7 +84,7 @@
   "relevant_corroborations": [
     "C4"
   ],
-  "next_action": "STOP with same draft442694338 updated to signed4 and unpublished. Maintainer must retest ordinary3.0.1→3.1.1 Apply Update on Fedora45. RPM-only does not normalize permissions; runtime already3.1.1 may not offer Update. No force/repair/live/merge/publication authorized.",
+  "next_action": "Implement and independently review three approved Diagnostic Center corrections; build/sign 3.1.1-5, replace assets only in current restored draft443047985 while retaining old4 until new5 authenticated verification. No publication or live/runtime activity.",
   "last_verified_head": "cbc8042a793a0185523d0b7fbab70419c40cbf09",
   "observed_remote_base_head": "4bc1f308071768b4f8045e58b4d12937bfa8ada2",
   "documentation_only": false,
@@ -338,5 +341,6 @@
     "final_draft_url": "https://github.com/sorguido/goodix-27c6-5125/releases/tag/untagged-41147acfd282a5b05d61",
     "final_state": "DRAFT ONLY — MAINTAINER FEDORA 45 RETEST REQUIRED",
     "final_report": "development/rpm/dropin-0755-v3.1.1/FINAL_REPORT.md"
-  }
+  },
+  "draft_release_id": 443047985
 }

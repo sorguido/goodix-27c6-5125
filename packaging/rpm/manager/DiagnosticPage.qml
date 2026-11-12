@@ -16,6 +16,7 @@ Kirigami.ScrollablePage {
     property bool awaitingReport: false
     property bool privacySubmitted: false
     property string exportNotice: ""
+    readonly property string customTimeError: timeSelection.currentIndex === 4 ? backend.report_time_error(reportSince.iso, reportUntil.iso) : ""
     readonly property bool available: !diagnostic.busy && !backend.view.busy
     readonly property var profileNames: ({system: "System status", install: "Installation or update failed", login: "Fingerprint sign-in problem", recognition: "Fingerprint recognition problem", other: "Other problem"})
     readonly property bool installationTimeAvailable: diagnostic.installationTimeAvailable
@@ -435,6 +436,7 @@ Kirigami.ScrollablePage {
                     Controls.Label { visible: timeSelection.currentIndex === 4; text: "Choose dates and times in your computer's local time (maximum 24 hours)."; wrapMode: Text.WordWrap; Layout.fillWidth: true }
                     LocalDateTime { objectName: "reportSince"; id: reportSince; caption: "Start"; initialTime: new Date(Date.now() - 30 * 60 * 1000); visible: timeSelection.currentIndex === 4; enabled: page.available; onEdited: page.invalidateReport() }
                     LocalDateTime { objectName: "reportUntil"; id: reportUntil; caption: "End"; visible: timeSelection.currentIndex === 4; enabled: page.available; onEdited: page.invalidateReport() }
+                    Controls.Label { objectName: "reportRangeError"; visible: timeSelection.currentIndex === 4 && text.length > 0; text: page.customTimeError; wrapMode: Text.WordWrap; Layout.fillWidth: true }
                 }
             }
             Panel {
@@ -452,7 +454,7 @@ Kirigami.ScrollablePage {
                 Layout.fillWidth: true
                 ActionButton { text: "Back"; enabled: page.available; onClicked: page.goBack() }
                 Item { Layout.fillWidth: true }
-                ActionButton { objectName: "continueReport"; text: "Continue to report"; icon.name: "go-next"; highlighted: true; enabled: page.available && (timeSelection.currentIndex !== 4 || (reportSince.iso.length > 0 && reportUntil.iso.length > 0)); onClicked: { page.invalidateReport(); page.privacySubmitted = false; consentCheck.checked = false; privacyDialog.open() } }
+                ActionButton { objectName: "continueReport"; text: "Continue to report"; icon.name: "go-next"; highlighted: true; enabled: page.available && page.customTimeError.length === 0; onClicked: { if (timeSelection.currentIndex === 4 && backend.report_time_error(reportSince.iso, reportUntil.iso).length > 0) return; page.invalidateReport(); page.privacySubmitted = false; consentCheck.checked = false; privacyDialog.open() } }
             }
         }
         ColumnLayout {
@@ -498,6 +500,7 @@ Kirigami.ScrollablePage {
                 Controls.TextArea { objectName: "reportPreview"; text: page.diagnostic.reportText; readOnly: true; selectByMouse: true; wrapMode: TextEdit.Wrap; textFormat: TextEdit.PlainText; font.family: "monospace"; Accessible.name: "Technical report preview" }
             }
             Notice { message: "Reports are saved locally. Nothing is uploaded or sent to the maintainer automatically. Always review personal information before attaching a report to an issue." }
+            Controls.Label { objectName: "reportExportNotice"; text: page.exportNotice; visible: text.length > 0; wrapMode: Text.WordWrap; Layout.fillWidth: true }
             GridLayout {
                 Layout.fillWidth: true
                 columns: page.width > 760 ? 3 : 1
@@ -507,10 +510,9 @@ Kirigami.ScrollablePage {
                 RowLayout {
                     spacing: 12
                     ActionButton { objectName: "copyReport"; text: "Copy report"; icon.name: "edit-copy"; enabled: page.available && page.diagnostic.reportReady; onClicked: { backend.copy_diagnostic_report(); page.exportNotice = "Report copied. Review personal information before sharing." } }
-                    ActionButton { objectName: "saveReport"; text: "Save report .txt"; icon.name: "document-save"; highlighted: true; enabled: page.available && page.diagnostic.reportReady; onClicked: backend.save_diagnostic_report() }
+                    ActionButton { objectName: "saveReport"; text: "Save report .txt"; icon.name: "document-save"; highlighted: true; enabled: page.available && page.diagnostic.reportReady; onClicked: page.exportNotice = backend.save_diagnostic_report() }
                 }
             }
-            Controls.Label { text: page.exportNotice; visible: text.length > 0; wrapMode: Text.WordWrap; Layout.fillWidth: true }
         }
         ColumnLayout {
             visible: page.screen === "test"

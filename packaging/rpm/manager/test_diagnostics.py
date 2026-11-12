@@ -281,6 +281,15 @@ class DiagnosticTests(unittest.TestCase):
 
 
 class EventTests(unittest.TestCase):
+    def report_history(self, result, profile='recognition', extended=False):
+        fixture = Fixtures()
+        collector = fixture.collector()
+        collector.run = lambda args, timeout=5: result if args[0] == '/usr/bin/journalctl' else fixture.run(args, timeout)
+        report = collector.report(profile, 'custom', extended, True,
+                                  (NOW - timedelta(hours=2)).isoformat(), NOW.isoformat())
+        self.assertTrue(report['reportReady'])
+        return report['reportText']
+
     def test_three_matches_are_observed_context_but_not_installation_evidence(self):
         raw = '\n'.join(event('verify-match', str(1794167999000000 + i)) for i in range(3))
         for profile in ('install', 'recognition', 'login', 'other'):
@@ -329,8 +338,10 @@ class EventTests(unittest.TestCase):
         self.assertEqual(unknown['omitted'], 0)
         mixed = parse_events(Result(stdout=event('verify-match') + '\n' +
                                     event('verify-match', boot='b' * 32)), 'install')
-        self.assertEqual(mixed['availability'], 'mixed_boot_history')
+        self.assertEqual(mixed['availability'], 'visible_history')
         self.assertEqual(mixed['events'], [])
+        self.assertEqual(mixed['omitted'], 2)
+        self.assertEqual(mixed['unclassified'], 0)
 
     def test_event_projection_separates_real_markers_and_strips_all_raw_details(self):
         messages = [
@@ -357,8 +368,96 @@ class EventTests(unittest.TestCase):
         self.assertIn('.000001', data['events'][0]['time'])
         self.assertNotIn('a' * 32, json.dumps(data))
         data = parse_events(Result(stdout=raw + '\n' + event('verify-match', boot='b' * 32)), 'recognition')
-        self.assertEqual(data['availability'], 'mixed_boot_history')
-        self.assertEqual(data['events'], [])
+        self.assertEqual(data['availability'], 'visible_history')
+        self.assertEqual(len(data['events']), 3)
+        self.assertEqual(data['session_count'], 2)
+        self.assertEqual([item['session'] for item in data['events']], [1, 2, 1])
+        self.assertNotIn('a' * 32, json.dumps(data))
+        self.assertNotIn('b' * 32, json.dumps(data))
+
+    def test_custom_report_keeps_multiple_startups_for_all_profiles_without_private_ids(self):
+        raw = '\n'.join(event(message, str(1794167999000000 + index), boot=boot)
+                        for index, (message, boot) in enumerate((
+                            ('verify-match RAW_SECRET', 'a' * 32),
+                            ('UNKNOWN RAW_SECRET', 'a' * 32),
+                            ('avc: denied RAW_SECRET', 'a' * 32),
+                            ('verify-no-match RAW_SECRET', 'b' * 32),
+                            ('UNKNOWN RAW_SECRET', 'b' * 32),
+                            ('avc: denied RAW_SECRET', 'b' * 32))))
+        for profile in ('recognition', 'login', 'install', 'other'):
+            with self.subTest(profile=profile):
+                history = parse_events(Result(stdout=raw), profile, True)
+                text = self.report_history(Result(stdout=raw), profile, True)
+                self.assertEqual(history['availability'], 'visible_history')
+                self.assertEqual(history['session_count'], 2)
+                self.assertEqual(history['unclassified'], 2)
+                self.assertEqual(history['omitted'], 2 if profile == 'install' else 0)
+                self.assertEqual(len(history['events']), 2 if profile == 'install' else 4)
+                self.assertIn('Unclassified records: 2', text)
+                self.assertIn('omitted for this profile: ' + ('2' if profile == 'install' else '0'), text)
+                self.assertLess(text.index('Startup session 1'), text.index('Startup session 2'))
+                self.assertIn('different startup sessions do not establish causal links', text)
+                self.assertIn('causal attribution remains UNKNOWN', text)
+                self.assertEqual(text.count('fprintd: security_denial'), 2)
+                if profile == 'install':
+                    self.assertNotIn('fprintd: match', text)
+                    self.assertNotIn('fprintd: no_match', text)
+                for private in ('a' * 32, 'b' * 32, '_BOOT_ID', 'MESSAGE', 'RAW_SECRET'):
+                    self.assertNotIn(private, text)
+                    self.assertNotIn(private, json.dumps(history))
+
+    def test_alternating_boots_keep_global_time_order_and_reuse_startup_labels(self):
+        raw = '\n'.join((event('verify-match', '1794167999000003', boot='b' * 32),
+                         event('verify-no-match', '1794167999000004', boot='a' * 32),
+                         event('verify-match', '1794167999000001', boot='a' * 32),
+                         event('verify-no-match', '1794167999000002', boot='b' * 32)))
+        history = parse_events(Result(stdout=raw), 'recognition')
+        self.assertEqual([item['session'] for item in history['events']], [1, 2, 2, 1])
+        self.assertEqual([item['time'] for item in history['events']], sorted(item['time'] for item in history['events']))
+        text = self.report_history(Result(stdout=raw))
+        self.assertEqual([line for line in text.splitlines() if line.startswith('Startup session')],
+                         ['Startup session 1', 'Startup session 2', 'Startup session 1 (continued)'])
+        displayed = [line for line in text.splitlines() if ' fprintd: ' in line]
+        self.assertEqual(displayed, sorted(displayed))
+        self.assertEqual(len(displayed), 4)
+
+    def test_single_startup_report_keeps_existing_history_text(self):
+        raw = event('verify-no-match', '1794167999000001') + '\n' + event('verify-match', '1794167999000002')
+        history = parse_events(Result(stdout=raw), 'recognition')
+        self.assertEqual(history['session_count'], 1)
+        self.assertEqual(history['events'], [
+            {'time': '2026-11-08T19:59:59.000001+00:00', 'source': 'fprintd', 'category': 'no_match'},
+            {'time': '2026-11-08T19:59:59.000002+00:00', 'source': 'fprintd', 'category': 'match'}])
+        text = self.report_history(Result(stdout=raw))
+        expected = ('History availability: visible_history\nUnclassified records: 0\n'
+                    'Known runtime events omitted for this profile: 0\n'
+                    'Missing or inaccessible history does not prove absence of problems.\n'
+                    '2026-11-08T19:59:59.000001+00:00 fprintd: no_match\n'
+                    '2026-11-08T19:59:59.000002+00:00 fprintd: match\n'
+                    'Temporal ordering is observed; causal attribution remains UNKNOWN.\n')
+        self.assertIn(expected, text)
+        self.assertNotIn('Startup session ', text)
+        self.assertNotIn('different startup sessions', text)
+
+    def test_multiple_startups_keep_partial_truncated_and_unavailable_history_visible(self):
+        raw = event('verify-match', boot='a' * 32) + '\n' + event('verify-no-match', boot='b' * 32)
+        partial = Result(stdout=raw + '\n' + event('UNKNOWN RAW_SECRET', boot='b' * 32), stderr_present=True)
+        text = self.report_history(partial)
+        self.assertIn('History availability: partial_history', text)
+        self.assertIn('Unclassified records: 1', text)
+        self.assertIn('Startup session 1', text)
+        self.assertIn('Startup session 2', text)
+        truncated = Result(stdout='\n'.join(event('verify-match', str(1794167999000000 + index),
+                                                  boot=('a' if index % 2 else 'b') * 32)
+                                           for index in range(1001)))
+        text = self.report_history(truncated)
+        self.assertIn('History availability: history_truncated', text)
+        self.assertEqual(text.count('fprintd: match'), 1000)
+        self.assertIn('Startup session 2', text)
+        self.assertNotIn('mixed_boot_history', text)
+        text = self.report_history(Result(returncode=1, stdout=raw))
+        self.assertIn('History availability: history_unavailable', text)
+        self.assertNotIn('Startup session ', text)
 
     def test_history_permission_missing_invalid_partial_and_limit_do_not_mean_healthy(self):
         for result in (Result(1), Result(code='source_unavailable'), Result(code='timeout'), Result(code='output_limit'), Result(stdout='{"MESSAGE": "SECRET"}'), Result(stdout='not json')):
@@ -402,24 +501,45 @@ class BoundaryTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 time_arguments('custom', start, end, NOW)
 
-    def test_export_new_regular_0600_file_without_overwrite_or_symlink(self):
+    def test_export_new_and_confirmed_overwrite_regular_0600_file(self):
         text = 'GOODIX MANAGER DIAGNOSTIC REPORT\nfixture\n'
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'report.txt'
             save_report(path, text)
-            self.assertEqual(path.read_text(), text)
+            self.assertEqual(path.read_bytes(), text.encode())
             self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
-            with self.assertRaises(FileExistsError):
-                save_report(path, text + 'different')
+            path.chmod(0o644)
+            updated = text + 'New report: è corretto\n'
+            save_report(path, updated)
+            self.assertEqual(path.read_bytes(), updated.encode())
+            self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
+            self.assertEqual(list(Path(tmp).iterdir()), [path])
+
+    def test_export_rejects_symlinks_special_files_and_invalid_reports(self):
+        text = 'GOODIX MANAGER DIAGNOSTIC REPORT\nfixture\n'
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'report.txt'
+            path.write_text('original')
             link = Path(tmp) / 'link'
             link.symlink_to(path)
-            with self.assertRaises(OSError):
-                save_report(link, text)
-            self.assertEqual(path.read_text(), text)
+            dangling = Path(tmp) / 'dangling'
+            dangling.symlink_to(Path(tmp) / 'missing')
+            fifo = Path(tmp) / 'fifo'
+            os.mkfifo(fifo)
+            directory = Path(tmp) / 'directory'
+            directory.mkdir()
+            for target in (link, dangling, fifo, directory):
+                with self.subTest(target=target.name), self.assertRaises(OSError):
+                    save_report(target, text)
+            self.assertEqual(path.read_text(), 'original')
+            self.assertTrue(link.is_symlink())
+            self.assertTrue(dangling.is_symlink())
+            self.assertTrue(stat.S_ISFIFO(fifo.lstat().st_mode))
             with self.assertRaises(ValueError):
                 save_report(Path(tmp) / 'invalid', 'untrusted')
             with self.assertRaises(ValueError):
                 save_report(Path(tmp) / 'overflow', text + 'x' * MAX_REPORT)
+            self.assertFalse(list(Path(tmp).glob('.goodix-report-*')))
 
     def test_runner_bounds_both_streams_and_rejects_invalid_encoding(self):
         for script, expected in [('import sys;sys.stdout.write("x"*300000)', 'output_limit'),
@@ -429,24 +549,60 @@ class BoundaryTests(unittest.TestCase):
             self.assertEqual(result.code, expected)
             self.assertEqual(result.stdout, '')
 
-    def test_export_failure_preserves_replacement_and_leaves_partial_file_restrictive(self):
+    def test_export_failures_preserve_previous_file_and_clean_temporary(self):
         text = 'GOODIX MANAGER DIAGNOSTIC REPORT\nfixture\n'
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'report'
-            def replace(_fd):
+            original = b'old report must remain byte-identical\n'
+            for operation in ('fsync', 'replace'):
+                for existing in (False, True):
+                    with self.subTest(operation=operation, existing=existing):
+                        if existing:
+                            path.write_bytes(original)
+                            path.chmod(0o600)
+                        with patch('diagnostics.os.' + operation, side_effect=OSError('fixture I/O failure')):
+                            with self.assertRaises(OSError):
+                                save_report(path, text)
+                        self.assertFalse(list(Path(tmp).glob('.goodix-report-*')))
+                        if existing:
+                            self.assertEqual(path.read_bytes(), original)
+                            self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
+                            path.unlink()
+                        else:
+                            self.assertFalse(path.exists())
+
+    def test_export_write_failure_and_changed_symlink_destination_are_safe(self):
+        text = 'GOODIX MANAGER DIAGNOSTIC REPORT\nfixture\n'
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'report'
+            path.write_bytes(b'old report')
+            fdopen = os.fdopen
+
+            def failing_stream(fd, mode):
+                stream = fdopen(fd, mode)
+                def fail_write(_data):
+                    raise OSError('fixture write failure')
+                stream.write = fail_write
+                return stream
+
+            with patch('diagnostics.os.fdopen', side_effect=failing_stream):
+                with self.assertRaises(OSError):
+                    save_report(path, text)
+            self.assertEqual(path.read_bytes(), b'old report')
+            self.assertFalse(list(Path(tmp).glob('.goodix-report-*')))
+            other = Path(tmp) / 'unrelated'
+            other.write_bytes(b'unrelated content')
+
+            def change_destination(_fd):
                 path.unlink()
-                path.write_text('UNRELATED_REPLACEMENT')
-                raise OSError('fixture fsync failure')
-            with patch('diagnostics.os.fsync', side_effect=replace):
+                path.symlink_to(other)
+
+            with patch('diagnostics.os.fsync', side_effect=change_destination):
                 with self.assertRaises(OSError):
                     save_report(path, text)
-            self.assertEqual(path.read_text(), 'UNRELATED_REPLACEMENT')
-            path.unlink()
-            with patch('diagnostics.os.fsync', side_effect=OSError('fixture fsync failure')):
-                with self.assertRaises(OSError):
-                    save_report(path, text)
-            self.assertTrue(path.exists())
-            self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
+            self.assertTrue(path.is_symlink())
+            self.assertEqual(other.read_bytes(), b'unrelated content')
+            self.assertFalse(list(Path(tmp).glob('.goodix-report-*')))
 
     def test_runner_cancellation_timeout_and_whole_request_budget(self):
         stop = threading.Event()
