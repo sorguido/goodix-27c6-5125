@@ -16,7 +16,7 @@ This candidate also improves everyday diagnostics:
 - Choose a custom period using a calendar and local hours and minutes.
 - Get reports focused on the selected problem, with clear messages when useful evidence is missing.
 - Open Home at a height suited to its content, while keeping your manual window size during use.
-- See clearer messages when system settings cannot be read; new installations create the service settings folder with the intended access.
+- See clearer messages when system settings cannot be read. Driver installation and updates now keep the service settings folder readable, including folders left restricted by an earlier installation.
 
 Diagnostics do not change the reader's normal operation. Reports stay local until
 you choose to share them. The Manager does not repair your system automatically
@@ -30,3 +30,6 @@ Earlier candidate observations remain separate; see [validation](VALIDATION.md).
 When a release is published, use the signed RPM and follow the
 [installation and signature-verification guide](INSTALLATION.md). Installing the
 Manager RPM alone does not activate the driver or change authentication settings.
+The folder correction runs when **Install** or **Apply Update** applies the
+driver. Installing the Manager package alone does not apply it, and a driver
+already at 3.1.1 may not offer an update action.

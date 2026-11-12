@@ -19,6 +19,15 @@ required. The corrected candidate needs a new Fedora 45 check of these flows.
 An inactive on-demand service is not itself a failure, and partial sign-in
 configuration checks remain partial regardless of successful login observations.
 
+The current installer correction makes its verified service configuration
+directory readable during normal driver installation/update, including an
+existing restricted directory. Offline fixtures cover new, 0700 and 0755
+directories, preserved drop-in files and rejection of unsafe paths. The real
+3.0.1 → 3.1.1 **Apply Update** path still requires maintainer testing on Fedora 45.
+An RPM-only Manager update does not run this correction; a runtime already at
+3.1.1 may not offer Update. No forced update, separate repair action or additional
+live qualification is implied.
+
 The [3.0.1 validation record](VALIDATION_3.0.1.md) separately tracks historical
 packaging checks, operator-reported Fedora 44/45 tests and remaining limits.
 The observations below concern earlier versions unless explicitly stated.

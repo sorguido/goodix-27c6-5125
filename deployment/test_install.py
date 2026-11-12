@@ -92,23 +92,35 @@ class DropinDirectory(unittest.TestCase):
         finally:
             os.umask(previous)
 
-    def test_existing_directory_modes_and_third_party_overrides_are_unchanged(self):
-        for mode in (0o755, 0o700):
-            with self.subTest(mode=oct(mode)):
-                self.directory.mkdir(mode=mode)
-                self.directory.chmod(mode)
-                other = self.directory / '10-admin.conf'
-                other.write_bytes(b'Administrator override sentinel')
-                other.chmod(0o600)
-                before = self.directory.stat()
-                with patch.object(m.os, 'fchmod', wraps=os.fchmod) as chmod:
-                    m.prepare_dropin_directory()
-                    chmod.assert_not_called()
-                self.assertEqual(self.directory.stat(), before)
-                self.assertEqual(other.read_bytes(), b'Administrator override sentinel')
-                self.assertEqual(stat.S_IMODE(other.stat().st_mode), 0o600)
-                other.unlink()
-                self.directory.rmdir()
+    def test_existing_directories_become_readable_without_changing_dropin_files(self):
+        previous = os.umask(0o077)
+        try:
+            for mode in (0o755, 0o700):
+                with self.subTest(mode=oct(mode)):
+                    self.directory.mkdir(mode=mode)
+                    self.directory.chmod(mode)
+                    other = self.directory / '10-admin.conf'
+                    other.write_bytes(b'Administrator override sentinel')
+                    other.chmod(0o600)
+                    m.r.DROPIN.write_bytes(m.r.DROPIN_BYTES)
+                    m.r.DROPIN.chmod(0o644)
+                    before = self.directory.stat()
+                    files = {path: (path.read_bytes(), path.stat().st_mode, path.stat().st_ino)
+                             for path in (other, m.r.DROPIN)}
+                    with patch.object(m.os, 'fchmod', wraps=os.fchmod) as chmod:
+                        m.prepare_dropin_directory()
+                        chmod.assert_called_once_with(unittest.mock.ANY, 0o755)
+                    after = self.directory.stat()
+                    self.assertEqual(stat.S_IMODE(after.st_mode), 0o755)
+                    self.assertEqual((after.st_dev, after.st_ino, after.st_uid, after.st_gid),
+                                     (before.st_dev, before.st_ino, before.st_uid, before.st_gid))
+                    for path, unchanged in files.items():
+                        self.assertEqual((path.read_bytes(), path.stat().st_mode, path.stat().st_ino), unchanged)
+                        path.unlink()
+                    self.assertEqual(os.umask(0o077), 0o077)
+                    self.directory.rmdir()
+        finally:
+            os.umask(previous)
 
     def test_untrusted_owner_symlink_wrong_type_and_redirected_parent_refused(self):
         self.directory.mkdir()

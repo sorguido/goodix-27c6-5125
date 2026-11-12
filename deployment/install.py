@@ -214,17 +214,11 @@ def restore_selinux_module(was_present):
 
 
 def prepare_dropin_directory():
-    """Only a newly created, verified configuration directory becomes 0755.
-
-    The helper deliberately keeps umask 0077. Existing administrator directories
-    (including earlier 0700 installations) are checked and left untouched.
-    """
+    """Make the verified configuration directory 0755, keeping umask 0077."""
     directory = r.DROPIN.parent
     safe_parent(directory)
-    created = False
     try:
         directory.mkdir(mode=0o755)
-        created = True
     except FileExistsError:
         pass
     r.trusted(directory, directory=True)
@@ -236,8 +230,7 @@ def prepare_dropin_directory():
                 and not info.st_mode & 0o022, 'service configuration directory ownership/type/mode drift')
         require((info.st_dev, info.st_ino) ==
                 (current.st_dev, current.st_ino), 'service configuration directory changed')
-        if created:
-            os.fchmod(fd, 0o755)
+        os.fchmod(fd, 0o755)
         info = os.fstat(fd)
         r.trusted(directory, directory=True)
         current = directory.lstat()
@@ -245,9 +238,8 @@ def prepare_dropin_directory():
                 (info.st_dev, info.st_ino, info.st_mode) ==
                 (current.st_dev, current.st_ino, current.st_mode),
                 'service configuration directory changed')
-        if created:
-            require(stat.S_IMODE(info.st_mode) == 0o755,
-                    'new service configuration directory is not readable')
+        require(stat.S_IMODE(info.st_mode) == 0o755,
+                'service configuration directory is not readable')
     finally:
         os.close(fd)
 

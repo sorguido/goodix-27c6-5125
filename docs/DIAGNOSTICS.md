@@ -81,12 +81,14 @@ must not collapse partial configuration evidence into “authentication works”
 
 If the Goodix service configuration cannot be read, `project_dropin_unavailable`
 means configuration access is unavailable, not that the service is broken or
-healthy. New driver installations explicitly make only the newly created,
-verified configuration directory 0755 while retaining umask 0077 elsewhere.
-Existing directories, including earlier root-only 0700 directories and
-administrator overrides, are not chmodded or migrated automatically. An RPM-only
-Manager update makes no active installation change. An inactive/dead on-demand
-fprintd remains an ordinary state, and Sign-in remains partially checked.
+healthy. Whenever the installer applies the driver, it makes the verified
+configuration directory 0755, including an existing root-owned 0700 directory,
+while retaining umask 0077 elsewhere. Existing drop-in files and protected state
+are not changed by this directory normalization. An RPM-only Manager update
+makes no active installation change: the fix runs during normal Install or
+Apply Update. A runtime already at 3.1.1 may not offer Update; no forced update or
+separate repair path is provided. An inactive/dead on-demand fprintd remains an
+ordinary state, and Sign-in remains partially checked.
 
 ## Profiles, source limits and collection boundaries
 

@@ -72,7 +72,7 @@ In Goodix Manager 3.1.1, open **Diagnostic Center** for guided system checks or 
 
 The optional **Test the reader** action requires separate consent and can use an enrolled finger. Each session stops after a match or at most three attempts. **New test** offers a fresh session only after safe cleanup; it clears consent and waits for a new **Start** action. An uncertain timeout or cleanup keeps the test blocked.
 
-If service settings cannot be read, the diagnostic check reports an access limitation, not a proven service failure or success. The directory creation fix applies to new driver installations. Existing restricted or administrator-managed directories are left unchanged; installing the Manager RPM alone does not change an active installation.
+If service settings cannot be read, the diagnostic check reports an access limitation, not a proven service failure or success. Normal **Install** or **Apply Update** now makes the verified service settings folder readable, including folders left restricted by an earlier installation; existing override files and protected data keep their permissions. Installing the Manager RPM alone does not apply this fix or change the active installation. The normal 3.0.1 → 3.1.1 driver update needs maintainer testing. A runtime already at 3.1.1 may not offer **Apply Update**; no forced update or separate repair action is added.
 
 Diagnostics do not change the reader's normal operation or repair your system automatically. **Report a bug** opens the [guided bug report form](https://github.com/sorguido/goodix-27c6-5125/issues/new?template=01-bug-report.yml). Share only relevant, reviewed information. Do not share fingerprint images, templates or pairing secrets.
 
