@@ -4,9 +4,9 @@
   "project": "Goodix 27c6:5125 — Goodix Manager diagnostics",
   "branch": "diagnostic",
   "execution_path": "PRIMARY",
-  "phase": "DRAFT_RELEASE_3_1_1_DIAGNOSTIC_CORRECTIONS_5",
+  "phase": "DRAFT_RELEASE_3_1_1_STATIC_UX_6",
   "phase_status": "DRAFT_ONLY_MAINTAINER_FEDORA45_RETEST_REQUIRED",
-  "primary_artifact": "development/rpm/diagnostic-corrections-5/FINAL_REPORT.md",
+  "primary_artifact": "development/rpm/builds/3.1.1-6.fc44/result.json",
   "completed_gates": [
     "DIAG0_DESIDERATA_RECORDED",
     "DIAG0_LOCAL_ARTIFACT_VERIFICATION",
@@ -42,10 +42,12 @@
     "CORRECTIVE5_SOURCE_ARCHIVE_SRPM_PAYLOAD_AND_DEPENDENCIES",
     "CORRECTIVE5_CONTROLLED_TAG_LEASE",
     "CORRECTIVE5_NEW_DOWNLOADS_VERIFIED_AND_REVIEWED_BEFORE_OLD_DELETE",
-    "CORRECTIVE5_REAL_FINAL_JSON_CANONICAL_AND_INDEPENDENT_REVIEW"
+    "CORRECTIVE5_REAL_FINAL_JSON_CANONICAL_AND_INDEPENDENT_REVIEW",
+    "STATIC_UX6_TARGETED_TESTS_AND_INDEPENDENT_SOURCE_REVIEW",
+    "STATIC_UX6_SIGNED_CANONICAL_BUILD_AND_VERIFIED_SAME_DRAFT_REPLACEMENT"
   ],
   "pending_gates": [
-    "MAINTAINER_FEDORA45_RETEST_NEW_5",
+    "MAINTAINER_FEDORA45_RETEST_NEW_6",
     "DIAG4_REAL_TARGET_QUALIFICATION",
     "DIAG5_ACCEPTANCE",
     "MAINTAINER_PUBLICATION_DECISION"
@@ -87,9 +89,9 @@
   "relevant_corroborations": [
     "C4"
   ],
-  "next_action": "Keep draft443047985 unpublished. Maintainer must retest confirmed report overwrite/cancellation, multi-startup history and custom-range rejection before consent on target desktop. No live, install, merge, main/development changes or publication authorized.",
-  "last_verified_head": "553a7a6f0c8a1d28b4b3372c94a443e950091b64",
-  "observed_remote_base_head": "4bc1f308071768b4f8045e58b4d12937bfa8ada2",
+  "next_action": "Keep draft443047985 unpublished. Requested static UX correction complete. Any installation, live sensor testing, merge or publication requires separate authorization.",
+  "last_verified_head": "914431425e7da4c23ab445d0358594f31f5f6dba",
+  "observed_remote_base_head": "33d2efacaa2b89897e99d86d3b9c407ce5a68d36",
   "documentation_only": false,
   "previous_milestone": {
     "schema_version": 1,
@@ -186,23 +188,21 @@
     "live_authorized": false
   },
   "verification": {
-    "diagnostic_collector": "PASS_35",
-    "controller_and_qml_flows": "PASS_29",
-    "prebuild_unique_cases": 165,
-    "canonical_rpm_check": "PASS_FULL_224_UNITTEST_CASES_PLUS_RENDER_CACHE_GEOMETRY_GATES",
-    "counting_limits": "Prebuild and RPM counts overlap; do not sum as distinct cases. Reviewer targeted repeats are separate.",
-    "extra_regressions": "PASS_101_BUILDER_SELECTION_RECOVERY_AND_FULL_VERIFIER",
+    "diagnostic_collector": "PASS_39",
+    "controller_and_qml_flows": "PASS_30",
+    "canonical_rpm_check": "PASS_FULL_229_UNITTEST_CASES_PLUS_RENDER_CACHE_GEOMETRY_GATES",
     "reader": "PASS_23_FAKE_TRANSPORT_AND_PRIVATE_BUS_IN_RPM_CHECK",
     "approved_reference_assets_and_visual_style": "UNCHANGED_FROM_ACCEPTED_DIAGNOSTIC_LAYOUT",
-    "rpm_packaging": "PASS_3.1.1_5_FC44_APPROVED_SIGNED_PAIR",
+    "rpm_packaging": "PASS_3.1.1_6_FC44_APPROVED_SIGNED_PAIR",
     "source_archive_srpm_payload_dependencies": "PASS_SOURCE478_CANONICAL_AND_INDEPENDENT_REVIEW",
-    "driver_executable_equivalence": "PASS_ONLY_BUILD_ID_DEBUG_DIFFERENCES_VS4",
+    "driver_executable_equivalence": "PASS_ONLY_BUILD_ID_DEBUG_DIFFERENCES_VS5",
     "rpmlint": "0_ERRORS_8_KNOWN_WARNINGS",
     "canonical_draft_gate": "PASS_LOCAL_CONTRACT_AUTHENTIC_RAW_FINAL_LOCAL_AND_AUTHENTICATED_DOWNLOADS",
     "final_independent_review": "ACCEPT_AND_CONTINUE_DRAFT_ONLY",
-    "live_sensor_host_and_vm": "NOT_TESTED_NEW_5"
+    "live_sensor_host_and_vm": "NOT_TESTED_NEW_6",
+    "expanded_text_and_report_descriptions": "BYTE_IDENTICAL_TO_BUILD5_EXCEPT_THREE_APPROVED_OUTCOME_LINES"
   },
-  "implementation_status": "THREE_DIAGNOSTIC_CORRECTIONS_COMMITTED_SIGNED5_AND_SAME_RESTORED_DRAFT_REPLACED",
+  "implementation_status": "THREE_STATIC_POSITIVE_STATES_EXACT_CAPTIONS_UNCHANGED_EXPANDED_DETAILS_SIGNED6_SAME_DRAFT",
   "baseline_qualification": {
     "commit": "dbdff8dc70f33cd8cc6a9b141942ad3371a28080",
     "unique_unit_integration_cases": 123,
@@ -217,47 +217,44 @@
     "build_baseline": "Fedora 44 x86_64",
     "draft_created": true,
     "live_and_installation": "NOT_AUTHORIZED_NOT_TESTED",
-    "evidence_directory": "development/rpm/diagnostic-corrections-5/",
-    "source_commit": "553a7a6f0c8a1d28b4b3372c94a443e950091b64",
+    "evidence_directory": "development/rpm/builds/3.1.1-6.fc44/",
+    "source_commit": "914431425e7da4c23ab445d0358594f31f5f6dba",
     "tag": "v3.1.1",
-    "packaging_release": 5,
+    "packaging_release": 6,
     "draft_release_id": 443047985,
-    "draft_url": "https://github.com/sorguido/goodix-27c6-5125/releases/tag/untagged-f496fbb38b3346be373c",
+    "draft_url": "https://github.com/sorguido/goodix-27c6-5125/releases/tag/untagged-0e1e0726504134cf6854",
     "draft": true,
     "prerelease": false,
     "published_at": null,
     "ready_for_publication": false,
     "signed_fingerprint": "5FB20F583C831729D5FF073FE99ADAE5B7EA4918",
     "signed_sha256": {
-      "goodix-manager-3.1.1-5.fc44.x86_64.rpm": "31f18713b0d5511353f0833b7ab4bb396afafec6a01cb16071e20a7c6cd44647",
-      "goodix-manager-3.1.1-5.fc44.src.rpm": "6efe9c1724098a1326df66183d6d459251b74c88610c6816a03d7f6466ede567"
+      "goodix-manager-3.1.1-6.fc44.x86_64.rpm": "caad7f9a52433d070b6d4d3e1ee37bc41aa1553c82c9db21e911615c95596c7f",
+      "goodix-manager-3.1.1-6.fc44.src.rpm": "2eb63533c993b6243e4df56eabc1435117c5fe597ea8280d442f33d04e59319d"
     },
-    "build_record": "development/rpm/builds/3.1.1-5.fc44/result.json",
+    "build_record": "development/rpm/builds/3.1.1-6.fc44/result.json",
     "verification": {
-      "diagnostic_collector": "PASS_35",
-      "controller_and_qml_flows": "PASS_29",
-      "prebuild_unique_cases": 165,
-      "canonical_rpm_check": "PASS_FULL_224_UNITTEST_CASES_PLUS_RENDER_CACHE_GEOMETRY_GATES",
-      "counting_limits": "Prebuild and RPM counts overlap; do not sum as distinct cases. Reviewer targeted repeats are separate.",
-      "extra_regressions": "PASS_101_BUILDER_SELECTION_RECOVERY_AND_FULL_VERIFIER",
+      "diagnostic_collector": "PASS_39",
+      "controller_and_qml_flows": "PASS_30",
+      "canonical_rpm_check": "PASS_FULL_229_UNITTEST_CASES_PLUS_RENDER_CACHE_GEOMETRY_GATES",
       "reader": "PASS_23_FAKE_TRANSPORT_AND_PRIVATE_BUS_IN_RPM_CHECK",
       "approved_reference_assets_and_visual_style": "UNCHANGED_FROM_ACCEPTED_DIAGNOSTIC_LAYOUT",
-      "rpm_packaging": "PASS_3.1.1_5_FC44_APPROVED_SIGNED_PAIR",
+      "rpm_packaging": "PASS_3.1.1_6_FC44_APPROVED_SIGNED_PAIR",
       "source_archive_srpm_payload_dependencies": "PASS_SOURCE478_CANONICAL_AND_INDEPENDENT_REVIEW",
-      "driver_executable_equivalence": "PASS_ONLY_BUILD_ID_DEBUG_DIFFERENCES_VS4",
+      "driver_executable_equivalence": "PASS_ONLY_BUILD_ID_DEBUG_DIFFERENCES_VS5",
       "rpmlint": "0_ERRORS_8_KNOWN_WARNINGS",
       "canonical_draft_gate": "PASS_LOCAL_CONTRACT_AUTHENTIC_RAW_FINAL_LOCAL_AND_AUTHENTICATED_DOWNLOADS",
       "final_independent_review": "ACCEPT_AND_CONTINUE_DRAFT_ONLY",
-      "live_sensor_host_and_vm": "NOT_TESTED_NEW_5"
+      "live_sensor_host_and_vm": "NOT_TESTED_NEW_6",
+      "expanded_text_and_report_descriptions": "BYTE_IDENTICAL_TO_BUILD5_EXCEPT_THREE_APPROVED_OUTCOME_LINES"
     },
     "failed_build_preserved": "development/rpm/builds/3.1.1-1.fc44/",
-    "final_report": "development/rpm/diagnostic-corrections-5/FINAL_REPORT.md",
     "ready_for_maintainer_retest": true,
     "additional_release_created": false,
-    "source_archive_sha256": "3d1399c80a301e5125cd07bc9089c5ce1e06f9b1d4747fd40aa38e65ba41bc9a",
+    "source_archive_sha256": "edc4a8c944901aa11ed66c3128ec31236b2dc4455ac1ded441df6b3849b7b924",
     "asset_ids": [
-      740068842,
-      740068915
+      741160882,
+      741160958
     ]
   },
   "draft_corrective_authorization": {
