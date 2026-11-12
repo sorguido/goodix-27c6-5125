@@ -9,7 +9,7 @@ body:
       value: |
         Thanks for reporting a problem with the Goodix USB `27c6:5125` driver.
 
-        Before filing, check the [supported configuration](https://github.com/sorguido/goodix-27c6-5125#supported-configuration) and [known limitations](https://github.com/sorguido/goodix-27c6-5125/blob/main/docs/VALIDATION.md). Fedora 44 KDE with APP12509 is the qualified target; APP12508 has narrower contributor-reported evidence. Other environments are welcome as reports, but are not automatically supported.
+        Before filing, check the [supported configuration](https://github.com/sorguido/goodix-27c6-5125#supported-configuration) and [known limitations](https://github.com/sorguido/goodix-27c6-5125/blob/main/docs/VALIDATION.md). Fedora KDE with APP12509 is the qualified target; APP12508 has narrower contributor-reported evidence. Other environments are welcome as reports, but are not automatically supported.
 
         For fingerprint enrollment, recognition or login problems, please review the practical guidance below. Other issue types can skip steps that do not apply.
 
@@ -64,7 +64,7 @@ body:
     id: os
     attributes:
       label: Linux distribution and version
-      placeholder: "e.g. Fedora 44"
+      placeholder: "e.g. Fedora 45"
     validations:
       required: true
 
