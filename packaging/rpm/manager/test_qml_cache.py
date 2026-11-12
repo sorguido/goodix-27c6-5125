@@ -120,7 +120,7 @@ def regression():
         os.utime(diagnostic_qml, (timestamp, timestamp))
         updated = run_probe(False)
         assert updated['report_visible'], 'The new process reused the old interface'
-        assert updated['opened_url'] == 'https://github.com/sorguido/goodix-27c6-5125/issues'
+        assert updated['opened_url'] == 'https://github.com/sorguido/goodix-27c6-5125/issues/new?template=01-bug-report.yml'
         assert updated['diagnostic_heading'] == 'Diagnostic Center'
     print('PASS: new process loads current Manager and Diagnostic Center despite old caches and unchanged mtimes; no real network, helper or sensor access')
 

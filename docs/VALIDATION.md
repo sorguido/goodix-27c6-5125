@@ -1,7 +1,9 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Validation scope and known limitations
 
-The [3.0.1 validation record](VALIDATION_3.0.1.md) separately tracks current
+Version **3.1.1** adds the Diagnostic Center. Its [offline diagnostic evidence](DIAGNOSTICS_VALIDATION.md) covers synthetic software and GUI contracts, not real-device, installation, login or Fedora 45 qualification for this revision. Release preparation and build/signature verification are separate from live acceptance. See the [3.1.1 release notes](RELEASE_NOTES_3.1.1.md).
+
+The [3.0.1 validation record](VALIDATION_3.0.1.md) separately tracks historical
 packaging checks, operator-reported Fedora 44/45 tests and remaining limits.
 The observations below concern earlier versions unless explicitly stated.
 

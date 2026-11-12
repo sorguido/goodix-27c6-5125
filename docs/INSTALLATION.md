@@ -9,7 +9,7 @@ Install **Goodix Manager** with KDE Discover, then use it to activate the finger
 
 ### 1. Download Goodix Manager
 
-Open the **[official GitHub Releases](https://github.com/sorguido/goodix-27c6-5125/releases)** and download the latest RPM explicitly marked compatible with your Fedora release from **Assets**. A `.fc44` suffix indicates the Fedora 44 build baseline, not necessarily the supported installation range. **The existing 3.0.0 RPM requires Fedora 44.** Version 3.0.1 has no package lock to a specific Fedora release, while retaining dependency and runtime compatibility checks. It is being prepared as an unpublished draft and is not publicly downloadable until publication.
+Open the **[official GitHub Releases](https://github.com/sorguido/goodix-27c6-5125/releases)** and download the latest RPM explicitly marked compatible with your Fedora release from **Assets**. A `.fc44` suffix indicates the Fedora 44 build baseline, not necessarily the supported installation range. **The existing 3.0.0 RPM requires Fedora 44.** Version 3.0.1 has no package lock to a specific Fedora release, while retaining dependency and runtime compatibility checks. Version 3.1.1, which adds the Diagnostic Center, is being prepared as an unpublished draft and is not publicly downloadable until publication. Its real-device and Fedora 45 qualification remain pending; see [validation](VALIDATION.md).
 
 ### 2. Install the RPM
 
@@ -57,7 +57,7 @@ remain usable without registering again.
 Later Fedora compatibility depends on the required system
 components and runtime checks; see [3.0.1 validation](VALIDATION_3.0.1.md).
 
-**Upgrading from a 2.x version?** For a recognized, intact installation, Goodix Manager offers **Upgrade to 3.0.1**. No preliminary uninstall is needed, but **you must register your fingerprints again** after the upgrade. Existing fingerprint files and pairing data are preserved.
+**Upgrading from a 2.x version?** For a recognized, intact installation, Goodix Manager offers **Upgrade to 3.1.1**. No preliminary uninstall is needed, but **you must register your fingerprints again** after the upgrade. Existing fingerprint files and pairing data are preserved.
 
 ## Removing the driver
 
@@ -68,7 +68,9 @@ Open **Goodix Manager**, select **Remove** and restart if requested. This leaves
 
 ## Need help?
 
-If an operation fails, use **Copy diagnostics** in Goodix Manager and [report the problem](https://github.com/sorguido/goodix-27c6-5125/issues). Do not share fingerprint images, templates or pairing secrets.
+In Goodix Manager 3.1.1, open **Diagnostic Center** for guided system checks or choose **I have a problem** to prepare a focused report. Read the privacy notice before collecting information, review the local preview, then choose whether to copy, save or share it. Reports stay local until you share them. The optional **Test the reader** action requires separate consent and can use an enrolled finger; it stops after a match or at most three attempts.
+
+Diagnostics do not change the reader's normal operation or repair your system automatically. **Report a bug** opens the [guided bug report form](https://github.com/sorguido/goodix-27c6-5125/issues/new?template=01-bug-report.yml). Share only relevant, reviewed information. Do not share fingerprint images, templates or pairing secrets.
 
 If login or normal removal is unavailable, follow the [recovery guide](UNINSTALL.md). Do not change Fedora authentication settings or disable SELinux to work around an error.
 

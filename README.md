@@ -14,7 +14,7 @@ and factory data.
 ## Supported configuration
 
 - Fedora KDE on x86_64, release 44 or newer, with local user accounts. Fedora
-  44 and 45 have reported functional tests; later releases depend on
+  44 and 45 have reported functional tests of earlier versions; later releases depend on
   compatible system components and runtime checks.
 - Goodix USB `27c6:5125`, recognized firmware `GF_ST411SEC_APP_12509` and
   `GF_ST411SEC_APP_12508`.
@@ -53,11 +53,23 @@ to a specific Fedora release; dependencies and runtime compatibility checks
 still apply. See [3.0.1 validation](docs/VALIDATION_3.0.1.md)
 for the observed Fedora 44/45 tests and their limits.
 
+### Diagnostic Center in 3.1.1
+
+Version 3.1.1 is being prepared as an unpublished draft. The new **Diagnostic
+Center** offers guided system checks, focused reports with a privacy notice and
+local preview, and an optional reader test. Reports stay local until you choose
+to share them. Diagnostics do not change the reader's normal operation. Improved
+icons and **Report a bug** guide you to the bug report form.
+
+This revision does not yet have real-device or Fedora 45 qualification. See the
+[3.1.1 release notes](docs/RELEASE_NOTES_3.1.1.md) and
+[validation scope](docs/VALIDATION.md).
+
 ### Upgrading from an earlier release
 
 Version 3.0.0 introduces the ChicagoHS biometric engine and a new stored
 fingerprint format. For an intact, recognized 2.x installation, Goodix Manager
-offers **Upgrade to 3.0.1** through the transactional installer, without a
+offers **Upgrade to 3.1.1** through the transactional installer, without a
 preliminary uninstall. Host pairing state and existing fingerprint files are
 preserved. Only if coming from 2.x installation **Previously enrolled fingers
 must be enrolled again** because the old templates cannot be used by the new

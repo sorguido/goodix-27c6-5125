@@ -2,10 +2,10 @@
 # Goodix Manager and native RPM
 
 Goodix Manager installs the Goodix fingerprint driver from a local, verified
-binary payload. Version 3.0.1 permits installation and activation on Fedora
+binary payload. Since version 3.0.1, installation and activation are permitted on Fedora
 **44 or newer KDE, x86_64**, with dependency and platform/runtime checks rather
 than an exact Fedora release lock. Fedora 44 and 45 have operator-reported
-functional tests; these do not qualify every packaging revision or future Fedora
+functional tests of earlier versions; these do not qualify every packaging revision or future Fedora
 release. The RPM is built on Fedora 44 as the oldest supported baseline so it
 can also run on
 newer releases where its real dependencies remain compatible. Its `.fc44`
@@ -39,8 +39,10 @@ against the host's stock fprintd symbols and loader resolution (`ldd -r`).
 An incompatible ABI or unresolved dependency stops before service/file changes.
 `binutils` supplies the runtime ELF inspection tools; no compiler is required.
 **The 3.0.0 RPM requires Fedora 44. Install 3.0.1 on Fedora 44 before upgrading
-to Fedora 45 or later.** No driver uninstall is needed. Version 3.0.1 is being
+to Fedora 45 or later.** No driver uninstall is needed. Version 3.1.1 is being
 prepared as an unpublished draft and is not publicly downloadable until publication.
+It adds the Diagnostic Center; real-device and Fedora 45 qualification for this
+revision remain pending. See the [3.1.1 release notes](../../docs/RELEASE_NOTES_3.1.1.md).
 See the [3.0.1 evidence and remaining limits](../../docs/VALIDATION_3.0.1.md).
 
 **Remove** performs the ordinary `goodix-uninstall` operation with the original
@@ -61,7 +63,7 @@ Emergency `goodix-force-remove` remains a TTY recovery command; it is not a GUI
 action. No RPM scriptlet attempts authentication changes or irreversible cleanup.
 
 Unknown or damaged software stops safely. Recognized, intact 2.x installations
-offer **Upgrade to 3.0.1**, using the canonical transactional update without a
+offer **Upgrade to 3.1.1**, using the canonical transactional update without a
 preliminary uninstall. Old fingerprints require **new enrollment** with the 3.x
 engine; historical files are preserved. Real populated-installation migration
 and rollback remain a separate VM qualification gate.
@@ -91,8 +93,12 @@ a public update notification; applying its payload still requires local checks.
 The read-only status helper checks installed package files and runtime receipts
 without opening USB or reading pairing/template contents. A narrow PolicyKit
 action permits status to the active local session; each mutation requires
-administrator authorization. Copyable diagnostics contain fixed software status
-codes and versions, never raw backend output or biometric journal entries.
+administrator authorization. The Diagnostic Center adds guided checks and focused reports with an explicit
+privacy notice and local preview. Reports project allowlisted software findings
+and event categories, without exporting raw backend output, raw journal messages
+or protected biometric/pairing data. Reports stay local until the user chooses
+to share them. An optional reader test requires separate consent; diagnostics
+do not change the reader's normal operation.
 There is no telemetry. GitHub receives the normal update HTTP request.
 
 ## Build the next release
@@ -104,7 +110,7 @@ Fedora packages, not by the build):
 sudo dnf install rpm-build rpm-sign rpmlint desktop-file-utils appstream \
   gcc meson ninja-build pkgconf-pkg-config glib2-devel libgusb-devel \
   libusb1-devel openssl-devel json-glib-devel pam-devel binutils fprintd
-sudo dnf install python3-pyside6 qt6-qtdeclarative kf6-kirigami
+sudo dnf install python3-pyside6 qt6-qtdeclarative kf6-kirigami dbus-daemon python3-dbus-next
 python3 packaging/rpm/build.py --release 1
 ```
 
@@ -214,6 +220,10 @@ python3 packaging/rpm/test_packaging.py
 python3 packaging/rpm/test_helper.py
 python3 packaging/rpm/test_compat_transactions.py
 python3 packaging/rpm/manager/test_model.py
+python3 packaging/rpm/test_stage.py
+python3 packaging/rpm/manager/test_diagnostics.py
+python3 packaging/rpm/manager/test_reader.py
+python3 packaging/rpm/manager/test_diagnostics_ui.py
 python3 packaging/rpm/manager/test_network_ui.py
 python3 packaging/rpm/test_verify_release.py
 python3 packaging/rpm/manager/test_ui.py

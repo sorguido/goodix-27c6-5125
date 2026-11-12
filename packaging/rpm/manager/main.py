@@ -273,7 +273,7 @@ class Controller(QObject):
 
     @Slot()
     def report_bug(self):
-        QDesktopServices.openUrl(QUrl(REPOSITORY + '/issues'))
+        QDesktopServices.openUrl(QUrl(REPOSITORY + '/issues/new?template=01-bug-report.yml'))
 
     @Slot(bool)
     def open_release(self, download):

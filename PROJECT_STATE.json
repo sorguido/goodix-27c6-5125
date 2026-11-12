@@ -4,8 +4,8 @@
   "project": "Goodix 27c6:5125 — Goodix Manager diagnostics",
   "branch": "diagnostic",
   "execution_path": "PRIMARY",
-  "phase": "DIAG4",
-  "phase_status": "CORRECTIVE_OFFLINE_COMPLETE_STOP_BEFORE_RPM_INSTALL_VM_LIVE",
+  "phase": "DRAFT_RELEASE_3_1_1_PREPARATION",
+  "phase_status": "SOURCE_QUALIFICATION_IN_PROGRESS",
   "primary_artifact": "docs/DIAGNOSTICS_VALIDATION.md",
   "completed_gates": [
     "DIAG0_DESIDERATA_RECORDED",
@@ -26,7 +26,8 @@
     "DIAGNOSTIC_CORRECTIVE_FINAL_REVIEW"
   ],
   "pending_gates": [
-    "RPM_AND_FEDORA45_VM_AUTHORIZATION",
+    "SIGNED_RPM_AND_DRAFT_VERIFICATION",
+    "FEDORA45_VM_AUTHORIZATION",
     "DIAG4_REAL_TARGET_QUALIFICATION",
     "DIAG5_ACCEPTANCE"
   ],
@@ -67,8 +68,8 @@
   "relevant_corroborations": [
     "C4"
   ],
-  "next_action": "STOP: attendere autorizzazione specifica prima di build/packaging RPM, installazione, VM Fedora 45 e test live. Passata correttiva offline completa e accettata; staging/manifests sorgente verificati soltanto con fixture, nessun pacchetto prodotto. DIAG4 sul target reale e DIAG5 restano non qualificati.",
-  "last_verified_head": "dbdff8dc70f33cd8cc6a9b141942ad3371a28080",
+  "next_action": "Qualify source with independent review; build/sign RPM and SRPM on Fedora 44; create and verify draft only. No publication, installation, live sensor or Fedora 45 VM authorized.",
+  "last_verified_head": "6c6fc18c80e0443ebc8ac276afb5dd4c35496b34",
   "observed_remote_base_head": "4bc1f308071768b4f8045e58b4d12937bfa8ada2",
   "documentation_only": false,
   "previous_milestone": {
@@ -182,11 +183,21 @@
     "final_independent_review": "ACCEPT_AND_CONTINUE_ALL_7_CORRECTIVE_POINTS_OFFLINE_ONLY",
     "reviewer_targeted_repeats": "PASS_3_REPEATS_NOT_ADDED_TO_52_UNIQUE_CASES"
   },
-  "implementation_status": "BASELINE_COMMITTED_CORRECTIVE_DELTA_IN_WORKTREE",
+  "implementation_status": "DIAGNOSTIC_BASELINE_AND_CORRECTIVE_COMMITTED_RELEASE_DELTA_IN_WORKTREE",
   "baseline_qualification": {
     "commit": "dbdff8dc70f33cd8cc6a9b141942ad3371a28080",
     "unique_unit_integration_cases": 123,
     "review": "ACCEPT_AND_CONTINUE_DIAG4_OFFLINE_FINAL",
     "evidence_scope": "PRIOR_QUALIFICATION_NOT_ALL_RERUN_IN_CORRECTIVE_PASS"
+  },
+  "draft_release_3_1_1": {
+    "authorized": true,
+    "publication_authorized": false,
+    "base_source_commit": "6c6fc18c80e0443ebc8ac276afb5dd4c35496b34",
+    "version": "3.1.1",
+    "build_baseline": "Fedora 44 x86_64",
+    "draft_created": false,
+    "live_and_installation": "NOT_AUTHORIZED_NOT_TESTED",
+    "evidence_directory": "development/rpm/release-v3.1.1/"
   }
 }
