@@ -377,7 +377,12 @@ Kirigami.ScrollablePage {
                                     ColumnLayout {
                                         Layout.fillWidth: true
                                         Controls.Label { text: checkDelegate.modelData.title; font.weight: Font.DemiBold; wrapMode: Text.WordWrap; Layout.fillWidth: true }
-                                        Controls.Label { text: page.checkDescriptions[checkDelegate.modelData.id]; opacity: .75; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                                        Controls.Label {
+                                            text: checkDelegate.modelData.outcome === "pass" && checkDelegate.modelData.id === "driver" ? "Manager package files verified. Driver status are installed and up to date." :
+                                                  checkDelegate.modelData.outcome === "pass" && checkDelegate.modelData.id === "auth" ? "Fedora Plasma PAM file and Goodix selector verified successfully." :
+                                                  checkDelegate.modelData.outcome === "pass" && checkDelegate.modelData.id === "security" ? "SELinux Enforcing. Inspected software paths have trusted ownership and permissions." : page.checkDescriptions[checkDelegate.modelData.id]
+                                            opacity: .75; wrapMode: Text.WordWrap; Layout.fillWidth: true
+                                        }
                                     }
                                     Rectangle {
                                         Layout.preferredWidth: Math.min(160, statusLabel.implicitWidth + 20)

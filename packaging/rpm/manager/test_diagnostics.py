@@ -94,6 +94,90 @@ class DiagnosticTests(unittest.TestCase):
         self.assertEqual(data['host']['release'], '45')
         self.assertFalse(any('pkexec' in ' '.join(c) for c in f.calls))
 
+    def test_positive_static_states_preserve_expanded_details_and_report_descriptions(self):
+        f = Fixtures()
+        f.files['/etc/pam.d/plasmalogin'] = (Path(__file__).resolve().parents[3] / 'deployment/plasma-login-opt-in/plasmalogin.pam').read_bytes()
+        collector = f.collector()
+        collector.metadata = lambda: ['trusted'] * 4
+        details = {
+            'driver': 'Manager RPM files passed verification. The cached helper status is not a fresh runtime or authentication check.',
+            'auth': 'The vendor Plasma PAM file belongs to its Fedora package. The project selector is byte-for-byte verified. sudo/polkit behavior and login remain unverified.',
+            'security': 'SELinux reports Enforcing; this does not verify policy behavior. Some inspected ordinary software paths have trusted root ownership, type and permissions. Protected data paths were not accessed; file labels and authentication behavior remain unverified.'}
+        for code in ('installed', 'up_to_date'):
+            with self.subTest(code=code):
+                state = dict(snapshot(), status=Status(state='installed', runtime_version='3.1.1',
+                    payload_version='3.1.1', package_version='3.1.1-5.fc44', message_code=code))
+                report = collector.report('system', 'current', False, True, status_snapshot=state)
+                rows = {item['id']: item for item in report['checks']}
+                for identifier, badge in (('driver', 'Manager files verified'), ('auth', 'Configuration verified'), ('security', 'Configuration checked')):
+                    self.assertEqual(rows[identifier]['outcome'], 'pass')
+                    self.assertEqual(rows[identifier]['summary'], badge)
+                    self.assertEqual(rows[identifier]['detail'], details[identifier])
+                    if identifier != 'security':
+                        self.assertIn(details[identifier], report['reportText'])
+                self.assertEqual(rows['driver']['code'], 'cached_' + code)
+                self.assertEqual(rows['auth']['code'], 'pam_selector_checked')
+                self.assertEqual(rows['security']['code'], 'security_partial')
+                findings = rows['security']['findings']
+                self.assertEqual([(item['outcome'], item['code'], item['summary'], item['detail']) for item in findings], [
+                    ('not_checked', 'security_partial', 'SELinux Enforcing', 'SELinux reports Enforcing; this does not verify policy behavior.'),
+                    ('pass', 'software_metadata_checked', 'Existing file metadata checked', 'Some inspected ordinary software paths have trusted root ownership, type and permissions.')])
+                for finding in findings:
+                    self.assertIn(finding['detail'], report['reportText'])
+                self.assertIn('Protected data paths were not accessed; file labels and authentication behavior remain unverified.', report['reportText'])
+                self.assertNotIn('Manager files verified', report['reportText'])
+                self.assertNotIn('Configuration verified', report['reportText'])
+
+    def test_driver_positive_requires_verified_package_and_valid_installed_status(self):
+        for state, runtime, code in (('absent', None, 'not_installed'), ('blocked', None, 'integrity_failed'),
+                                     ('installed', '3.0.0', 'update_available'), ('installed', '3.1.1', 'runtime_changed')):
+            with self.subTest(state=state, code=code):
+                status = Status(state=state, runtime_version=runtime, payload_version='3.1.1',
+                                package_version='3.1.1-5.fc44', message_code=code)
+                driver = Fixtures().collector().checks(dict(snapshot(), status=status))['checks'][0]
+                self.assertEqual(driver['outcome'], 'not_checked')
+                self.assertEqual(driver['summary'], 'Previous software status available')
+        installed = dict(snapshot(), status=Status(state='installed', runtime_version='3.1.1',
+            payload_version='3.1.1', package_version='3.1.1-5.fc44', message_code='up_to_date'))
+        for result in (Result(1, 'missing     /usr/bin/goodix-manager\n'), Result(code='timeout')):
+            f = Fixtures()
+            f.results[('/usr/bin/rpm', '-V', '--noscripts', '--nodeps', 'goodix-manager')] = result
+            self.assertNotEqual(f.collector().checks(installed)['checks'][0]['outcome'], 'pass')
+        invalid = dict(installed, status=Status(state='installed', payload_version='3.1.1', message_code='up_to_date'))
+        f = Fixtures()
+        with self.assertRaises(ValueError):
+            f.collector().checks(invalid)
+        self.assertEqual(f.calls, [])
+
+    def test_static_auth_positive_requires_vendor_and_exact_selector(self):
+        selector = (Path(__file__).resolve().parents[3] / 'deployment/plasma-login-opt-in/plasmalogin.pam').read_bytes()
+        for contents in (None, b'foreign selector'):
+            f = Fixtures()
+            if contents is not None:
+                f.files['/etc/pam.d/plasmalogin'] = contents
+            self.assertNotEqual(f.collector().checks()['checks'][3]['outcome'], 'pass')
+        f = Fixtures()
+        f.files['/etc/pam.d/plasmalogin'] = selector
+        f.results[('/usr/bin/rpm', '-qf', '--qf', '%{NAME}', '/usr/lib/pam.d/plasmalogin')] = Result(code='source_unavailable')
+        self.assertEqual(f.collector().checks()['checks'][3]['outcome'], 'unavailable')
+        collector = Fixtures().collector()
+        read = collector.read
+        collector.read = lambda path: (_ for _ in ()).throw(PermissionError()) if path == '/etc/pam.d/plasmalogin' else read(path)
+        self.assertEqual(collector.checks()['checks'][3]['outcome'], 'unavailable')
+
+    def test_static_security_positive_requires_enforcing_and_all_paths_trusted(self):
+        for enforcement, metadata in ((Result(stdout='Permissive\n'), ['trusted'] * 4),
+                                      (Result(code='timeout'), ['trusted'] * 4),
+                                      (Result(stdout='Enforcing\n'), ['trusted', 'trusted', 'absent', 'trusted']),
+                                      (Result(stdout='Enforcing\n'), ['trusted', 'unavailable', 'trusted', 'trusted']),
+                                      (Result(stdout='Enforcing\n'), ['changed', 'trusted', 'trusted', 'trusted'])):
+            with self.subTest(enforcement=enforcement, metadata=metadata):
+                f = Fixtures()
+                f.results[('/usr/sbin/getenforce',)] = enforcement
+                collector = f.collector()
+                collector.metadata = lambda: metadata
+                self.assertNotEqual(collector.checks()['checks'][4]['outcome'], 'pass')
+
     def test_issue55_has_two_independent_findings_and_safe_path(self):
         f = Fixtures()
         f.results[('/usr/bin/rpm', '-V', '--noscripts', '--nodeps', 'libfprint')] = Result(1, 'missing     /usr/lib64/libfprint-2.so.2\n')

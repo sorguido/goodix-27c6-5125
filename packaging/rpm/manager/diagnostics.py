@@ -573,6 +573,8 @@ class Collector:
                 code = 'runtime_not_checked'
             driver = row('driver', 'not_checked', 'cached_' + code, 'Previous software status available',
                          'Manager RPM files passed verification. The cached helper status is not a fresh runtime or authentication check.')
+            if package == 'pass' and status_snapshot.state == 'installed' and code in {'installed', 'up_to_date'}:
+                driver.update(outcome='pass', summary='Manager files verified')
         if (host['distribution'] == 'other' or host['architecture'] == 'other' or
                 host['release'] and int(host['release']) < 44) and driver['outcome'] != 'anomaly':
             driver = row('driver', 'anomaly', 'unsupported_host', 'Host outside supported baseline',
@@ -606,7 +608,8 @@ class Collector:
         elif not vendor_known or selector_state == 'unavailable':
             auth = unavailable('auth', 'pam_owner_unavailable' if not vendor_known else 'pam_selector_unavailable')
         else:
-            auth = row('auth', 'not_checked', 'pam_selector_' + selector_state, 'Integration partially checked',
+            auth = row('auth', 'pass' if selector_state == 'checked' else 'not_checked', 'pam_selector_' + selector_state,
+                       'Configuration verified' if selector_state == 'checked' else 'Integration partially checked',
                        'The vendor Plasma PAM file belongs to its Fedora package. The project selector is ' + ('byte-for-byte verified' if selector_state == 'checked' else 'absent; the project login integration is not activated') + '. sudo/polkit behavior and login remain unverified.')
         security_findings = []
 
@@ -649,6 +652,8 @@ class Collector:
                        'Security settings need attention' if sum(f['outcome'] == 'anomaly' for f in security_findings) > 1 else primary['summary'],
                        ' '.join(f['detail'] for f in security_findings) + ' Protected data paths were not accessed; file labels and authentication behavior remain unverified.')
         security['findings'] = security_findings
+        if primary['code'] == 'security_partial' and all(state == 'trusted' for state in metadata):
+            security.update(outcome='pass', summary='Configuration checked')
         try:
             if self.cancel is not None and self.cancel.is_set():
                 raise OSError('cancelled')

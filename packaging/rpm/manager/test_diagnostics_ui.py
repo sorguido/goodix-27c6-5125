@@ -462,6 +462,44 @@ class UiTests(unittest.TestCase):
             RENDER_DIR.mkdir(parents=True, exist_ok=True)
             self.assertTrue(image.save(str(RENDER_DIR / (name + '.png'))))
 
+    def test_positive_static_badges_subtitles_and_unchanged_expanded_details(self):
+        import test_diagnostics as fixture
+        f = fixture.Fixtures()
+        f.files['/etc/pam.d/plasmalogin'] = (Path(__file__).resolve().parents[3] / 'deployment/plasma-login-opt-in/plasmalogin.pam').read_bytes()
+        collector = f.collector()
+        collector.metadata = lambda: ['trusted'] * 4
+        status = fixture.Status(state='installed', runtime_version='3.1.1', payload_version='3.1.1',
+                                package_version='3.1.1-5.fc44', message_code='up_to_date')
+        positive = collector.checks(dict(fixture.snapshot(), status=status))
+        negative = fixture.Fixtures().collector().checks(fixture.snapshot())
+        subtitles = {
+            'driver': ('Manager package files verified. Driver status are installed and up to date.', 'Manager package files and previously checked driver status'),
+            'auth': ('Fedora Plasma PAM file and Goodix selector verified successfully.', 'Plasma sign-in files (partial check)'),
+            'security': ('SELinux Enforcing. Inspected software paths have trusted ownership and permissions.', 'SELinux mode and ordinary software path permissions')}
+        self.open_center()
+        for data, is_positive in ((positive, True), (negative, False)):
+            self.collect_checks.return_value = report_result(**data, reportReady=False, reportText='')
+            self.click('overviewRunChecks')
+            self.wait(lambda: not self.controller.diagnostics['busy'])
+            self.click('chooseChecks')
+            for identifier, (positive_text, negative_text) in subtitles.items():
+                row = next(item for item in data['checks'] if item['id'] == identifier)
+                button = self.item('check-' + identifier)
+                expression = QQmlExpression(QQmlEngine.contextForObject(button), button,
+                    'JSON.stringify({texts: contentItem.children[1].children.map(item => item.text), color: contentItem.children[2].border.color.toString(), badge: contentItem.children[2].children[0].text})')
+                value, _undefined = expression.evaluate()
+                self.assertFalse(expression.hasError(), expression.error().toString())
+                shown = json.loads(value)
+                self.assertIn(positive_text if is_positive else negative_text, shown['texts'])
+                self.assertNotIn(negative_text if is_positive else positive_text, shown['texts'])
+                self.assertEqual(shown['color'] == '#27ae60', is_positive)
+                self.assertEqual(shown['badge'], row['summary'])
+                self.click('check-' + identifier)
+                self.assertTrue(self.item('detail-' + identifier).property('visible'))
+                self.assertEqual(self.item('detail-' + identifier).property('text'), row['detail'])
+                self.click('check-' + identifier)
+            self.click('diagnosticBack')
+
     def test_navigation_checks_and_back_without_automatic_collection(self):
         self.snapshot('01-manager-dark')
         self.open_center()
