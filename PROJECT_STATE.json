@@ -5,7 +5,7 @@
   "branch": "diagnostic",
   "execution_path": "PRIMARY",
   "phase": "DRAFT_RELEASE_3_1_1_DIAGNOSTIC_CORRECTIONS_5",
-  "phase_status": "IN_PROGRESS_OFFLINE_CORRECTIONS",
+  "phase_status": "DRAFT_ONLY_MAINTAINER_FEDORA45_RETEST_REQUIRED",
   "primary_artifact": "development/rpm/diagnostic-corrections-5/FINAL_REPORT.md",
   "completed_gates": [
     "DIAG0_DESIDERATA_RECORDED",
@@ -36,12 +36,15 @@
     "DROPIN4_MINIMAL_SOURCE_REVIEW",
     "DROPIN4_CANONICAL_BUILD_AND_SIGNATURES",
     "DROPIN4_NEW_DOWNLOADS_VERIFIED_BEFORE_OLD_DELETE",
-    "DROPIN4_SAME_DRAFT_FINAL_GATE_AND_REVIEW"
+    "DROPIN4_SAME_DRAFT_FINAL_GATE_AND_REVIEW",
+    "CORRECTIVE5_SOURCE_AND_UI_REVIEW",
+    "CORRECTIVE5_CANONICAL_BUILD_FULL_CHECK_AND_APPROVED_SIGNATURES",
+    "CORRECTIVE5_SOURCE_ARCHIVE_SRPM_PAYLOAD_AND_DEPENDENCIES",
+    "CORRECTIVE5_CONTROLLED_TAG_LEASE",
+    "CORRECTIVE5_NEW_DOWNLOADS_VERIFIED_AND_REVIEWED_BEFORE_OLD_DELETE",
+    "CORRECTIVE5_REAL_FINAL_JSON_CANONICAL_AND_INDEPENDENT_REVIEW"
   ],
   "pending_gates": [
-    "CORRECTIVE5_OFFLINE_REVIEW",
-    "CORRECTIVE5_CANONICAL_BUILD_SIGNATURES",
-    "CORRECTIVE5_TAG_LEASE_AND_VERIFIED_DRAFT_REPLACEMENT",
     "MAINTAINER_FEDORA45_RETEST_NEW_5",
     "DIAG4_REAL_TARGET_QUALIFICATION",
     "DIAG5_ACCEPTANCE",
@@ -84,8 +87,8 @@
   "relevant_corroborations": [
     "C4"
   ],
-  "next_action": "Implement and independently review three approved Diagnostic Center corrections; build/sign 3.1.1-5, replace assets only in current restored draft443047985 while retaining old4 until new5 authenticated verification. No publication or live/runtime activity.",
-  "last_verified_head": "cbc8042a793a0185523d0b7fbab70419c40cbf09",
+  "next_action": "Keep draft443047985 unpublished. Maintainer must retest confirmed report overwrite/cancellation, multi-startup history and custom-range rejection before consent on target desktop. No live, install, merge, main/development changes or publication authorized.",
+  "last_verified_head": "553a7a6f0c8a1d28b4b3372c94a443e950091b64",
   "observed_remote_base_head": "4bc1f308071768b4f8045e58b4d12937bfa8ada2",
   "documentation_only": false,
   "previous_milestone": {
@@ -183,25 +186,23 @@
     "live_authorized": false
   },
   "verification": {
-    "diagnostic_collector": "PASS_29",
-    "manager_staging": "PASS_3_TEMP_FIXTURE_TESTS_NO_BUILD_OR_INSTALL",
-    "controller_and_qml_flows": "PASS_25",
-    "unique_unit_integration_cases": 346,
-    "existing_manager_palettes": "PASS_DARK_AND_LIGHT_13_IN_MEMORY_RENDER_STATES_PER_RUN",
-    "qml_cache": "PASS_CURRENT_MANAGER_AND_DIAGNOSTIC_QML_WITH_SVG_RESOURCES",
-    "gui_mockup_comparison": "PASS_HTML_LAYOUT_AND_PNG_ICON_MORPHOLOGY_STYLE_24PX_DARK_LIGHT_INDEPENDENT_REVIEW",
-    "approved_assets": "PASS_6_SHA256_UNCHANGED",
-    "synthetic_screens": "19_CORRECTIVE_GITIGNORED_SYNTHETIC_OUTPUTS_SEPARATE_FROM_13_BASELINE_CAPTURES",
-    "rpm_staging_new_files": "PASS_ACTUAL_RPM_6_MANAGER_FILES_14_SVG_IDENTICAL",
-    "reader": "PASS_23_FAKE_TRANSPORT_AND_PRIVATE_BUS",
-    "live_sensor_host_and_vm": "NOT_PERFORMED_NEW_4",
-    "rpm_packaging": "PASS_3.1.1_4_FC44_SIGNED_PAIR_REAL_METADATA_GATE",
-    "final_independent_review": "ACCEPT_AND_CONTINUE_DROPIN4_DRAFT_ONLY",
-    "reviewer_targeted_repeats": "PASS_3_REPEATS_NOT_ADDED_TO_52_UNIQUE_CASES",
-    "targeted_dropin_installer": "44_PASS_WITH_NEW_700_755_NORMALIZATION_AND_NEGATIVES",
-    "dropin_regressions": "219_PASS_2_NATIVE_CASES_COMPLETED_BY_CANONICAL_BUILD"
+    "diagnostic_collector": "PASS_35",
+    "controller_and_qml_flows": "PASS_29",
+    "prebuild_unique_cases": 165,
+    "canonical_rpm_check": "PASS_FULL_224_UNITTEST_CASES_PLUS_RENDER_CACHE_GEOMETRY_GATES",
+    "counting_limits": "Prebuild and RPM counts overlap; do not sum as distinct cases. Reviewer targeted repeats are separate.",
+    "extra_regressions": "PASS_101_BUILDER_SELECTION_RECOVERY_AND_FULL_VERIFIER",
+    "reader": "PASS_23_FAKE_TRANSPORT_AND_PRIVATE_BUS_IN_RPM_CHECK",
+    "approved_reference_assets_and_visual_style": "UNCHANGED_FROM_ACCEPTED_DIAGNOSTIC_LAYOUT",
+    "rpm_packaging": "PASS_3.1.1_5_FC44_APPROVED_SIGNED_PAIR",
+    "source_archive_srpm_payload_dependencies": "PASS_SOURCE478_CANONICAL_AND_INDEPENDENT_REVIEW",
+    "driver_executable_equivalence": "PASS_ONLY_BUILD_ID_DEBUG_DIFFERENCES_VS4",
+    "rpmlint": "0_ERRORS_8_KNOWN_WARNINGS",
+    "canonical_draft_gate": "PASS_LOCAL_CONTRACT_AUTHENTIC_RAW_FINAL_LOCAL_AND_AUTHENTICATED_DOWNLOADS",
+    "final_independent_review": "ACCEPT_AND_CONTINUE_DRAFT_ONLY",
+    "live_sensor_host_and_vm": "NOT_TESTED_NEW_5"
   },
-  "implementation_status": "MINIMAL_DROPIN_FD_NORMALIZATION_COMMITTED_SIGNED_AND_SAME_DRAFT_REPLACED",
+  "implementation_status": "THREE_DIAGNOSTIC_CORRECTIONS_COMMITTED_SIGNED5_AND_SAME_RESTORED_DRAFT_REPLACED",
   "baseline_qualification": {
     "commit": "dbdff8dc70f33cd8cc6a9b141942ad3371a28080",
     "unique_unit_integration_cases": 123,
@@ -216,39 +217,48 @@
     "build_baseline": "Fedora 44 x86_64",
     "draft_created": true,
     "live_and_installation": "NOT_AUTHORIZED_NOT_TESTED",
-    "evidence_directory": "development/rpm/release-v3.1.1/",
-    "source_commit": "cbc8042a793a0185523d0b7fbab70419c40cbf09",
+    "evidence_directory": "development/rpm/diagnostic-corrections-5/",
+    "source_commit": "553a7a6f0c8a1d28b4b3372c94a443e950091b64",
     "tag": "v3.1.1",
-    "packaging_release": 4,
-    "draft_release_id": 442694338,
-    "draft_url": "https://github.com/sorguido/goodix-27c6-5125/releases/tag/untagged-41147acfd282a5b05d61",
+    "packaging_release": 5,
+    "draft_release_id": 443047985,
+    "draft_url": "https://github.com/sorguido/goodix-27c6-5125/releases/tag/untagged-f496fbb38b3346be373c",
     "draft": true,
     "prerelease": false,
     "published_at": null,
     "ready_for_publication": false,
     "signed_fingerprint": "5FB20F583C831729D5FF073FE99ADAE5B7EA4918",
     "signed_sha256": {
-      "goodix-manager-3.1.1-4.fc44.x86_64.rpm": "4327b8b4b03bc3bf08d25ca541c34246b76b7d9be6bde6227bd98c4c268e448a",
-      "goodix-manager-3.1.1-4.fc44.src.rpm": "11d4d47755919e13990f86783a17f59a88057863d045b051834b35ed817be451"
+      "goodix-manager-3.1.1-5.fc44.x86_64.rpm": "31f18713b0d5511353f0833b7ab4bb396afafec6a01cb16071e20a7c6cd44647",
+      "goodix-manager-3.1.1-5.fc44.src.rpm": "6efe9c1724098a1326df66183d6d459251b74c88610c6816a03d7f6466ede567"
     },
-    "build_record": "development/rpm/builds/3.1.1-4.fc44/result.json",
+    "build_record": "development/rpm/builds/3.1.1-5.fc44/result.json",
     "verification": {
-      "offline_cases": "344_PASS_PLUS_2_NATIVE_CASES_EXECUTED_BY_CANONICAL_PRODUCTION_BUILD",
-      "qml_palettes_cache_and_page_cleanup": "PASS_STRICT_PLUS_9_FIRST_SHOW_GEOMETRY_CONFIGURATIONS",
-      "source_archive": "478_FILES_IDENTICAL_TO_TAGGED_SOURCE_AND_SRPM",
-      "rpm_payload_metadata_resources_and_inactive_layout": "PASS",
-      "approved_signatures_and_digests": "PASS_BOTH_LOCAL_AND_AUTHENTICATED_DOWNLOADS_ISOLATED_KEYRING",
-      "rpmlint": "0_ERRORS_8_EXISTING_WARNINGS",
-      "authenticated_draft_and_assets": "PASS_ONLY_NEW_4_PAIR_OLD_3_REMOVED_AFTER_NEW_DOWNLOAD_VALIDATION",
-      "canonical_draft_verifier": "PASS_REAL_UNMODIFIED_FINAL_JSON_ORIGINAL_AND_DOWNLOADED_4",
-      "independent_final_review": "ACCEPT_AND_CONTINUE_DRAFT_ONLY_MAINTAINER_FEDORA45_RETEST_REQUIRED",
-      "installation_live_login_fedora45": "NOT_TESTED_NEW_4_BY_CODEX",
-      "test_only_private_key_signature_fixtures": "NOT_RUN_NO_NEW_PRIVATE_KEYS"
+      "diagnostic_collector": "PASS_35",
+      "controller_and_qml_flows": "PASS_29",
+      "prebuild_unique_cases": 165,
+      "canonical_rpm_check": "PASS_FULL_224_UNITTEST_CASES_PLUS_RENDER_CACHE_GEOMETRY_GATES",
+      "counting_limits": "Prebuild and RPM counts overlap; do not sum as distinct cases. Reviewer targeted repeats are separate.",
+      "extra_regressions": "PASS_101_BUILDER_SELECTION_RECOVERY_AND_FULL_VERIFIER",
+      "reader": "PASS_23_FAKE_TRANSPORT_AND_PRIVATE_BUS_IN_RPM_CHECK",
+      "approved_reference_assets_and_visual_style": "UNCHANGED_FROM_ACCEPTED_DIAGNOSTIC_LAYOUT",
+      "rpm_packaging": "PASS_3.1.1_5_FC44_APPROVED_SIGNED_PAIR",
+      "source_archive_srpm_payload_dependencies": "PASS_SOURCE478_CANONICAL_AND_INDEPENDENT_REVIEW",
+      "driver_executable_equivalence": "PASS_ONLY_BUILD_ID_DEBUG_DIFFERENCES_VS4",
+      "rpmlint": "0_ERRORS_8_KNOWN_WARNINGS",
+      "canonical_draft_gate": "PASS_LOCAL_CONTRACT_AUTHENTIC_RAW_FINAL_LOCAL_AND_AUTHENTICATED_DOWNLOADS",
+      "final_independent_review": "ACCEPT_AND_CONTINUE_DRAFT_ONLY",
+      "live_sensor_host_and_vm": "NOT_TESTED_NEW_5"
     },
     "failed_build_preserved": "development/rpm/builds/3.1.1-1.fc44/",
-    "final_report": "development/rpm/dropin-0755-v3.1.1/FINAL_REPORT.md",
+    "final_report": "development/rpm/diagnostic-corrections-5/FINAL_REPORT.md",
     "ready_for_maintainer_retest": true,
-    "additional_release_created": false
+    "additional_release_created": false,
+    "source_archive_sha256": "3d1399c80a301e5125cd07bc9089c5ce1e06f9b1d4747fd40aa38e65ba41bc9a",
+    "asset_ids": [
+      740068842,
+      740068915
+    ]
   },
   "draft_corrective_authorization": {
     "product_version": "3.1.1",
@@ -342,5 +352,23 @@
     "final_state": "DRAFT ONLY — MAINTAINER FEDORA 45 RETEST REQUIRED",
     "final_report": "development/rpm/dropin-0755-v3.1.1/FINAL_REPORT.md"
   },
-  "draft_release_id": 443047985
+  "draft_release_id": 443047985,
+  "diagnostic_corrections_5": {
+    "source_commit": "553a7a6f0c8a1d28b4b3372c94a443e950091b64",
+    "old_tag_commit": "cbc8042a793a0185523d0b7fbab70419c40cbf09",
+    "draft_id": 443047985,
+    "old4_asset_ids_removed_after_verification": [
+      739764986,
+      739765126
+    ],
+    "new5_asset_ids": [
+      740068842,
+      740068915
+    ],
+    "old4_local_files": "PRESERVED_ORIGINAL_HASHES",
+    "final_report": "development/rpm/diagnostic-corrections-5/FINAL_REPORT.md",
+    "status": "DRAFT_ONLY_MAINTAINER_FEDORA45_RETEST_REQUIRED",
+    "publication_authorized": false,
+    "live_authorized": false
+  }
 }
