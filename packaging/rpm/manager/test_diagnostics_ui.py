@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Offline Controller/Qt contracts; all collectors, buses and save dialogs are fake."""
 import argparse
+import json
 import os
 from pathlib import Path
 import sys
@@ -15,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import main as manager
-from PySide6.QtCore import QObject, Signal, QPointF, QTimer, Qt
+from PySide6.QtCore import QCoreApplication, QEvent, QObject, Signal, QPointF, QTimer, Qt
 from PySide6.QtQml import QQmlApplicationEngine, QQmlEngine, QQmlExpression
 from PySide6.QtQuick import QQuickWindow
 from PySide6.QtQuickControls2 import QQuickStyle
@@ -307,6 +308,10 @@ class UiTests(unittest.TestCase):
 
     def tearDown(self):
         self.window.hide()
+        clear = QQmlExpression(QQmlEngine.contextForObject(self.window), self.window, 'void pageStack.clear()')
+        clear.evaluate()
+        self.assertFalse(clear.hasError(), clear.error().toString())
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
         self.engine.deleteLater()
         self.app.processEvents()
         ControllerTests.tearDown(self)
@@ -318,14 +323,20 @@ class UiTests(unittest.TestCase):
         item = self.window.findChild(QObject, name)
         if item is None:
             # Repeater delegates belong to a visual parent without necessarily
-            # belonging to its QObject tree. Follow actual rendered children.
-            pending = [self.window.contentItem()]
-            while pending:
-                candidate = pending.pop()
-                if candidate.objectName() == name:
-                    item = candidate
-                    break
-                pending.extend(candidate.childItems())
+            # belonging to its QObject tree. Traverse in QML so PySide does not
+            # wrap every private inline type from successive temporary engines.
+            source = '''(function() {
+                const pending = [contentItem];
+                while (pending.length) {
+                    const candidate = pending.pop();
+                    if (candidate.objectName === %s) return candidate;
+                    for (const child of candidate.children) pending.push(child);
+                }
+                return null;
+            })()''' % json.dumps(name)
+            expression = QQmlExpression(QQmlEngine.contextForObject(self.window), self.window, source)
+            item, _undefined = expression.evaluate()
+            self.assertFalse(expression.hasError(), expression.error().toString())
         self.assertIsNotNone(item, name)
         return item
 
@@ -539,6 +550,10 @@ class UiTests(unittest.TestCase):
         self.assertFalse(self.controller.diagnostics['reportReady'])
 
     def test_native_page_stack_pop_during_collection_cancels_removed_page(self):
+        def destruction_events(item):
+            events = []
+            item.destroyed.connect(lambda: events.append(True))
+            return events
         started, release = Event(), Event()
         def slow(**kwargs):
             started.set()
@@ -546,6 +561,7 @@ class UiTests(unittest.TestCase):
             return report_result()
         self.collect_checks.side_effect = slow
         self.open_center()
+        removed = destruction_events(self.item('diagnosticPage'))
         self.click('overviewRunChecks')
         self.assertTrue(started.wait(.5))
         try:
@@ -554,16 +570,26 @@ class UiTests(unittest.TestCase):
             # Exercise the same native PageRow pop even when that shortcut is
             # not mapped by this offscreen platform.
             if not self.controller._diagnostic_cancel.is_set():
-                expression = QQmlExpression(QQmlEngine.contextForObject(self.window), self.window, 'pageStack.pop()')
+                expression = QQmlExpression(QQmlEngine.contextForObject(self.window), self.window, 'void pageStack.pop()')
                 expression.evaluate()
                 self.assertFalse(expression.hasError(), expression.error().toString())
             QTest.qWait(400)
             self.assertTrue(self.controller._diagnostic_cancel.is_set(), 'Native back must cancel work from the removed diagnostic page')
+            self.assertEqual(len(removed), 1, 'Popped diagnostic pages must be destroyed')
         finally:
             release.set()
         self.wait(lambda: not self.controller.diagnostics['busy'])
         self.assertFalse(self.controller.diagnostics['reportReady'])
         self.assertTrue(self.item('openDiagnosticCenter').property('visible'))
+        for _ in range(3):
+            self.open_center()
+            removed = destruction_events(self.item('diagnosticPage'))
+            expression = QQmlExpression(QQmlEngine.contextForObject(self.window), self.window, 'void pageStack.pop()')
+            expression.evaluate()
+            self.assertFalse(expression.hasError(), expression.error().toString())
+            self.wait(lambda: len(removed) == 1)
+            self.assertFalse([item for item in self.window.findChildren(QObject)
+                              if item.objectName() == 'diagnosticPage'])
 
     def test_installation_time_missing_available_and_invalid_follow_real_ui(self):
         self.open_center()

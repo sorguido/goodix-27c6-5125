@@ -250,7 +250,14 @@ Kirigami.ApplicationWindow {
                     icon.source: Qt.resolvedUrl("diagnostic-icons/diagnostic-pulse.svg")
                     highlighted: true
                     enabled: !info.busy && !info.diagnosticBusy
-                    onClicked: window.pageStack.push(diagnosticComponent, {managerWindow: window})
+                    onClicked: {
+                        const page = diagnosticComponent.createObject(window.pageStack, {managerWindow: window})
+                        if (page) {
+                            // Create in the scene, then transfer visual ownership to PageRow.
+                            page.parent = null
+                            window.pageStack.push(page)
+                        }
+                    }
                 }
             }
             Controls.Label {

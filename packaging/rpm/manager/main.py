@@ -303,9 +303,12 @@ class Controller(QObject):
         self._diagnostic_generation += 1
         if self._diagnostic_cancel is not None:
             self._diagnostic_cancel.set()
-        self._diagnostic_data.update(reportReady=False, reportText='', reportTitle='',
-                                     reportSummary='', reportError='')
-        self.changed.emit()
+        cleared = dict(reportReady=False, reportText='', reportTitle='',
+                       reportSummary='', reportError='')
+        changed = any(self._diagnostic_data.get(key) != value for key, value in cleared.items())
+        self._diagnostic_data.update(cleared)
+        if changed:
+            self.changed.emit()
 
     def _start_diagnostic_worker(self, task):
         if self._shutdown_requested or self.busy or self.diagnostics['busy']:

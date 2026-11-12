@@ -18,8 +18,9 @@ Kirigami.ScrollablePage {
     property string exportNotice: ""
     readonly property bool available: !diagnostic.busy && !backend.view.busy
     readonly property var profileNames: ({system: "System status", install: "Installation or update failed", login: "Fingerprint sign-in problem", recognition: "Fingerprint recognition problem", other: "Other problem"})
-    readonly property var timeChoices: ["During the current startup", "During the previous startup", "Within the last 30 minutes", "Earlier today", "Choose a date and time range"].concat(diagnostic.installationTimeAvailable ? ["Most recent installation attempt"] : [])
-    readonly property var timeValues: ["current", "previous", "last30", "today", "custom"].concat(diagnostic.installationTimeAvailable ? ["installation"] : [])
+    readonly property bool installationTimeAvailable: diagnostic.installationTimeAvailable
+    readonly property var timeChoices: ["During the current startup", "During the previous startup", "Within the last 30 minutes", "Earlier today", "Choose a date and time range"].concat(installationTimeAvailable ? ["Most recent installation attempt"] : [])
+    readonly property var timeValues: ["current", "previous", "last30", "today", "custom"].concat(installationTimeAvailable ? ["installation"] : [])
     readonly property var checkDescriptions: ({driver: "Manager package files and previously checked driver status", components: "Fedora libfprint, fprintd and fprintd-pam package files", service: "Service configuration and overrides; no connection test", auth: "Plasma sign-in files (partial check)", security: "SELinux mode and ordinary software path permissions", reader: "Goodix USB detection; no reader operation"})
     readonly property var checkIcons: ({driver: "fingerprint", components: "layers", service: "gear", auth: "layers", security: "shield", reader: "usb"})
     readonly property color iconColor: surface.hslLightness < 0.5 ? "#8ed8f5" : "#086da2"
@@ -111,7 +112,7 @@ Kirigami.ScrollablePage {
         ColumnLayout {
             Layout.fillWidth: true
             spacing: 5
-            Kirigami.Heading { text: parent.parent.heading; color: page.ink; level: 1; font.pixelSize: 27; font.weight: Font.DemiBold; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            Kirigami.Heading { text: parent.parent.heading; color: page.ink; level: 1; font.pointSize: 20.25; font.weight: Font.DemiBold; wrapMode: Text.WordWrap; Layout.fillWidth: true }
             Controls.Label { text: parent.parent.description; wrapMode: Text.WordWrap; opacity: .78; Layout.fillWidth: true }
         }
     }
@@ -212,7 +213,7 @@ Kirigami.ScrollablePage {
                     spacing: 16
                     RowLayout {
                         Layout.fillWidth: true
-                        Kirigami.Heading { text: "System overview"; color: page.ink; font.pixelSize: 21; font.weight: Font.DemiBold; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                        Kirigami.Heading { text: "System overview"; color: page.ink; font.pointSize: 15.75; font.weight: Font.DemiBold; wrapMode: Text.WordWrap; Layout.fillWidth: true }
                         ActionButton { objectName: "overviewRunChecks"; text: "Run system checks"; icon.name: "view-refresh"; enabled: page.available; onClicked: backend.run_diagnostics() }
                     }
                     RowLayout {
@@ -250,7 +251,7 @@ Kirigami.ScrollablePage {
                     }
                 }
             }
-            Kirigami.Heading { text: "What would you like to do?"; color: page.ink; level: 2; font.pixelSize: 20; font.weight: Font.DemiBold }
+            Kirigami.Heading { text: "What would you like to do?"; color: page.ink; level: 2; font.pointSize: 15; font.weight: Font.DemiBold }
             GridLayout {
                 columns: page.width > 760 ? 3 : 1
                 Layout.fillWidth: true
@@ -393,7 +394,7 @@ Kirigami.ScrollablePage {
                             color: "#493827"
                             Controls.Label { anchors.centerIn: parent; text: "!"; color: "#f2c077"; font.pixelSize: 23; Accessible.ignored: true }
                         }
-                        Kirigami.Heading { text: page.diagnostic.reportTitle; color: page.ink; font.pixelSize: 21; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                        Kirigami.Heading { text: page.diagnostic.reportTitle; color: page.ink; font.pointSize: 15.75; wrapMode: Text.WordWrap; Layout.fillWidth: true }
                     }
                     Controls.Label { text: page.diagnostic.reportSummary; wrapMode: Text.WordWrap; Layout.fillWidth: true }
                     Repeater {
@@ -444,7 +445,7 @@ Kirigami.ScrollablePage {
                 color: "transparent"; radius: 93; border.width: 3; border.color: page.line
                 DiagnosticIcon { anchors.centerIn: parent; iconName: "fingerprint"; width: 100; height: 100 }
             }
-            Kirigami.Heading { objectName: "readerHeading"; text: page.diagnostic.readerBusy ? "Reader test in progress" : page.diagnostic.readerState === "match" ? "Fingerprint matched" : !page.diagnostic.readerCanStart ? "Reader test stopped" : "Ready to check the reader"; color: page.ink; font.pixelSize: 24; Layout.alignment: Qt.AlignHCenter; wrapMode: Text.WordWrap }
+            Kirigami.Heading { objectName: "readerHeading"; text: page.diagnostic.readerBusy ? "Reader test in progress" : page.diagnostic.readerState === "match" ? "Fingerprint matched" : !page.diagnostic.readerCanStart ? "Reader test stopped" : "Ready to check the reader"; color: page.ink; font.pointSize: 18; Layout.alignment: Qt.AlignHCenter; wrapMode: Text.WordWrap }
             Controls.Label { objectName: "readerMessage"; text: page.diagnostic.readerMessage; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; Layout.fillWidth: true }
             Notice { message: "This requests ordinary fingerprint verification. A first biometric action may activate the driver's qualified Linux pairing. No new fingerprint is enrolled. Keep your password available. At most three physical attempts; stop on the first match." }
             Controls.CheckBox { objectName: "readerConsent"; id: readerConsent; text: "I understand and want to test the reader"; enabled: !page.diagnostic.readerBusy && page.diagnostic.readerCanStart }

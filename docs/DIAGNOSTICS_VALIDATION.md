@@ -1,6 +1,10 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Diagnostic Center: offline qualification
 
+This is the historical qualification record preceding release preparation.
+Its HEAD, working-tree descriptions and packaging stop gates refer to that
+earlier phase. Current 3.1.1 scope and limits are in [VALIDATION.md](VALIDATION.md).
+
 The initial Diagnostic Center implementation is committed on branch `diagnostic`
 at `dbdff8dc70f33cd8cc6a9b141942ad3371a28080`. The current corrective changes are
 in the working tree on that commit. Evidence from the initial qualification and

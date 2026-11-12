@@ -39,6 +39,8 @@ the runtime. Existing runtime and standalone recovery commands remain available.
 /usr/bin/python3 -I -B packaging/rpm/stage.py install --payload ../goodix-payload --root %{buildroot} --release @RELEASE@
 
 %check
+# Qt requires UTF-8; keep deterministic English output for offline checks.
+export LC_ALL=C.UTF-8
 /usr/bin/python3 -I -B packaging/rpm/test_packaging.py
 /usr/bin/python3 -I -B packaging/rpm/test_stage.py
 /usr/bin/python3 -I -B packaging/rpm/test_helper.py

@@ -20,8 +20,8 @@ def probe(directory, file_loader):
     from unittest.mock import patch
     sys.path.insert(0, str(directory))
     import main as manager
-    from PySide6.QtCore import QObject, QMetaObject, QTimer, QUrl
-    from PySide6.QtQml import QQmlApplicationEngine, QQmlComponent
+    from PySide6.QtCore import QCoreApplication, QEvent, QObject, QMetaObject, QTimer, QUrl
+    from PySide6.QtQml import QQmlApplicationEngine, QQmlComponent, QQmlExpression
     from PySide6.QtQuick import QQuickWindow
     from PySide6.QtQuickControls2 import QQuickStyle
     from PySide6.QtWidgets import QApplication
@@ -47,6 +47,7 @@ def probe(directory, file_loader):
     if not engine.rootObjects():
         raise RuntimeError('QML failed to load')
     window = engine.rootObjects()[0]
+    window.show()
     result = {}
     with patch.object(manager.QDesktopServices, 'openUrl', return_value=True) as opened:
         def inspect():
@@ -68,6 +69,15 @@ def probe(directory, file_loader):
             app.quit()
         QTimer.singleShot(250, inspect)
         app.exec()
+    window.hide()
+    clear = QQmlExpression(engine.rootContext(), window, 'pageStack.clear()')
+    clear.evaluate()
+    assert not clear.hasError(), clear.error().toString()
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    window.deleteLater()
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    engine.deleteLater()
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
     print(json.dumps(result, sort_keys=True))
 
 
@@ -92,7 +102,8 @@ def regression():
         diagnostic_older = diagnostic_current.replace(b'heading: "Diagnostic Center"', b'heading: "Diagnostic Former"')
         assert diagnostic_older != diagnostic_current and len(diagnostic_older) == len(diagnostic_current)
         timestamp = 1700000000  # Two packages with the same reproducible-build mtime.
-        environment = dict(os.environ, QT_QPA_PLATFORM='offscreen', XDG_CACHE_HOME=str(cache),
+        environment = dict(os.environ, QT_QPA_PLATFORM='offscreen', QT_FORCE_STDERR_LOGGING='1',
+                           LC_ALL='C.UTF-8', XDG_CACHE_HOME=str(cache),
                            QML_DISK_CACHE_PATH=str(cache / 'qmlcache'))
         environment.pop('QML_DISK_CACHE', None)
         environment.pop('QML_DISABLE_DISK_CACHE', None)
