@@ -137,7 +137,12 @@ class DiagnosticTests(unittest.TestCase):
         text = SERVICE.replace('DropInPaths=', 'DropInPaths=' + PROJECT_DROPIN).replace('Environment=', 'Environment=LD_LIBRARY_PATH=/usr/local/lib64/goodix-27c6-5125')
         self.assertEqual(parse_service(Result(stdout=text), lambda p: DROPIN_BYTES)['outcome'], 'pass')
         self.assertEqual(parse_service(Result(stdout=text), lambda p: b'foreign')['outcome'], 'anomaly')
-        self.assertEqual(parse_service(Result(stdout=text), lambda p: (_ for _ in ()).throw(PermissionError()))['outcome'], 'unavailable')
+        unavailable = parse_service(Result(stdout=text), lambda p: (_ for _ in ()).throw(PermissionError()))
+        self.assertEqual(unavailable['outcome'], 'unavailable')
+        self.assertEqual(unavailable['code'], 'project_dropin_unavailable')
+        self.assertEqual(unavailable['summary'], 'Configuration file access unavailable')
+        self.assertIn('does not show that the service is broken or healthy', unavailable['detail'])
+        self.assertIn('does not change active configuration permissions', unavailable['detail'])
 
     def test_before_install_absent_runtime_and_metadata_are_honest(self):
         f = Fixtures()
@@ -276,6 +281,57 @@ class DiagnosticTests(unittest.TestCase):
 
 
 class EventTests(unittest.TestCase):
+    def test_three_matches_are_observed_context_but_not_installation_evidence(self):
+        raw = '\n'.join(event('verify-match', str(1794167999000000 + i)) for i in range(3))
+        for profile in ('install', 'recognition', 'login', 'other'):
+            with self.subTest(profile=profile):
+                history = parse_events(Result(stdout=raw), profile)
+                self.assertEqual(history['availability'], 'visible_history')
+                self.assertEqual(history['unclassified'], 0)
+                self.assertEqual(history['omitted'], 3 if profile == 'install' else 0)
+                self.assertEqual([e['category'] for e in history['events']],
+                                 [] if profile == 'install' else ['match'] * 3)
+                f = Fixtures()
+                f.results = {}
+                original = f.run
+                f.run = lambda args, timeout=5: Result(stdout=raw) if args[0] == '/usr/bin/journalctl' else original(args, timeout)
+                report = f.collector().report(profile, 'current', False, True)
+                self.assertTrue(report['reportReady'])
+                self.assertEqual(len(report['checks']), 6)
+                if profile == 'install':
+                    self.assertNotIn('fprintd: match', report['reportText'])
+                    self.assertIn('No installation-specific event evidence', report['reportText'])
+                    self.assertIn('omitted for this profile: 3', report['reportText'])
+                else:
+                    self.assertEqual(report['reportText'].count('fprintd: match'), 3)
+                    self.assertIn('causal attribution remains UNKNOWN', report['reportText'])
+
+    def test_profile_filter_preserves_failures_scope_and_history_limits(self):
+        raw = '\n'.join(event(message, str(1794167999000000 + i)) for i, message in enumerate((
+            'verify-no-match', 'post-TLS FDT initialization deadline expired',
+            'TLS handshake failed closed', 'verify-disconnected', 'avc: denied SECRET')))
+        for profile in ('recognition', 'login', 'other'):
+            history = parse_events(Result(stdout=raw), profile, True)
+            self.assertEqual({e['category'] for e in history['events']},
+                             {'no_match', 'fdt_initialization_timeout', 'tls_handshake_failure',
+                              'transport_disconnected', 'security_denial'})
+            self.assertNotIn('SECRET', json.dumps(history))
+        self.assertEqual(parse_events(Result(stdout=raw), 'install')['events'], [])
+        installed = parse_events(Result(stdout=raw), 'install', True)
+        self.assertEqual([e['category'] for e in installed['events']], ['security_denial'])
+        self.assertEqual(installed['omitted'], 4)
+        partial = parse_events(Result(stdout=event('verify-match'), stderr_present=True), 'install')
+        self.assertEqual(partial['availability'], 'partial_history')
+        self.assertEqual(partial['events'], [])
+        self.assertEqual(parse_events(Result(), 'install')['availability'], 'no_visible_events')
+        unknown = parse_events(Result(stdout=event('UNRECOGNIZED SECRET')), 'install')
+        self.assertEqual(unknown['unclassified'], 1)
+        self.assertEqual(unknown['omitted'], 0)
+        mixed = parse_events(Result(stdout=event('verify-match') + '\n' +
+                                    event('verify-match', boot='b' * 32)), 'install')
+        self.assertEqual(mixed['availability'], 'mixed_boot_history')
+        self.assertEqual(mixed['events'], [])
+
     def test_event_projection_separates_real_markers_and_strips_all_raw_details(self):
         messages = [
             'GOODIX_STOCK_CAPTURE_RESULT attempt=1 outcome=NO_MATCH terminal=1 SECRET=',

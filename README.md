@@ -61,7 +61,8 @@ local preview, and an optional reader test. Reports stay local until you choose
 to share them. Diagnostics do not change the reader's normal operation. Improved
 icons and **Report a bug** guide you to the bug report form.
 
-This revision does not yet have real-device or Fedora 45 qualification. See the
+The replacement candidate awaits fresh real-device and Fedora 45 tests; reported
+results from the previous candidate are recorded separately. See the
 [3.1.1 release notes](docs/RELEASE_NOTES_3.1.1.md) and
 [validation scope](docs/VALIDATION.md).
 

@@ -97,6 +97,84 @@ Kirigami.ScrollablePage {
     }
     component ActionButton: Controls.Button { implicitHeight: 38 }
 
+    component LocalDateTime: ColumnLayout {
+        id: picker
+        property string caption
+        property date initialTime: new Date()
+        property date selectedDate: initialTime
+        property int hour: initialTime.getHours()
+        property int minute: initialTime.getMinutes()
+        readonly property var resolved: backend.report_local_time(selectedDate.getFullYear(), selectedDate.getMonth() + 1, selectedDate.getDate(), hour, minute)
+        readonly property string iso: resolved.iso
+        signal edited()
+        onSelectedDateChanged: edited()
+        onHourChanged: edited()
+        onMinuteChanged: edited()
+        spacing: 8
+        Layout.fillWidth: true
+        Controls.Label { text: picker.caption; font.weight: Font.DemiBold }
+        GridLayout {
+            columns: page.width > 610 ? 2 : 1
+            Layout.fillWidth: true
+            Controls.Button {
+                objectName: picker.objectName + "Date"
+                Layout.fillWidth: true
+                text: Qt.formatDate(picker.selectedDate, Qt.DefaultLocaleShortDate)
+                icon.name: "view-calendar"
+                Accessible.name: picker.caption + " date"
+                onClicked: {
+                    calendar.month = picker.selectedDate.getMonth()
+                    calendar.year = picker.selectedDate.getFullYear()
+                    calendarPopup.open()
+                }
+            }
+            RowLayout {
+                Controls.Label { text: "Hour" }
+                Controls.SpinBox { objectName: picker.objectName + "Hour"; from: 0; to: 23; value: picker.hour; editable: true; onValueModified: picker.hour = value; Accessible.name: picker.caption + " hour" }
+                Controls.Label { text: "Minute" }
+                Controls.SpinBox { objectName: picker.objectName + "Minute"; from: 0; to: 59; value: picker.minute; editable: true; onValueModified: picker.minute = value; Accessible.name: picker.caption + " minute" }
+            }
+        }
+        Controls.Label { objectName: picker.objectName + "Error"; text: picker.resolved.error; visible: text.length > 0; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+        Controls.Popup {
+            id: calendarPopup
+            objectName: picker.objectName + "Calendar"
+            parent: Controls.Overlay.overlay
+            anchors.centerIn: parent
+            modal: true
+            focus: true
+            width: Math.min(page.width - 40, 350)
+            closePolicy: Controls.Popup.CloseOnEscape | Controls.Popup.CloseOnPressOutside
+            contentItem: ColumnLayout {
+                spacing: 8
+                RowLayout {
+                    Controls.Button { text: "‹"; Accessible.name: "Previous month"; onClicked: { const date = new Date(calendar.year, calendar.month - 1, 1); calendar.year = date.getFullYear(); calendar.month = date.getMonth() } }
+                    Controls.Label { Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter; text: Qt.formatDate(new Date(calendar.year, calendar.month, 1), "MMMM yyyy") }
+                    Controls.Button { text: "›"; Accessible.name: "Next month"; onClicked: { const date = new Date(calendar.year, calendar.month + 1, 1); calendar.year = date.getFullYear(); calendar.month = date.getMonth() } }
+                }
+                Controls.DayOfWeekRow { locale: calendar.locale; Layout.fillWidth: true }
+                Controls.MonthGrid {
+                    id: calendar
+                    objectName: picker.objectName + "Month"
+                    month: picker.selectedDate.getMonth()
+                    year: picker.selectedDate.getFullYear()
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 238
+                    delegate: Controls.Button {
+                        required property var model
+                        objectName: picker.objectName + "Day-" + model.year + "-" + model.month + "-" + model.day
+                        text: model.day
+                        enabled: model.month === calendar.month
+                        opacity: enabled ? 1 : 0
+                        highlighted: model.year === picker.selectedDate.getFullYear() && model.month === picker.selectedDate.getMonth() && model.day === picker.selectedDate.getDate()
+                        Accessible.name: Qt.formatDate(model.date, Qt.DefaultLocaleLongDate)
+                        onClicked: { picker.selectedDate = model.date; calendarPopup.close() }
+                    }
+                }
+            }
+        }
+    }
+
     component HeadingBlock: RowLayout {
         property string iconName
         property string heading
@@ -354,9 +432,9 @@ Kirigami.ScrollablePage {
                     Controls.ComboBox { objectName: "reportTime"; id: timeSelection; implicitHeight: 41; model: page.timeChoices; Layout.fillWidth: true; enabled: page.available; onCurrentIndexChanged: page.invalidateReport(); Accessible.name: "When did it happen?" }
                     Controls.Label { objectName: "installationTimeNotice"; visible: page.profile === "install" && !page.diagnostic.installationTimeAvailable; text: "A valid time for an installation or update attempt is not available in this session. Select a startup or time range."; opacity: .8; wrapMode: Text.WordWrap; Layout.fillWidth: true }
                     Controls.Label { text: "If older events were not preserved by Fedora, the report will say so."; opacity: .72; wrapMode: Text.WordWrap; Layout.fillWidth: true }
-                    Controls.Label { visible: timeSelection.currentIndex === 4; text: "Enter start and end timestamps including the timezone (maximum 24 hours)."; wrapMode: Text.WordWrap; Layout.fillWidth: true }
-                    Controls.TextField { objectName: "reportSince"; id: reportSince; visible: timeSelection.currentIndex === 4; placeholderText: "Start: 2026-11-08T09:00:00+01:00"; Layout.fillWidth: true; enabled: page.available; onTextChanged: page.invalidateReport(); Accessible.name: "Start date and time with timezone" }
-                    Controls.TextField { objectName: "reportUntil"; id: reportUntil; visible: timeSelection.currentIndex === 4; placeholderText: "End: 2026-11-08T10:00:00+01:00"; Layout.fillWidth: true; enabled: page.available; onTextChanged: page.invalidateReport(); Accessible.name: "End date and time with timezone" }
+                    Controls.Label { visible: timeSelection.currentIndex === 4; text: "Choose dates and times in your computer's local time (maximum 24 hours)."; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                    LocalDateTime { objectName: "reportSince"; id: reportSince; caption: "Start"; initialTime: new Date(Date.now() - 30 * 60 * 1000); visible: timeSelection.currentIndex === 4; enabled: page.available; onEdited: page.invalidateReport() }
+                    LocalDateTime { objectName: "reportUntil"; id: reportUntil; caption: "End"; visible: timeSelection.currentIndex === 4; enabled: page.available; onEdited: page.invalidateReport() }
                 }
             }
             Panel {
@@ -374,7 +452,7 @@ Kirigami.ScrollablePage {
                 Layout.fillWidth: true
                 ActionButton { text: "Back"; enabled: page.available; onClicked: page.goBack() }
                 Item { Layout.fillWidth: true }
-                ActionButton { objectName: "continueReport"; text: "Continue to report"; icon.name: "go-next"; highlighted: true; enabled: page.available; onClicked: { page.invalidateReport(); page.privacySubmitted = false; consentCheck.checked = false; privacyDialog.open() } }
+                ActionButton { objectName: "continueReport"; text: "Continue to report"; icon.name: "go-next"; highlighted: true; enabled: page.available && (timeSelection.currentIndex !== 4 || (reportSince.iso.length > 0 && reportUntil.iso.length > 0)); onClicked: { page.invalidateReport(); page.privacySubmitted = false; consentCheck.checked = false; privacyDialog.open() } }
             }
         }
         ColumnLayout {
@@ -453,6 +531,7 @@ Kirigami.ScrollablePage {
                 Layout.alignment: Qt.AlignHCenter
                 ActionButton { objectName: "readerStart"; text: "Start reader test"; highlighted: true; enabled: page.available && page.diagnostic.readerCanStart && readerConsent.checked; onClicked: backend.start_reader_test(readerConsent.checked) }
                 ActionButton { objectName: "readerCancel"; text: "Cancel test"; enabled: page.diagnostic.readerBusy; onClicked: backend.cancel_reader_test() }
+                ActionButton { objectName: "readerNewTest"; text: "New test"; visible: page.diagnostic.readerCanNewTest; enabled: page.available && page.diagnostic.readerCanNewTest; onClicked: { readerConsent.checked = false; backend.new_reader_test() } }
             }
             Controls.Label { text: "Physical attempts started: " + page.diagnostic.readerAttempts + " / 3. A successful test does not guarantee a future login."; opacity: .75; wrapMode: Text.WordWrap; Layout.fillWidth: true }
         }
@@ -490,7 +569,7 @@ Kirigami.ScrollablePage {
                     enabled: consentCheck.checked && page.available
                     onClicked: {
                         page.privacySubmitted = true
-                        backend.create_diagnostic_report(page.profile, page.timeValues[timeSelection.currentIndex], extendedDetails.checked, consentCheck.checked, reportSince.text, reportUntil.text)
+                        backend.create_diagnostic_report(page.profile, page.timeValues[timeSelection.currentIndex], extendedDetails.checked, consentCheck.checked, reportSince.iso, reportUntil.iso)
                         page.awaitingReport = page.diagnostic.collecting
                         privacyDialog.close()
                     }

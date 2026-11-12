@@ -6,9 +6,10 @@ import os
 from pathlib import Path
 import sys
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from threading import Event
 
-from PySide6.QtCore import QObject, Property, QProcess, QThread, QTimer, QUrl, Signal, Slot
+from PySide6.QtCore import QObject, Property, QProcess, QThread, QTimer, QTimeZone, QUrl, Signal, Slot
 from PySide6.QtGui import QDesktopServices, QGuiApplication, QIcon
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 from PySide6.QtQml import QQmlApplicationEngine, QQmlComponent
@@ -23,6 +24,26 @@ from reader import ReaderSession
 
 HELPER = '/usr/libexec/goodix-manager-helper'
 MAX_REPLY = 512 * 1024
+
+
+def local_report_time(year, month, day, hour, minute, zone_name):
+    """Reject clock gaps/folds instead of silently choosing a UTC instant."""
+    try:
+        wall = datetime(year, month, day, hour, minute)
+        zone = ZoneInfo(zone_name)
+        candidates = {}
+        for fold in (0, 1):
+            local = wall.replace(tzinfo=zone, fold=fold)
+            instant = local.astimezone(timezone.utc)
+            if instant.astimezone(zone).replace(tzinfo=None) == wall:
+                candidates[instant] = local
+        if not candidates:
+            return {'iso': '', 'error': 'This local time does not exist because the clocks move forward. Choose another time.'}
+        if len(candidates) != 1:
+            return {'iso': '', 'error': 'This local time occurs twice because the clocks move back. Choose another time.'}
+        return {'iso': next(iter(candidates.values())).isoformat(), 'error': ''}
+    except (ValueError, TypeError, ZoneInfoNotFoundError):
+        return {'iso': '', 'error': 'The selected date, time or local timezone is unavailable. Choose a valid date and time.'}
 
 
 class DiagnosticWorker(QThread):
@@ -45,6 +66,12 @@ class DiagnosticWorker(QThread):
 
 class Controller(QObject):
     changed = Signal()
+
+    @Property(int, constant=True)
+    def availableScreenHeight(self):
+        # Available before the first window is visible, unlike attached Screen.
+        screen = QGuiApplication.primaryScreen()
+        return screen.availableGeometry().height() if screen is not None else 528
 
     def __init__(self):
         super().__init__()
@@ -292,6 +319,7 @@ class Controller(QObject):
                 'readerState': reader['state'], 'readerMessage': reader['message'],
                 'readerBusy': reader['busy'], 'readerAttempts': reader['attempts'],
                 'readerCanStart': reader['canStart'],
+                'readerCanNewTest': reader.get('canNewTest', False),
                 'busy': self._diagnostic_thread is not None or reader['busy'],
                 'collecting': self._diagnostic_thread is not None,
                 'installationTimeAvailable': diagnostic_tools.installation_reference(self._diagnostic_snapshot()) is not None,
@@ -407,6 +435,17 @@ class Controller(QObject):
     @Slot()
     def cancel_reader_test(self):
         self.reader.cancel()
+
+    @Slot(result=bool)
+    def new_reader_test(self):
+        if self._shutdown_requested or self.busy or self.diagnostics['busy']:
+            return False
+        return self.reader.new_test()
+
+    @Slot(int, int, int, int, int, result='QVariantMap')
+    def report_local_time(self, year, month, day, hour, minute):
+        return local_report_time(year, month, day, hour, minute,
+                                 bytes(QTimeZone.systemTimeZoneId()).decode('utf-8'))
 
     @Slot()
     def cancel_diagnostics(self):

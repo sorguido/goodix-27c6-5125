@@ -301,7 +301,12 @@ def parse_service(result, read=read_file):
         try:
             exact = read(PROJECT_DROPIN) == DROPIN_BYTES
         except (OSError, ValueError):
-            return unavailable('service', 'project_dropin_unavailable')
+            return row('service', 'unavailable', 'project_dropin_unavailable',
+                       'Configuration file access unavailable',
+                       'The Goodix service configuration could not be read by this user. '
+                       'An existing private configuration directory can prevent this check. '
+                       'This does not show that the service is broken or healthy. '
+                       'Installing a Manager RPM does not change active configuration permissions.')
         if not exact or libraries and PROJECT_DROPIN not in drops:
             return row('service', 'anomaly', 'project_dropin_changed', 'Project service override changed',
                        'The project fprintd override does not match the supported configuration.')
@@ -448,6 +453,7 @@ def parse_events(result, profile, extended=False):
         return {'availability': result.code if result.code != 'ok' else 'history_unavailable', 'events': [], 'unclassified': 0}
     events = []
     unknown = 0
+    omitted = 0
     boot = None
     lines = result.stdout.splitlines()
     if len(lines) > 1001:
@@ -471,16 +477,24 @@ def parse_events(result, profile, extended=False):
             if source is None or profile == 'recognition' and source != 'fprintd':
                 unknown += 1
                 continue
+            # Keep the history boundary before profile filtering. Removing
+            # irrelevant successes must not hide a mixed-boot input.
+            if boot is None:
+                boot = item_boot
+            elif boot != item_boot:
+                return {'availability': 'mixed_boot_history', 'events': [], 'unclassified': 0}
             category = event_category(item.get('MESSAGE'), source)
             if category == 'security_denial' and not extended:
                 category = None
             if category:
+                # These sources contain runtime/authentication observations,
+                # not installer-phase evidence. Installation reports retain
+                # only explicitly requested service security denials as context.
+                if profile == 'install' and category != 'security_denial':
+                    omitted += 1
+                    continue
                 seconds, micros = divmod(int(timestamp), 1000000)
                 timestamp = datetime.fromtimestamp(seconds, timezone.utc).replace(microsecond=micros).isoformat(timespec='microseconds')
-                if boot is None:
-                    boot = item_boot
-                elif boot != item_boot:
-                    return {'availability': 'mixed_boot_history', 'events': [], 'unclassified': 0}
                 events.append({'time': timestamp, 'source': source, 'category': category})
             else:
                 unknown += 1
@@ -490,7 +504,8 @@ def parse_events(result, profile, extended=False):
     availability = ('history_truncated' if len(lines) > 1000 else
                     'partial_history' if result.stderr_present else
                     'visible_history' if lines else 'no_visible_events')
-    return {'availability': availability, 'events': events, 'unclassified': unknown}
+    return {'availability': availability, 'events': events, 'unclassified': unknown,
+            'omitted': omitted}
 
 
 class Collector:
@@ -724,7 +739,12 @@ class Collector:
         if history is not None:
             lines.extend(['', 'History availability: ' + history['availability'],
                           'Unclassified records: ' + str(history['unclassified']),
+                          'Known runtime events omitted for this profile: ' + str(history.get('omitted', 0)),
                           'Missing or inaccessible history does not prove absence of problems.'])
+            if profile == 'install':
+                lines.append('No installation-specific event evidence is available from these history sources. '
+                             'Fingerprint results and runtime capture/transport events are not installation evidence. '
+                             'Static checks and the separately dated cached operation remain context.')
             for event in history['events']:
                 lines.append(event['time'] + ' ' + event['source'] + ': ' + event['category'])
             lines.append('Temporal ordering is observed; causal attribution remains UNKNOWN.')

@@ -35,7 +35,7 @@ class FakeReader(QObject):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.view = {'busy': False, 'state': 'idle', 'message': 'Ready to check the reader', 'attempts': 0, 'canStart': True}
+        self.view = {'busy': False, 'state': 'idle', 'message': 'Ready to check the reader', 'attempts': 0, 'canStart': True, 'canNewTest': False}
         self.calls = []
 
     def start(self, consent):
@@ -50,6 +50,13 @@ class FakeReader(QObject):
 
     def shutdown(self):
         self.cancel()
+
+    def new_test(self):
+        if not self.view.get('canNewTest') or self.view['busy']:
+            return False
+        self.view.update(state='idle', attempts=0, canStart=True, canNewTest=False)
+        self.changed.emit()
+        return True
 
 
 def report_result(**updates):
@@ -280,6 +287,24 @@ class ControllerTests(unittest.TestCase):
             self.controller.last_operation = item
             self.assertFalse(self.controller.diagnostics['installationTimeAvailable'], item)
 
+    def test_local_date_time_rejects_clock_gaps_folds_and_preserves_range_contract(self):
+        convert = lambda y, m, d, h, minute: manager.local_report_time(y, m, d, h, minute, 'Europe/Rome')
+        self.assertTrue(convert(2026, 3, 29, 2, 30)['error'], 'Spring gap must not silently move to 03:30')
+        self.assertTrue(convert(2026, 10, 25, 2, 30)['error'], 'Autumn fold must not choose one offset')
+        self.assertTrue(convert(2026, 2, 30, 12, 0)['error'])
+        self.assertIn('+01:00', convert(2026, 11, 10, 12, 0)['iso'])
+        self.assertIn('+02:00', convert(2026, 7, 10, 12, 0)['iso'])
+        now = datetime(2026, 11, 12, 12, tzinfo=timezone.utc)
+        for start, end in (((2026, 11, 10, 12, 0), (2026, 11, 10, 13, 0)),
+                           ((2026, 11, 10, 23, 0), (2026, 11, 11, 1, 0)),
+                           ((2026, 11, 10, 12, 0), (2026, 11, 11, 12, 0))):
+            manager.diagnostic_tools.time_arguments('custom', convert(*start)['iso'], convert(*end)['iso'], now)
+        for start, end in (((2026, 11, 10, 13, 0), (2026, 11, 10, 12, 0)),
+                           ((2026, 11, 10, 12, 0), (2026, 11, 11, 12, 1)),
+                           ((2026, 11, 12, 12, 0), (2026, 11, 12, 15, 0))):
+            with self.assertRaises(ValueError):
+                manager.diagnostic_tools.time_arguments('custom', convert(*start)['iso'], convert(*end)['iso'], now)
+
 
 class UiTests(unittest.TestCase):
     @classmethod
@@ -302,6 +327,7 @@ class UiTests(unittest.TestCase):
         manager.load_interface(self.engine)
         self.assertTrue(self.engine.rootObjects())
         self.window = self.engine.rootObjects()[0]
+        self.wait(lambda: self.window.property('initialHomeFitDone'))
         self.window.setWidth(1040)
         self.window.setHeight(900)
         QTest.qWait(200)
@@ -326,7 +352,7 @@ class UiTests(unittest.TestCase):
             # belonging to its QObject tree. Traverse in QML so PySide does not
             # wrap every private inline type from successive temporary engines.
             source = '''(function() {
-                const pending = [contentItem];
+                const pending = [contentItem, Controls.Overlay.overlay];
                 while (pending.length) {
                     const candidate = pending.pop();
                     if (candidate.objectName === %s) return candidate;
@@ -352,7 +378,8 @@ class UiTests(unittest.TestCase):
                 viewport.setProperty('contentY', max(0, viewport.property('contentY') + point.y() - self.window.height() / 2))
                 QTest.qWait(70)
         point = item.mapToScene(QPointF(item.width() / 2, item.height() / 2)).toPoint()
-        self.assertTrue(0 <= point.x() < self.window.width() and 0 <= point.y() < self.window.height(), name + ' outside viewport')
+        self.assertTrue(0 <= point.x() < self.window.width() and 0 <= point.y() < self.window.height(),
+                        name + ' outside viewport: ' + str((point.x(), point.y(), self.window.width(), self.window.height())))
         QTest.mouseClick(self.window, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, point)
         QTest.qWait(100)
 
@@ -364,6 +391,26 @@ class UiTests(unittest.TestCase):
 
     def screen(self):
         return self.item('diagnosticPage').property('screen')
+
+    def qml_value(self, source):
+        page = self.item('diagnosticPage')
+        expression = QQmlExpression(QQmlEngine.contextForObject(page), page, source)
+        value, _undefined = expression.evaluate()
+        self.assertFalse(expression.hasError(), expression.error().toString())
+        return value
+
+    def visual_value(self, name, attribute):
+        # Inline QML type metadata belongs to its temporary engine. Read scalar
+        # values without creating Python wrappers for those private types.
+        return self.qml_value('''(function() {
+            const pending = [page, Controls.Overlay.overlay];
+            while (pending.length) {
+                const candidate = pending.pop();
+                if (candidate.objectName === %s) return candidate[%s];
+                for (const child of candidate.children) pending.push(child);
+            }
+            throw new Error("Missing visual item");
+        })()''' % (json.dumps(name), json.dumps(attribute)))
 
     def choose_time(self, index):
         self.click('reportTime')
@@ -442,8 +489,8 @@ class UiTests(unittest.TestCase):
         self.assertFalse(self.controller.diagnostics['reportReady'])
         self.click('extendedDetails')
         self.choose_time(4)
-        self.assertTrue(self.item('reportSince').property('visible'))
-        self.assertTrue(self.item('reportUntil').property('visible'))
+        self.assertTrue(self.qml_value('reportSince.visible'))
+        self.assertTrue(self.qml_value('reportUntil.visible'))
 
     def test_real_collector_issue55_to_qml_preview_excludes_hostile_raw_data(self):
         from test_diagnostics import Fixtures, SERVICE, event
@@ -504,6 +551,120 @@ class UiTests(unittest.TestCase):
         self.assertFalse(self.item('readerStart').property('enabled'))
         self.click('diagnosticBack')
         self.assertEqual(self.screen(), 'dashboard')
+
+    def test_reader_new_session_requires_clean_release_new_consent_and_no_automatic_request(self):
+        from reader import ReaderSession, TARGET_NAME
+        from test_reader import FakeTransport, PATH
+        transports = []
+        def factory():
+            transport = FakeTransport()
+            transports.append(transport)
+            return transport
+        self.controller.reader.shutdown()
+        self.controller.reader = ReaderSession(self.controller, transport_factory=factory)
+        self.controller.reader.changed.connect(self.controller.changed)
+        self.open_center()
+        self.click('chooseReader')
+        self.click('readerConsent')
+        self.click('readerStart')
+        transport = transports[0]
+        for method, values in (('GetDevices', [[PATH]]), ('Get', [TARGET_NAME]), ('Claim', []), ('VerifyStart', [])):
+            transport.reply(method, values)
+        transport.emit('verify-match')
+        self.assertFalse(self.controller.new_reader_test(), 'Pending cleanup must not reset')
+        transport.reply('VerifyStop')
+        transport.reply('Release')
+        self.app.processEvents()
+        self.assertFalse(self.item('readerStart').property('enabled'))
+        self.assertTrue(self.item('readerNewTest').property('enabled'))
+        self.snapshot('18-reader-match-new-session-dark')
+        self.click('readerNewTest')
+        self.assertEqual(len(transports), 1)
+        self.assertEqual(self.controller.reader.view['attempts'], 0)
+        self.assertFalse(self.item('readerConsent').property('checked'))
+        self.assertFalse(self.item('readerStart').property('enabled'))
+        self.click('readerConsent')
+        self.click('readerStart')
+        self.assertEqual(len(transports), 2)
+        self.controller.reader.timeout()
+        self.app.processEvents()
+        self.assertFalse(self.item('readerNewTest').property('visible'))
+        self.assertFalse(self.controller.new_reader_test())
+        self.click('diagnosticBack')
+        self.click('chooseReader')
+        self.assertFalse(self.item('readerStart').property('enabled'))
+        self.assertEqual(len(transports), 2, 'Page re-entry must not replay requests')
+
+    def test_custom_calendar_local_time_to_real_bounded_collector_and_dst(self):
+        from test_diagnostics import Fixtures
+        fixture = Fixtures()
+        self.collect_report.side_effect = lambda *args, **kwargs: fixture.collector(cancel=kwargs.pop('cancel', None)).report(*args, **kwargs)
+        with patch.object(manager.QTimeZone, 'systemTimeZoneId', return_value=b'Europe/Rome'):
+            self.open_center()
+            self.click('chooseProblem')
+            self.click('problemLogin')
+            self.choose_time(4)
+            def select(name, day, hour, minute, month=10):
+                self.qml_value('%s.selectedDate = new Date(2026, %d, %d); %s.hour = %d; %s.minute = %d; undefined' %
+                               (name, month, day, name, hour, name, minute))
+                self.app.processEvents()
+            def choose_day(name):
+                self.assertTrue(self.visual_value(name, 'visible'))
+                self.assertTrue(self.visual_value(name, 'enabled'))
+                point = self.qml_value('''(function() {
+                    const pending = [Controls.Overlay.overlay];
+                    while (pending.length) {
+                        const item = pending.pop();
+                        if (item.objectName === %s) return item.mapToItem(null, item.width / 2, item.height / 2);
+                        for (const child of item.children) pending.push(child);
+                    }
+                    return null;
+                })()''' % json.dumps(name))
+                self.assertIsNotNone(point)
+                self.assertTrue(0 <= point.x() < self.window.width() and 0 <= point.y() < self.window.height())
+                QTest.mouseClick(self.window, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, point.toPoint())
+                QTest.qWait(100)
+            select('reportSince', 7, 22, 0)
+            select('reportUntil', 8, 0, 0)
+            self.click('reportSinceDate')
+            self.assertTrue(self.item('reportSinceCalendar').property('visible'))
+            self.snapshot('19-calendar-dark')
+            choose_day('reportSinceDay-2026-10-6')
+            self.assertIn('2026-11-06', self.qml_value('reportSince.iso'))
+            self.item('reportSinceHour').forceActiveFocus()
+            QTest.keyClick(self.window, Qt.Key.Key_Up)
+            self.item('reportSinceMinute').forceActiveFocus()
+            QTest.keyClick(self.window, Qt.Key.Key_Up)
+            self.app.processEvents()
+            self.assertIn('T23:01:00', self.qml_value('reportSince.iso'))
+            self.click('reportSinceDate')
+            choose_day('reportSinceDay-2026-10-7')
+            self.click('continueReport')
+            self.assertFalse(self.item('createReport').property('enabled'))
+            self.click('reportConsent')
+            self.click('createReport')
+            self.wait(lambda: self.screen() == 'preview')
+            args = self.collect_report.call_args.args
+            self.assertEqual(args[1], 'custom')
+            self.assertEqual(args[4:6], ('2026-11-07T23:01:00+01:00', '2026-11-08T00:00:00+01:00'))
+            self.click('previewBack')
+            select('reportSince', 29, 2, 30, 2)
+            self.assertFalse(self.item('continueReport').property('enabled'))
+            self.assertIn('does not exist', self.item('reportSinceError').property('text'))
+            select('reportSince', 25, 2, 30, 9)
+            self.assertIn('occurs twice', self.item('reportSinceError').property('text'))
+            self.assertFalse(self.controller.diagnostics['reportReady'])
+            select('reportSince', 7, 10, 0)
+            select('reportUntil', 8, 10, 1)
+            self.click('continueReport')
+            self.click('reportConsent')
+            self.click('createReport')
+            self.wait(lambda: not self.controller.diagnostics['busy'])
+            self.assertFalse(self.controller.diagnostics['reportReady'])
+            self.assertIn('24 hours', self.controller.diagnostics['reportError'])
+            self.app.setPalette(system_palette(False))
+            self.window.setWidth(560)
+            self.snapshot('20-custom-time-compact-light')
 
     def test_denied_report_and_light_compact_render(self):
         self.collect_report.return_value = report_result(reportReady=False, reportText='', reportError='History is unavailable: permission denied.')
@@ -666,12 +827,11 @@ class UiTests(unittest.TestCase):
         self.assertEqual(self.controller.diagnostics['generatedAt'], '')
         self.snapshot('15-recollection-failed-dark')
         for name in ('diagnostic-pulse', 'fingerprint', 'gear', 'layers', 'usb', 'checklist', 'flask'):
-            icon = self.item('diagnosticIcon-' + name)
-            self.assertTrue(icon.property('valid'), name)
-            self.assertTrue(icon.property('isMask'), name)
-            self.assertIn('/diagnostic-icons/' + name + '.svg', str(icon.property('source')))
+            self.assertTrue(self.visual_value('diagnosticIcon-' + name, 'valid'), name)
+            self.assertTrue(self.visual_value('diagnosticIcon-' + name, 'isMask'), name)
+            self.assertIn('/diagnostic-icons/' + name + '.svg', str(self.visual_value('diagnosticIcon-' + name, 'source')))
         self.click('chooseChecks')
-        self.assertIn('No new', self.item('checksNotice').property('message'))
+        self.assertIn('No new', self.visual_value('checksNotice', 'message'))
         self.assertIn('could not be collected', self.item('checksNotice').property('message'))
         for key, absent in [('service', 'D-Bus'), ('security', 'labels')]:
             self.click('check-' + key)

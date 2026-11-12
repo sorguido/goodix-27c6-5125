@@ -20,6 +20,14 @@ HERE = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location('goodix_installer_test', HERE / 'install.py')
 m = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)
+REAL_FSTAT = os.fstat
+
+
+def root_owned_fstat(fd):
+    """Simulate privileged ownership only; inode/type/mode remain real."""
+    values = list(REAL_FSTAT(fd))
+    values[4:6] = (0, 0)
+    return os.stat_result(values)
 
 
 class HostCompatibility(unittest.TestCase):
@@ -44,6 +52,125 @@ class HostCompatibility(unittest.TestCase):
                     patch.object(m, 'command', return_value=selinux):
                 with self.assertRaises(RuntimeError):
                     m.supported_system()
+
+
+class DropinDirectory(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix='goodix-dropin-permissions-')
+        self.addCleanup(temporary.cleanup)
+        self.base = Path(temporary.name)
+        self.directory = self.base / 'fprintd.service.d'
+        self.ctx = contextlib.ExitStack()
+        self.addCleanup(self.ctx.close)
+        self.ctx.enter_context(patch.object(m.r, 'DROPIN', self.directory / '90-goodix-5125-runtime.conf'))
+        self.ctx.enter_context(patch.object(m, 'safe_parent', side_effect=m.r.parents))
+        self.ctx.enter_context(patch.object(m.os, 'fstat', side_effect=root_owned_fstat))
+        self.production_trusted = m.r.trusted
+        # The real test process remains unprivileged. Only ownership's expected
+        # identity is substituted; actual inode, type and permissions are checked.
+        self.ctx.enter_context(patch.object(m.r, 'trusted', side_effect=self.trusted))
+
+    def trusted(self, path, directory=False):
+        m.r.parents(path)
+        info = path.lstat()
+        m.require((stat.S_ISDIR if directory else stat.S_ISREG)(info.st_mode)
+                  and (info.st_uid, info.st_gid) == (os.getuid(), os.getgid())
+                  and not info.st_mode & 0o022, 'fixture ownership/type/mode drift')
+
+    def test_new_directory_is_readable_under_private_umask_and_state_stays_private(self):
+        previous = os.umask(0o077)
+        try:
+            protected = self.base / 'protected-state'
+            protected.mkdir(mode=0o700)
+            m.prepare_dropin_directory()
+            m.write_file(m.r.DROPIN, m.r.DROPIN_BYTES)
+            self.assertEqual(stat.S_IMODE(self.directory.stat().st_mode), 0o755)
+            self.assertEqual(stat.S_IMODE(m.r.DROPIN.stat().st_mode), 0o644)
+            self.assertEqual(m.r.DROPIN.read_bytes(), m.r.DROPIN_BYTES)
+            self.assertEqual(os.umask(0o077), 0o077, 'The process umask must stay private')
+            self.assertEqual(stat.S_IMODE(protected.stat().st_mode), 0o700)
+        finally:
+            os.umask(previous)
+
+    def test_existing_directory_modes_and_third_party_overrides_are_unchanged(self):
+        for mode in (0o755, 0o700):
+            with self.subTest(mode=oct(mode)):
+                self.directory.mkdir(mode=mode)
+                self.directory.chmod(mode)
+                other = self.directory / '10-admin.conf'
+                other.write_bytes(b'Administrator override sentinel')
+                other.chmod(0o600)
+                before = self.directory.stat()
+                with patch.object(m.os, 'fchmod', wraps=os.fchmod) as chmod:
+                    m.prepare_dropin_directory()
+                    chmod.assert_not_called()
+                self.assertEqual(self.directory.stat(), before)
+                self.assertEqual(other.read_bytes(), b'Administrator override sentinel')
+                self.assertEqual(stat.S_IMODE(other.stat().st_mode), 0o600)
+                other.unlink()
+                self.directory.rmdir()
+
+    def test_untrusted_owner_symlink_wrong_type_and_redirected_parent_refused(self):
+        self.directory.mkdir()
+        with patch.object(m.r, 'trusted', side_effect=RuntimeError('unexpected owner')), \
+                patch.object(m.os, 'fchmod', wraps=os.fchmod) as chmod:
+            with self.assertRaisesRegex(RuntimeError, 'unexpected owner'):
+                m.prepare_dropin_directory()
+            chmod.assert_not_called()
+        self.directory.rmdir()
+        target = self.base / 'unrelated'
+        target.mkdir(mode=0o700)
+        self.directory.symlink_to(target, target_is_directory=True)
+        with self.assertRaises(RuntimeError):
+            m.prepare_dropin_directory()
+        self.assertEqual(stat.S_IMODE(target.stat().st_mode), 0o700)
+        self.directory.unlink()
+        self.directory.write_bytes(b'unrelated file')
+        with self.assertRaises(RuntimeError):
+            m.prepare_dropin_directory()
+        self.assertEqual(self.directory.read_bytes(), b'unrelated file')
+        self.directory.unlink()
+        redirected = self.base / 'redirected'
+        redirected.symlink_to(target, target_is_directory=True)
+        with patch.object(m.r, 'DROPIN', redirected / 'fprintd.service.d/90-goodix-5125-runtime.conf'):
+            with self.assertRaisesRegex(RuntimeError, 'redirected parent'):
+                m.prepare_dropin_directory()
+        self.assertFalse((target / 'fprintd.service.d').exists())
+
+    def test_actual_non_root_owner_fails_production_trust_before_any_chmod(self):
+        self.assertNotEqual(os.getuid(), 0, 'This fixture must run without root')
+        self.directory.mkdir(mode=0o700)
+        with patch.object(m.r, 'trusted', side_effect=self.production_trusted), \
+                patch.object(m.os, 'fchmod', wraps=os.fchmod) as chmod:
+            with self.assertRaisesRegex(RuntimeError, 'ownership/type/mode drift'):
+                m.prepare_dropin_directory()
+            chmod.assert_not_called()
+        self.assertEqual(stat.S_IMODE(self.directory.stat().st_mode), 0o700)
+
+    def test_opened_inode_unexpected_owner_or_replacement_is_never_chmodded(self):
+        previous = os.umask(0o077)
+        try:
+            with patch.object(m.os, 'fstat', side_effect=REAL_FSTAT), \
+                    patch.object(m.os, 'fchmod', wraps=os.fchmod) as chmod:
+                with self.assertRaisesRegex(RuntimeError, 'ownership/type/mode drift'):
+                    m.prepare_dropin_directory()
+                chmod.assert_not_called()
+        finally:
+            os.umask(previous)
+        self.assertEqual(stat.S_IMODE(self.directory.stat().st_mode), 0o700)
+        self.directory.rmdir()
+        real_open = os.open
+        def replace_then_open(path, flags, *args, **kwargs):
+            fd = real_open(path, flags, *args, **kwargs)
+            self.directory.rename(self.base / 'original')
+            self.directory.mkdir(mode=0o700)
+            return fd
+        with patch.object(m.os, 'open', side_effect=replace_then_open), \
+                patch.object(m.os, 'fchmod', wraps=os.fchmod) as chmod:
+            with self.assertRaisesRegex(RuntimeError, 'directory changed'):
+                m.prepare_dropin_directory()
+            chmod.assert_not_called()
+        self.assertEqual(stat.S_IMODE(self.directory.stat().st_mode), 0o700)
 
 
 class Installer(unittest.TestCase):
@@ -90,6 +217,7 @@ class Installer(unittest.TestCase):
         self.ctx.enter_context(patch.object(m.builder, 'validate_chicago_sources', return_value={}))
         self.abi_check = self.ctx.enter_context(patch.object(m.builder, 'verify_runtime_abi'))
         self.ctx.enter_context(patch.object(m, 'safe_parent', side_effect=m.r.parents))
+        self.ctx.enter_context(patch.object(m.os, 'fstat', side_effect=root_owned_fstat))
         self.ctx.enter_context(patch.object(m.r, 'trusted', side_effect=self.trusted))
         self.ctx.enter_context(patch.object(m, 'label_materials', side_effect=self.labels))
         self.stdout, self.stderr = io.StringIO(), io.StringIO()

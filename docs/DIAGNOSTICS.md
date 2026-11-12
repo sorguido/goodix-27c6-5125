@@ -79,6 +79,15 @@ Multiple probe results may populate one group. A group with missing required
 evidence must show incomplete/unavailable, even if other probes pass. The overview
 must not collapse partial configuration evidence into “authentication works”.
 
+If the Goodix service configuration cannot be read, `project_dropin_unavailable`
+means configuration access is unavailable, not that the service is broken or
+healthy. New driver installations explicitly make only the newly created,
+verified configuration directory 0755 while retaining umask 0077 elsewhere.
+Existing directories, including earlier root-only 0700 directories and
+administrator overrides, are not chmodded or migrated automatically. An RPM-only
+Manager update makes no active installation change. An inactive/dead on-demand
+fprintd remains an ordinary state, and Sign-in remains partially checked.
+
 ## Profiles, source limits and collection boundaries
 
 | Profile | Entry / essential sources | Extended opt-in and limits |
@@ -95,8 +104,28 @@ select evidence; they do not force collection of unavailable or privileged data.
 Before the first check the dashboard says “No checks have been run yet”. Opening
 the center, selecting a problem or toggling extended details does not collect.
 
+The six static check groups are common context. Event selection is narrower:
+
+| Profile | Event relevance |
+| --- | --- |
+| System | No event history. |
+| Installation/update | Omit biometric outcomes and runtime acquisition/FDT/transport/TLS events. Only separately opted-in selected-service security-denial context is retained. Explicitly state that these sources contain no installation-specific event evidence; dated cached operation evidence remains separate. |
+| Recognition | Observed fprintd outcomes, acquisition, initialization and transport categories; opted-in security-denial context. |
+| Login | Existing bounded fprintd and authentication-service categories, with time order and unknown causal attribution. |
+| Other | Existing bounded union of recognition and authentication context; no new sources. |
+
+Out-of-scope recognized events are counted as omitted, separately from unknown
+messages. Missing or empty history is not a positive diagnostic result. Events
+retain chronological order within their verified boot/time scope.
+
 **Time:** allow current boot, previous boot, last 30 minutes, today, or an explicit
-validated interval of at most 24 hours. “Most recent installation attempt” uses
+validated interval of at most 24 hours. Custom input uses a calendar and local
+hours/minutes, converted internally into timezone-aware timestamps. Nonexistent
+and ambiguous local times at daylight-saving transitions are refused with a
+clear correction message. The backend still enforces start before end, the
+24-hour maximum and the existing future-time tolerance. Changing the selected
+date or time invalidates the old preview; each new collection requires consent.
+“Most recent installation attempt” uses
 only known dated operation evidence, with a five-minute window on each side of
 the observed result time (bounded by the present); this is not the full duration
 of a potentially long installation. The shared pure `installation_reference()`
@@ -191,10 +220,11 @@ justified deviation. DIAG4 tests cover synthetic event ordering, no-match versus
 FDT/acquisition versus transport versus auth, missing/partial history, previous
 boot, overflow, cancellation and recovery without weakening the installer.
 
-Offline results establish parser/UI/software behavior only. Sensor, privileged
-host checks, real Fedora install/update/login/recovery and VM Fedora 45 remain
-unqualified. Stop before RPM packaging and the VM campaign; DIAG5/live acceptance
-remain separate decisions.
+Offline results establish parser/UI/software behavior only. The replacement
+package's sensor, privileged-host and real install/update/login/recovery behavior
+still needs maintainer qualification. Operator observations on the previous
+candidate are separately scoped in [VALIDATION.md](VALIDATION.md). RPM build,
+signature and draft checks are separate from DIAG5/live acceptance.
 
 ### Implemented collector boundary
 
@@ -246,7 +276,13 @@ only, enumerate GetDevices and bind the exact driver device name
 Claim the current user (`Claim('')`), subscribe to VerifyStatus and start
 `VerifyStart('any')`. Every physical outcome, including retry statuses, ends the
 attempt with VerifyStop and Release. A further attempt requires a new click;
-the third ends the session and MATCH prevents further attempts. No enrollment,
+the third ends the session and MATCH prevents further attempts in that session.
+After confirmed safe cleanup, **New test** explicitly resets the session count
+and clears consent without connecting, claiming or starting verification.
+Starting again requires fresh consent and a new Start click. Ambiguous pending
+operations, timeout, disconnection or failed VerifyStop/Release remain blocked;
+leaving and reopening the page does not reset a session or a safety block.
+No enrollment,
 deletion or new pairing protocol is implemented. State that ordinary first use
 may activate the existing qualified pairing path. Cancellation, timeout, late
 Claim replies, errors and application close must release resources; a disconnected
@@ -259,7 +295,13 @@ The GUI/controller boundary is `diagnostics`, a QVariantMap containing `busy`,
 Slots: `run_diagnostics()`,
 `create_diagnostic_report(profile,timeWindow,extended,consent,since,until)`,
 `copy_diagnostic_report()`, `save_diagnostic_report()`,
-`start_reader_test(consent)`, `cancel_reader_test()`.
+`start_reader_test(consent)`, `cancel_reader_test()`, `new_reader_test()`.
 Profile enums are system/install/recognition/login/other (A/B/C/D/E); time enums
 are current/previous/last30/today/custom/installation. Unsupported values fail
 closed. Implementations must enforce consent and busy state below the GUI too.
+
+Home is fitted once from its laid-out visible content, chrome and bottom margin,
+bounded by the available screen height. Later state changes, dialogs and
+Home/Diagnostic Center navigation preserve the geometry, including manual
+resizing. Content that exceeds the viewport remains scrollable; there is no
+continuous height binding, polling or resize animation.

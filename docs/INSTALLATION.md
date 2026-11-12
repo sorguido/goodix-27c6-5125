@@ -68,7 +68,11 @@ Open **Goodix Manager**, select **Remove** and restart if requested. This leaves
 
 ## Need help?
 
-In Goodix Manager 3.1.1, open **Diagnostic Center** for guided system checks or choose **I have a problem** to prepare a focused report. Read the privacy notice before collecting information, review the local preview, then choose whether to copy, save or share it. Reports stay local until you share them. The optional **Test the reader** action requires separate consent and can use an enrolled finger; it stops after a match or at most three attempts.
+In Goodix Manager 3.1.1, open **Diagnostic Center** for guided system checks or choose **I have a problem** to prepare a focused report. Read the privacy notice before collecting information, review the local preview, then choose whether to copy, save or share it. Reports stay local until you share them. Custom periods use a calendar and local hours and minutes; invalid or ambiguous clock-change times must be corrected before collection.
+
+The optional **Test the reader** action requires separate consent and can use an enrolled finger. Each session stops after a match or at most three attempts. **New test** offers a fresh session only after safe cleanup; it clears consent and waits for a new **Start** action. An uncertain timeout or cleanup keeps the test blocked.
+
+If service settings cannot be read, the diagnostic check reports an access limitation, not a proven service failure or success. The directory creation fix applies to new driver installations. Existing restricted or administrator-managed directories are left unchanged; installing the Manager RPM alone does not change an active installation.
 
 Diagnostics do not change the reader's normal operation or repair your system automatically. **Report a bug** opens the [guided bug report form](https://github.com/sorguido/goodix-27c6-5125/issues/new?template=01-bug-report.yml). Share only relevant, reviewed information. Do not share fingerprint images, templates or pairing secrets.
 

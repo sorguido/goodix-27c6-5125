@@ -89,10 +89,11 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(self.transports, [])
         self.assertEqual(self.reader.view['attempts'], 0)
 
-    def test_match_stops_and_releases_then_permanently_blocks(self):
+    def test_match_stops_and_requires_explicit_clean_new_session(self):
         transport = self.begin()
         self.assertEqual(self.reader.view['state'], 'verifying')
         transport.emit('verify-match')
+        self.assertFalse(self.reader.new_test())
         self.clean(transport)
         self.assertEqual(self.reader.view['state'], 'match')
         self.assertFalse(self.reader.start(True))
@@ -101,6 +102,19 @@ class ReaderTests(unittest.TestCase):
                          ['GetDevices', 'Get', 'Claim', 'VerifyStart', 'VerifyStop', 'Release'])
         self.assertEqual(transport.calls[2][3], [''])
         self.assertEqual(transport.calls[3][3], ['any'])
+        self.assertTrue(self.reader.view['canNewTest'])
+        self.assertTrue(self.reader.new_test())
+        self.assertEqual(self.reader.view['attempts'], 0)
+        self.assertEqual(len(self.transports), 1, 'New test must not open a bus')
+        transport.emit('verify-match')
+        self.assertEqual(self.reader.view['state'], 'idle', 'Late prior-session signal must be ignored')
+        self.assertFalse(self.reader.start(False))
+        self.assertEqual(len(self.transports), 1)
+        next_transport = self.begin()
+        self.assertIsNot(next_transport, transport)
+        self.assertEqual(self.reader.view['attempts'], 1)
+        next_transport.emit('verify-match')
+        self.clean(next_transport)
 
     def test_three_explicit_no_matches_never_fourth(self):
         for count in range(1, MAX_ATTEMPTS + 1):
@@ -111,6 +125,48 @@ class ReaderTests(unittest.TestCase):
             self.assertEqual(len(self.transports), count)
         self.assertFalse(self.reader.start(True))
         self.assertFalse(self.reader.view['canStart'])
+        self.assertTrue(self.reader.new_test())
+        self.assertEqual(self.reader.view['attempts'], 0)
+        self.assertEqual(len(self.transports), MAX_ATTEMPTS)
+        self.assertFalse(self.reader.new_test(), 'An idle session must not be reset repeatedly')
+
+    def test_ambiguous_requests_and_failed_cleanup_cannot_reset(self):
+        for phase in ('Claim', 'VerifyStart', 'VerifyStop', 'Release'):
+            with self.subTest(phase=phase):
+                reader = ReaderSession(transport_factory=FakeTransport)
+                self.addCleanup(reader.shutdown)
+                reader.start(True)
+                t = reader.transport
+                t.reply('GetDevices', [[PATH]])
+                t.reply('Get', [TARGET_NAME])
+                if phase != 'Claim':
+                    t.reply('Claim')
+                if phase not in ('Claim', 'VerifyStart'):
+                    t.reply('VerifyStart')
+                    t.emit('verify-match')
+                    if phase == 'Release':
+                        t.reply('VerifyStop')
+                t.reply(phase, error='error')
+                if phase == 'VerifyStart':
+                    t.reply('VerifyStop')
+                    t.reply('Release')
+                self.assertTrue(reader.uncertain)
+                self.assertFalse(reader.view['canNewTest'])
+                self.assertFalse(reader.new_test())
+                self.assertFalse(reader.start(True))
+
+    def test_third_cancel_after_confirmed_stop_release_can_start_new_inert_session(self):
+        for _ in range(MAX_ATTEMPTS):
+            transport = self.begin()
+            self.reader.cancel()
+            self.assertFalse(self.reader.new_test())
+            self.clean(transport)
+        self.assertTrue(self.reader.view['canNewTest'])
+        self.assertTrue(self.reader.new_test())
+        self.assertEqual(self.reader.view['attempts'], 0)
+        self.assertEqual(len(self.transports), MAX_ATTEMPTS)
+        self.assertFalse(self.reader.start(False))
+        self.assertEqual(len(self.transports), MAX_ATTEMPTS)
 
     def test_each_retry_status_ends_attempt_even_when_not_done(self):
         for result in ('verify-retry-scan', 'verify-swipe-too-short',
@@ -166,6 +222,7 @@ class ReaderTests(unittest.TestCase):
         t.reply('Claim')
         self.assertEqual(self.reader.view['state'], 'cancelled')
         self.assertFalse(any(c[2] == 'VerifyStart' for c in t.calls))
+        self.assertFalse(self.reader.new_test(), 'Pending Claim cancellation remains unsafe')
 
     def test_cancel_start_pending_charges_attempt_and_ignores_late_reply(self):
         t = self.begin(started=False)
@@ -175,6 +232,7 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(self.reader.view['state'], 'cancelled')
         self.assertEqual(self.reader.view['attempts'], 1)
         self.assertTrue(t.closed)
+        self.assertFalse(self.reader.new_test(), 'Pending VerifyStart cancellation remains unsafe')
 
     def test_cancel_during_capture_waits_for_cleanup(self):
         t = self.begin()
@@ -221,6 +279,7 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(len(t.calls), calls)
         self.assertTrue(t.closed)
         self.assertFalse(self.reader.start(True))
+        self.assertFalse(self.reader.new_test())
 
     def test_timeout_and_shutdown_close_pending_connections(self):
         t = self.begin(claimed=False)
@@ -229,6 +288,7 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(self.reader.view['state'], 'timeout')
         self.assertTrue(t.closed)
         self.assertFalse(self.reader.start(True))
+        self.assertFalse(self.reader.new_test())
         other = ReaderSession(transport_factory=FakeTransport)
         other.start(True)
         pending = other.transport

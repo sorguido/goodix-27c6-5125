@@ -62,6 +62,49 @@ def artifact_metadata(binary, source):
 
 
 class Metadata(unittest.TestCase):
+    def test_realistic_temporary_draft_urls_are_consistent_and_never_public(self):
+        data = fixture()
+        data.update(draft=True, published_at=None)
+        temporary = 'untagged-9e008443590cf1a75c55'
+        data['html_url'] = v.REPOSITORY + '/releases/tag/' + temporary
+        for asset in data['assets']:
+            asset['browser_download_url'] = v.REPOSITORY + '/releases/download/' + temporary + '/' + asset['name']
+        self.assertEqual(v.release_assets(data, 'draft')[:2], ('3.0.1', '1'))
+        public = copy.deepcopy(data)
+        public['draft'] = False
+        with self.assertRaisesRegex(ValueError, 'untrusted release URL'):
+            v.release_assets(public, 'public')
+        public['html_url'] = FIXTURE['html_url']
+        with self.assertRaisesRegex(ValueError, 'untrusted download URL'):
+            v.release_assets(public, 'public')
+        for field, value in (('published_at', '2026-11-12T12:00:00Z'),
+                             ('html_url', None),
+                             ('html_url', data['html_url'] + '?redirect=1'),
+                             ('html_url', data['html_url'] + '#fragment'),
+                             ('html_url', data['html_url'].replace('github.com/', 'github.com.evil.invalid/')),
+                             ('html_url', data['html_url'].replace('/sorguido/', '/foreign/')),
+                             ('html_url', data['html_url'].replace(temporary, 'untagged-../v3.0.1')),
+                             ('html_url', data['html_url'].replace(temporary, 'untagged-%2f' + '0' * 20)),
+                             ('html_url', data['html_url'].replace(temporary, 'untagged-' + '0' * 19))):
+            with self.subTest(field=field, value=value):
+                bad = copy.deepcopy(data)
+                bad[field] = value
+                with self.assertRaises(ValueError):
+                    v.release_assets(bad, 'draft')
+        for index in (0, 1):
+            for url in (data['assets'][index]['browser_download_url'].replace(temporary, 'untagged-' + '0' * 20),
+                        data['assets'][index]['browser_download_url'].replace(temporary, 'v3.0.1'),
+                        data['assets'][index]['browser_download_url'] + '?redirect=1',
+                        data['assets'][index]['browser_download_url'] + '#fragment',
+                        data['assets'][index]['browser_download_url'].replace('/download/', '/download/%2f'),
+                        data['assets'][index]['browser_download_url'].replace('github.com/', 'evil.invalid/'),
+                        data['assets'][index]['browser_download_url'].replace('/sorguido/', '/foreign/')):
+                with self.subTest(index=index, url=url):
+                    bad = copy.deepcopy(data)
+                    bad['assets'][index]['browser_download_url'] = url
+                    with self.assertRaises(ValueError):
+                        v.release_assets(bad, 'draft')
+
     def test_draft_readiness_distinct_from_public(self):
         data = fixture()
         self.assertEqual(v.release_assets(data, 'public')[:2], ('3.0.1', '1'))

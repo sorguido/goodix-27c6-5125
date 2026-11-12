@@ -41,8 +41,9 @@ An incompatible ABI or unresolved dependency stops before service/file changes.
 **The 3.0.0 RPM requires Fedora 44. Install 3.0.1 on Fedora 44 before upgrading
 to Fedora 45 or later.** No driver uninstall is needed. Version 3.1.1 is being
 prepared as an unpublished draft and is not publicly downloadable until publication.
-It adds the Diagnostic Center; real-device and Fedora 45 qualification for this
-revision remain pending. See the [3.1.1 release notes](../../docs/RELEASE_NOTES_3.1.1.md).
+It adds the Diagnostic Center; the replacement package still needs maintainer
+retesting. Operator observations on the previous candidate are recorded separately
+in [validation](../../docs/VALIDATION.md). See the [3.1.1 release notes](../../docs/RELEASE_NOTES_3.1.1.md).
 See the [3.0.1 evidence and remaining limits](../../docs/VALIDATION_3.0.1.md).
 
 **Remove** performs the ordinary `goodix-uninstall` operation with the original
@@ -206,6 +207,13 @@ metadata, and signatures from the approved personal certificate. `--mode public`
 checks a saved published-release response instead. Both modes check local
 evidence only: they neither publish nor prove GitHub availability. Do not publish
 a candidate that fails the gate.
+
+Private GitHub drafts can use a temporary `untagged-…` URL even when the product
+tag already exists. Draft mode accepts only the official repository and an exact
+matching temporary token across the release and both asset URLs, with no
+publication time. Public mode continues to require the versioned tag URLs.
+Save the authentic API response unchanged. Remote tag/source correspondence and
+authenticated download identity must also be checked before declaring readiness.
 
 Release regression tests use saved, fictional release responses and isolated
 test packages. Their private artifacts are **TEST ONLY / NEVER PUBLISH** and

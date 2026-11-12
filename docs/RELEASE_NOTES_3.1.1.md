@@ -10,14 +10,22 @@ and prepare useful information when something goes wrong.
 - Improved icons make the checks and actions easier to recognize.
 - **Report a bug** opens the guided GitHub bug report form.
 
+This candidate also improves everyday diagnostics:
+
+- Start a **New test** after a safely completed reader-test session, with fresh consent.
+- Choose a custom period using a calendar and local hours and minutes.
+- Get reports focused on the selected problem, with clear messages when useful evidence is missing.
+- Open Home at a height suited to its content, while keeping your manual window size during use.
+- See clearer messages when system settings cannot be read; new installations create the service settings folder with the intended access.
+
 Diagnostics do not change the reader's normal operation. Reports stay local until
 you choose to share them. The Manager does not repair your system automatically
 or guarantee a successful fingerprint sign-in.
 
-This is an unpublished draft prepared for maintainer evaluation. The build
+This is an unpublished draft prepared for maintainer retesting. The build
 baseline is Fedora 44 x86_64. Offline checks do not establish real-device,
-installation, login or Fedora 45 qualification for this revision. Earlier-version
-functional observations remain separate; see [validation](VALIDATION.md).
+installation, login or Fedora 45 qualification for this replacement package.
+Earlier candidate observations remain separate; see [validation](VALIDATION.md).
 
 When a release is published, use the signed RPM and follow the
 [installation and signature-verification guide](INSTALLATION.md). Installing the

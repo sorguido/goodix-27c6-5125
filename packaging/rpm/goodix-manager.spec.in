@@ -45,6 +45,7 @@ export LC_ALL=C.UTF-8
 /usr/bin/python3 -I -B packaging/rpm/test_stage.py
 /usr/bin/python3 -I -B packaging/rpm/test_helper.py
 /usr/bin/python3 -I -B packaging/rpm/test_compat_transactions.py
+/usr/bin/python3 -I -B deployment/test_install.py
 /usr/bin/python3 -I -B packaging/rpm/manager/test_model.py
 /usr/bin/python3 -I -B packaging/rpm/manager/test_network_ui.py
 /usr/bin/python3 -I -B packaging/rpm/manager/test_qml_cache.py
@@ -54,6 +55,7 @@ export LC_ALL=C.UTF-8
 /usr/bin/python3 -I -B packaging/rpm/test_verify_release.py Metadata PayloadMetadata
 /usr/bin/python3 -I -B packaging/rpm/manager/test_ui.py
 /usr/bin/python3 -I -B packaging/rpm/manager/test_ui.py --initial-palette dark
+/usr/bin/python3 -I -B packaging/rpm/manager/test_ui.py --geometry
 desktop-file-validate %{buildroot}%{_datadir}/applications/io.github.sorguido.GoodixManager.desktop
 
 %files

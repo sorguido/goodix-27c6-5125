@@ -56,7 +56,19 @@ def release_assets(data, mode):
     require(isinstance(tag, str) and len(tag) <= 49
             and re.fullmatch('v' + VERSION, tag), 'missing or invalid stable version tag')
     version = tag[1:]
-    require(data.get('html_url') == REPOSITORY + '/releases/tag/' + tag,
+    # GitHub drafts can retain a temporary URL even when their product tag
+    # already exists. Only that exact official-repository token may be reused
+    # by the assets; the published-release URL contract remains unchanged.
+    download_ref = tag
+    if mode == 'draft':
+        require(data.get('published_at') is None, 'draft has a publication time')
+        url = data.get('html_url')
+        temporary = (re.fullmatch(re.escape(REPOSITORY + '/releases/tag/')
+                                  + r'(untagged-[0-9a-f]{20})', url)
+                     if isinstance(url, str) else None)
+        if temporary:
+            download_ref = temporary[1]
+    require(data.get('html_url') == REPOSITORY + '/releases/tag/' + download_ref,
             'untrusted release URL')
     assets = data.get('assets')
     require(isinstance(assets, list) and len(assets) <= 128, 'invalid asset list')
@@ -87,7 +99,7 @@ def release_assets(data, mode):
                 and re.fullmatch(r'sha256:[0-9a-f]{64}', asset['digest']),
                 'missing or invalid asset SHA-256 digest')
         require(asset.get('browser_download_url') == REPOSITORY + '/releases/download/'
-                + tag + '/' + asset['name'], 'untrusted download URL')
+                + download_ref + '/' + asset['name'], 'untrusted download URL')
     revision = binary['name'].removeprefix('goodix-manager-' + version + '-').split('.')[0]
     return version, revision, binary, source
 

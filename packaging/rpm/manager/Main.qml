@@ -8,9 +8,31 @@ Kirigami.ApplicationWindow {
     id: window
     title: "Goodix Manager"
     width: 840
-    height: 780
+    height: 480
+    visible: initialHomeFitDone
     minimumWidth: 520
-    minimumHeight: 560
+    readonly property real homeScreenLimit: Math.max(1, backend.availableScreenHeight - 48)
+    minimumHeight: Math.min(480, homeScreenLimit)
+    property bool initialHomeFitDone: false
+    readonly property real homeContentHeight: homeContent ? homeContent.implicitHeight : 0
+    readonly property real homeChromeHeight: page ? Math.max(0, height - page.height) + page.topPadding + page.bottomPadding : 0
+    readonly property real homeBottomMargin: Kirigami.Units.largeSpacing * 2
+    // Fit once after the initial layout. Later status, navigation and user
+    // resizing retain this geometry; overflowing content remains scrollable.
+    function fitInitialHome() {
+        if (initialHomeFitDone || !homeContent || homeContent.implicitHeight <= 0) return
+        function polish(item) {
+            item.ensurePolished()
+            for (const child of item.children) polish(child)
+            item.ensurePolished()
+        }
+        // Hidden nested layouts must resolve wrapping before the first show.
+        polish(homeContent)
+        height = Math.max(minimumHeight, Math.min(homeScreenLimit,
+                         Math.ceil(homeContent.implicitHeight + homeChromeHeight + homeBottomMargin)))
+        initialHomeFitDone = true
+    }
+    Component.onCompleted: Qt.callLater(fitInitialHome)
     pageStack.defaultColumnWidth: width
     property var info: backend.view
     property string requestedAction: ""
@@ -98,12 +120,15 @@ Kirigami.ApplicationWindow {
     }
     pageStack.initialPage: Kirigami.ScrollablePage {
         id: page
+        objectName: "managerHome"
         title: "Goodix Manager"
         Kirigami.Theme.inherit: false
         Kirigami.Theme.backgroundColor: window.surfaceColor
         Kirigami.Theme.textColor: window.inkColor
         background: Rectangle { color: window.surfaceColor }
         ColumnLayout {
+            id: homeContent
+            objectName: "managerHomeContent"
             spacing: Kirigami.Units.largeSpacing * 2
             width: page.width - Kirigami.Units.largeSpacing * 4
             RowLayout {
@@ -261,6 +286,7 @@ Kirigami.ApplicationWindow {
                 }
             }
             Controls.Label {
+                objectName: "managerHomeNotice"
                 text: "Installing the Manager package does not activate the driver. Removing the driver keeps this app available. Password login and recovery remain essential."
                 wrapMode: Text.WordWrap
                 opacity: 0.7

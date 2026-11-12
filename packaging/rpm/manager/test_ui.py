@@ -2,20 +2,25 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Render Qt system palettes in-process; no host theme, network or privilege changes."""
 import argparse
+import json
+import math
 import os
 from pathlib import Path
 import sys
+from types import SimpleNamespace
+from unittest.mock import patch
 
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from main import Controller, load_interface
 from model import Status
-from PySide6.QtCore import QObject, QMetaObject, QPointF, QRect, QSize, QTimer, qInstallMessageHandler
+from PySide6.QtCore import QCoreApplication, QEvent, QObject, QMetaObject, QPointF, QRect, QSize, QTimer, qInstallMessageHandler
 from PySide6.QtGui import QColor, QPalette
-from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtQml import QQmlApplicationEngine, QQmlEngine, QQmlExpression
 from PySide6.QtQuick import QQuickWindow
 from PySide6.QtQuickControls2 import QQuickStyle
 from PySide6.QtWidgets import QApplication
+from PySide6.QtTest import QTest
 
 
 def system_palette(dark):
@@ -54,10 +59,119 @@ def contrast(first, second):
     return (second + 0.05) / (first + 0.05)
 
 
+def geometry_checks(app, args):
+    """First show uses real 3.1.1 content; later operations retain geometry."""
+    import main as manager
+    font = app.font()
+    font.setPointSizeF(font.pointSizeF() * args.font_scale)
+    app.setFont(font)
+    records = []
+    for name, state, remote in (('absent', 'absent', 'unavailable'),
+                                ('installed', 'installed', 'current'),
+                                ('update', 'installed', 'available')):
+        with patch.object(Path, 'read_text', side_effect=FileNotFoundError):
+            backend = Controller()
+        backend.status = Status.parse({'schema': 1, 'state': state, 'runtime_version': '3.1.1' if state == 'installed' else None,
+            'payload_version': '3.1.1', 'package_version': '3.1.1-3.fc44', 'sensor_present': None,
+            'message_code': 'up_to_date' if state == 'installed' else 'not_installed'})
+        backend.notice = 'The installed driver matches the local payload.' if state == 'installed' else 'The driver has not been activated.'
+        backend.public_status = lambda: (remote, 'A new public package is available.' if remote == 'available' else 'No compatible public update is available.')
+        backend.release = SimpleNamespace(package_version='3.1.2-1.fc44')
+        backend.remote_state = remote
+        engine = QQmlApplicationEngine()
+        engine.addImportPath('/usr/lib64/qt6/qml')
+        engine.rootContext().setContextProperty('backend', backend)
+        load_interface(engine)
+        window = engine.rootObjects()[0]
+        changes = []
+        window.heightChanged.connect(lambda: changes.append(window.height()))
+        QTest.qWait(250)
+        assert window.property('initialHomeFitDone') and window.isVisible()
+        content = window.property('homeContentHeight')
+        chrome = window.property('homeChromeHeight')
+        maximum = window.property('homeScreenLimit')
+        assert maximum <= app.primaryScreen().availableGeometry().height() - 24
+        desired = math.ceil(content + chrome + window.property('homeBottomMargin'))
+        expected = max(window.minimumHeight(), min(maximum, desired))
+        assert abs(window.height() - expected) <= 2, (name, window.height(), expected, content, chrome)
+        notice = window.findChild(QObject, 'managerHomeNotice')
+        gap = window.height() - notice.mapToScene(QPointF(0, notice.height())).y()
+        if desired <= maximum:
+            assert 12 <= gap <= 72, (name, gap)
+        home = window.findChild(QObject, 'managerHome')
+        record = {'state': name, 'initial_height': window.height(), 'content_height': content,
+                  'chrome_height': chrome, 'bottom_gap': gap, 'screen_limit': maximum,
+                  'initial_height_changes': list(changes), 'font_scale': args.font_scale}
+        if args.render_dir:
+            args.render_dir.mkdir(parents=True, exist_ok=True)
+            assert window.grabWindow().save(str(args.render_dir / ('home-initial-' + name + '.png')))
+        window.setWidth(560)
+        window.setHeight(max(window.minimumHeight(), window.height() - 80))
+        QTest.qWait(150)
+        manual = window.height()
+        changes.clear()
+        backend.notice = 'A changing status with more detail. ' * 5
+        backend.changed.emit()
+        QTest.qWait(150)
+        assert window.height() == manual
+        window.setProperty('requestedAction', 'update')
+        dialog = next(item for item in window.findChildren(QObject) if item.property('title') == 'Apply the local update?')
+        QMetaObject.invokeMethod(dialog, 'open')
+        QTest.qWait(100)
+        assert window.height() == manual
+        QMetaObject.invokeMethod(dialog, 'close')
+        for _ in range(3):
+            QMetaObject.invokeMethod(window.findChild(QObject, 'openDiagnosticCenter'), 'clicked')
+            QTest.qWait(150)
+            page = window.findChild(QObject, 'diagnosticPage')
+            assert page is not None and window.height() == manual
+            expression = QQmlExpression(QQmlEngine.contextForObject(page), page, 'showScreen("checks"); undefined')
+            expression.evaluate()
+            assert not expression.hasError(), expression.error().toString()
+            with patch.object(manager.diagnostic_tools, 'collect_checks', return_value={'checks': [], 'overview': 'Synthetic collection complete', 'generatedAt': ''}):
+                backend.run_diagnostics()
+                for _wait in range(100):
+                    QTest.qWait(10)
+                    if not backend.diagnostics['busy']:
+                        break
+                assert not backend.diagnostics['busy']
+            expression = QQmlExpression(QQmlEngine.contextForObject(window), window, 'void pageStack.pop()')
+            expression.evaluate()
+            assert not expression.hasError(), expression.error().toString()
+            for _wait in range(300):
+                QTest.qWait(10)
+                if window.findChild(QObject, 'diagnosticPage') is None:
+                    break
+            assert window.findChild(QObject, 'diagnosticPage') is None, 'Removed diagnostic page must be destroyed'
+            assert window.height() == manual
+        assert not changes, changes
+        expression = QQmlExpression(QQmlEngine.contextForObject(home), home, 'flickable.contentHeight > flickable.height')
+        overflowing, _undefined = expression.evaluate()
+        assert not expression.hasError() and overflowing, 'Small window must scroll overflowing content'
+        record['manual_height_preserved'] = manual
+        records.append(record)
+        window.hide()
+        expression = QQmlExpression(QQmlEngine.contextForObject(window), window, 'void pageStack.clear()')
+        expression.evaluate()
+        assert not expression.hasError(), expression.error().toString()
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        window.deleteLater()
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        engine.deleteLater()
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        backend.shutdown()
+        backend.deleteLater()
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    print('PASS_GEOMETRY ' + json.dumps(records, sort_keys=True))
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--render-dir', type=Path)
     parser.add_argument('--initial-palette', choices=('light', 'dark'), default='light')
+    parser.add_argument('--geometry', action='store_true')
+    parser.add_argument('--font-scale', type=float, default=1.0)
     args = parser.parse_args()
     Controller.refresh = lambda self: None
     Controller.check_releases = lambda self: None
@@ -65,6 +179,8 @@ def main():
     QQuickStyle.setStyle('Fusion')
     app = QApplication([])
     app.setPalette(system_palette(args.initial_palette == 'dark'))
+    if args.geometry:
+        return geometry_checks(app, args)
     backend = Controller()
     backend.status = Status.parse({'schema': 1, 'state': 'installed', 'runtime_version': '3.0.0',
                                    'payload_version': '3.1.0', 'package_version': '3.1.0-1.fc44',

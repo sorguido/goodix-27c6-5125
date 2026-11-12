@@ -213,6 +213,45 @@ def restore_selinux_module(was_present):
         r.remove_selinux_module()
 
 
+def prepare_dropin_directory():
+    """Only a newly created, verified configuration directory becomes 0755.
+
+    The helper deliberately keeps umask 0077. Existing administrator directories
+    (including earlier 0700 installations) are checked and left untouched.
+    """
+    directory = r.DROPIN.parent
+    safe_parent(directory)
+    created = False
+    try:
+        directory.mkdir(mode=0o755)
+        created = True
+    except FileExistsError:
+        pass
+    r.trusted(directory, directory=True)
+    fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        info = os.fstat(fd)
+        current = directory.lstat()
+        require(stat.S_ISDIR(info.st_mode) and (info.st_uid, info.st_gid) == (0, 0)
+                and not info.st_mode & 0o022, 'service configuration directory ownership/type/mode drift')
+        require((info.st_dev, info.st_ino) ==
+                (current.st_dev, current.st_ino), 'service configuration directory changed')
+        if created:
+            os.fchmod(fd, 0o755)
+        info = os.fstat(fd)
+        r.trusted(directory, directory=True)
+        current = directory.lstat()
+        require((info.st_uid, info.st_gid) == (0, 0) and
+                (info.st_dev, info.st_ino, info.st_mode) ==
+                (current.st_dev, current.st_ino, current.st_mode),
+                'service configuration directory changed')
+        if created:
+            require(stat.S_IMODE(info.st_mode) == 0o755,
+                    'new service configuration directory is not readable')
+    finally:
+        os.close(fd)
+
+
 def install_runtime(payload, manifest, rule_preexisting, legacy_present):
     provenance = json.loads((payload / 'runtime/build-provenance.json').read_bytes())
     version = provenance.get('version')
@@ -245,7 +284,7 @@ def install_runtime(payload, manifest, rule_preexisting, legacy_present):
         'material_mode': 'legacy-and-state-v2' if legacy_present else 'state-v2',
         'state_root': str(r.STATE)})
     command('restorecon', '-RF', str(r.RUNTIME))
-    r.DROPIN.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+    prepare_dropin_directory()
     write_file(r.DROPIN, r.DROPIN_BYTES)
     command('restorecon', '-F', str(r.DROPIN))
 

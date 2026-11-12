@@ -139,7 +139,7 @@ class QtFprintTransport(QObject):
 
 
 class ReaderSession(QObject):
-    """One physical outcome per click, at most three per Controller lifetime."""
+    """One physical outcome per click, at most three per explicit session."""
     changed = Signal()
 
     def __init__(self, parent=None, *, transport_factory=None):
@@ -151,6 +151,8 @@ class ReaderSession(QObject):
         self.message = 'Ready for an explicit reader test. No test has been run.'
         self.busy = False
         self.blocked = False
+        self.uncertain = False
+        self.restart_ready = False
         self.phase = 'idle'
         self.epoch = 0
         self.path = None
@@ -165,7 +167,23 @@ class ReaderSession(QObject):
     def view(self):
         return {'busy': self.busy, 'state': self.state, 'message': self.message,
                 'attempts': self.attempts,
-                'canStart': not self.busy and not self.blocked and self.attempts < MAX_ATTEMPTS}
+                'canStart': not self.busy and not self.blocked and self.attempts < MAX_ATTEMPTS,
+                'canNewTest': not self.busy and not self.uncertain and self.restart_ready}
+
+    def new_test(self):
+        """Reset only a safely completed session; never create a connection."""
+        if not self.view['canNewTest']:
+            return False
+        self.epoch += 1
+        self.attempts = 0
+        self.blocked = self.restart_ready = False
+        self.outcome = 'error'
+        self._set('idle', 'Ready for a new test. Give consent and select Start when you are ready.')
+        return True
+
+    def _block_uncertain(self):
+        self.blocked = self.uncertain = True
+        self.restart_ready = False
 
     def _set(self, state, message):
         self.state, self.message = state, message
@@ -178,6 +196,7 @@ class ReaderSession(QObject):
             self._set('consent_required', 'Confirm the reader test and possible first-use pairing before starting.')
             return False
         self.busy = True
+        self.restart_ready = False
         self.epoch += 1
         self.path = None
         self.claimed = self.started = False
@@ -198,7 +217,7 @@ class ReaderSession(QObject):
             if epoch != self.epoch or not self.busy or phase != self.phase:
                 return
             if error in {'timeout', 'disconnected'}:
-                self.blocked = True
+                self._block_uncertain()
                 self._finish(error, 'The reader connection was lost or timed out. No further test will be started.')
                 return
             callback(error, values)
@@ -206,7 +225,7 @@ class ReaderSession(QObject):
         try:
             self.transport.call(path, interface, method, arguments, reply)
         except Exception:
-            self.blocked = True
+            self._block_uncertain()
             self._finish('error', 'The reader request could not be completed safely.')
 
     def _devices(self, error, values):
@@ -254,10 +273,12 @@ class ReaderSession(QObject):
 
     def _claim(self, error, values):
         if error:
+            if error not in {'permission_denied', 'in_use', 'no_device', 'no_prints'}:
+                self._block_uncertain()
             self._fail(error)
             return
         if values:
-            self.blocked = True
+            self._block_uncertain()
             self._finish('error', 'The reader claim could not be confirmed safely.')
             return
         self.claimed = True
@@ -272,11 +293,15 @@ class ReaderSession(QObject):
     def _started(self, error, values):
         if error:
             self.outcome = error
+            if error not in {'permission_denied', 'in_use', 'no_device', 'no_prints'}:
+                self._block_uncertain()
+                self._stop()
+                return
             self.started = False
             self._release()
             return
         if values:
-            self.blocked = True
+            self._block_uncertain()
             self.outcome = 'error'
             self._stop()
             return
@@ -288,7 +313,7 @@ class ReaderSession(QObject):
             return
         if result == 'verify-disconnected':
             # fprintd explicitly forbids further device calls after this status.
-            self.blocked = True
+            self._block_uncertain()
             self._finish('disconnected', 'The reader disconnected. No further test will be started.')
             return
         if result == 'verify-match':
@@ -300,7 +325,7 @@ class ReaderSession(QObject):
             self.outcome = 'retry'
         else:
             self.outcome = 'error'
-            self.blocked = True
+            self._block_uncertain()
         self._stop()
 
     def _stop(self):
@@ -309,7 +334,7 @@ class ReaderSession(QObject):
 
         def stopped(error, values):
             if error or values:
-                self.blocked = True
+                self._block_uncertain()
                 self._finish('cleanup_error', 'Reader cleanup could not be confirmed. The connection was closed; no further test will be started.')
                 return
             self.started = False
@@ -322,10 +347,13 @@ class ReaderSession(QObject):
 
         def released(error, values):
             if error or values:
-                self.blocked = True
+                self._block_uncertain()
                 self._finish('cleanup_error', 'Reader release could not be confirmed. The connection was closed; no further test will be started.')
                 return
             self.claimed = False
+            self.restart_ready = (not self.uncertain and
+                                  (self.outcome == 'match' or
+                                   (self.attempts >= MAX_ATTEMPTS and self.outcome in {'no_match', 'retry', 'cancelled'})))
             messages = {
                 'match': 'Fingerprint matched. This does not guarantee a future login; testing is complete.',
                 'no_match': 'The scan completed without a match. A new attempt requires your explicit action.',
@@ -354,13 +382,19 @@ class ReaderSession(QObject):
         self.timer.stop()
         self.epoch += 1
         if self.transport is not None:
-            self.transport.close()
+            try:
+                self.transport.close()
+            except Exception:
+                self._block_uncertain()
+                state, message = 'cleanup_error', 'The reader connection could not be closed safely. Restarting this test is unavailable.'
             if isinstance(self.transport, QObject):
                 self.transport.deleteLater()
             self.transport = None
         self.claimed = self.started = False
         self.busy = False
         self.phase = 'idle'
+        if self.uncertain:
+            message += ' A new test is unavailable because the reader state is uncertain.'
         self._set(state, message)
 
     def cancel(self):
@@ -373,15 +407,15 @@ class ReaderSession(QObject):
             # A pending Claim/VerifyStart is ambiguous: sever its dedicated
             # connection rather than sending a racing Release or replaying it.
             if self.phase in {'claiming', 'starting'}:
-                self.blocked = True
+                self._block_uncertain()
             self._finish('cancelled', 'The reader test was cancelled; its private connection was closed.')
 
     def timeout(self):
         if self.busy:
-            self.blocked = True
+            self._block_uncertain()
             self._finish('timeout', 'The reader test timed out. Its connection was closed; no further test will be started.')
 
     def shutdown(self):
-        self.blocked = True
+        self._block_uncertain()
         if self.busy:
             self._finish('cancelled', 'The reader connection was closed on application exit.')

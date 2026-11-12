@@ -4,8 +4,8 @@
   "project": "Goodix 27c6:5125 — Goodix Manager diagnostics",
   "branch": "diagnostic",
   "execution_path": "PRIMARY",
-  "phase": "DRAFT_RELEASE_3_1_1_VERIFICATION",
-  "phase_status": "HUMAN_REQUIRED_DRAFT_NOT_READY_URL_CONTRACT",
+  "phase": "DRAFT_RELEASE_3_1_1_CORRECTIVE",
+  "phase_status": "SOURCE_REVIEW_ACCEPTED_PENDING_SIGNED_REBUILD",
   "primary_artifact": "docs/DIAGNOSTICS_VALIDATION.md",
   "completed_gates": [
     "DIAG0_DESIDERATA_RECORDED",
@@ -29,8 +29,9 @@
     "DRAFT_3_1_1_TAG_AND_AUTHENTICATED_ASSET_CORRESPONDENCE"
   ],
   "pending_gates": [
-    "DRAFT_METADATA_URL_CONTRACT_DECISION",
-    "FEDORA45_VM_AUTHORIZATION",
+    "FIVE_FIXES_SOURCE_REVIEW",
+    "SIGNED_REBUILD_AND_SOURCE_ARCHIVE",
+    "SAME_DRAFT_ASSET_REPLACEMENT_AND_TAG_POSTFLIGHT",
     "DIAG4_REAL_TARGET_QUALIFICATION",
     "DIAG5_ACCEPTANCE",
     "MAINTAINER_EVALUATION_BEFORE_PUBLICATION"
@@ -72,7 +73,7 @@
   "relevant_corroborations": [
     "C4"
   ],
-  "next_action": "STOP with draft v3.1.1 unpublished. Canonical verifier rejects real GitHub untagged draft URLs. A specific decision and review of that trust contract are required before readiness; do not normalize JSON, publish to bypass, retag, merge or alter signed source. Installation/live/Fedora45 remain unauthorized and unqualified.",
+  "next_action": "Build/sign complete new3.1.1-3.fc44 pair from reviewed source on Fedora44; verify archive/source/package/signatures before tag lease and existing-draft asset replacement. Old2 remains intact; no publication or live tests authorized.",
   "last_verified_head": "4060c7a55fa08d1d868e5ed63906ac9d360e5a4b",
   "observed_remote_base_head": "4bc1f308071768b4f8045e58b4d12937bfa8ada2",
   "documentation_only": false,
@@ -233,5 +234,35 @@
     },
     "failed_build_preserved": "development/rpm/builds/3.1.1-1.fc44/",
     "final_report": "development/rpm/release-v3.1.1/FINAL_REPORT.md"
+  },
+  "draft_corrective_authorization": {
+    "product_version": "3.1.1",
+    "tag": "v3.1.1",
+    "existing_release_id": 442694338,
+    "old_tag_commit": "4060c7a55fa08d1d868e5ed63906ac9d360e5a4b",
+    "controlled_tag_realign": true,
+    "replace_old_assets_after_new_pair_verified": true,
+    "publication_authorized": false,
+    "install_and_live_authorized": false,
+    "old_build_preserved": "development/rpm/builds/3.1.1-2.fc44/",
+    "evidence_directory": "development/rpm/corrective-v3.1.1/",
+    "candidate_revision": 3,
+    "source_review": "ACCEPT_AND_CONTINUE_A_B_C_D_E_AND_DRAFT_VERIFIER",
+    "offline_cases_pass": 344,
+    "native_cases_pending_canonical_build": 2,
+    "gui_source_evidence": "development/rpm/corrective-v3.1.1/gui-results.json",
+    "backend_source_evidence": "development/rpm/corrective-v3.1.1/backend-results.json"
+  },
+  "operator_reported_3_1_1_2": {
+    "source": "CURRENT_USER_CORRECTIVE_PROMPT",
+    "environment": "one clean Fedora45 KDE VM, Goodix27c6:5125",
+    "results": {
+      "installation": "PASS_OPERATOR_REPORTED",
+      "enrollment": "PASS_OPERATOR_REPORTED",
+      "fingerprint_verification": "PASS_OPERATOR_REPORTED",
+      "sudo": "PASS_OPERATOR_REPORTED",
+      "cold_login": "PASS_OPERATOR_REPORTED"
+    },
+    "limits": "Not Codex-executed tests; not qualification of replacement candidate or other firmware/machines/scenarios."
   }
 }

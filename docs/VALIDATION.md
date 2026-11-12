@@ -1,7 +1,23 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Validation scope and known limitations
 
-Version **3.1.1** adds the Diagnostic Center. Its [offline diagnostic evidence](DIAGNOSTICS_VALIDATION.md) covers synthetic software and GUI contracts, not real-device, installation, login or Fedora 45 qualification for this revision. Release preparation and build/signature verification are separate from live acceptance. See the [3.1.1 release notes](RELEASE_NOTES_3.1.1.md).
+Version **3.1.1** adds the Diagnostic Center. Its [offline diagnostic evidence](DIAGNOSTICS_VALIDATION.md) covers synthetic software and GUI contracts. The replacement candidate requires fresh maintainer testing; release preparation and build/signature verification are separate from live acceptance. See the [3.1.1 release notes](RELEASE_NOTES_3.1.1.md).
+
+## Operator observations on the previous 3.1.1 candidate
+
+The maintainer reports successful installation, fingerprint enrollment and
+verification, sudo and cold login with **3.1.1-2.fc44** on one clean Fedora 45 KDE
+VM using a Goodix USB `27c6:5125`. These are operator observations, not tests
+performed by Codex, and do not qualify the replacement package, other machines,
+firmware revisions or additional authentication/recovery scenarios.
+
+That candidate also exposed an unreadable service configuration directory,
+reader tests that could not start a fresh session, difficult custom time input,
+unfocused event reports and a request to improve Home sizing. The Home screenshot
+showed the older 3.0.1 interface; measurements of the actual 3.1.1 layout are
+required. The corrected candidate needs a new Fedora 45 check of these flows.
+An inactive on-demand service is not itself a failure, and partial sign-in
+configuration checks remain partial regardless of successful login observations.
 
 The [3.0.1 validation record](VALIDATION_3.0.1.md) separately tracks historical
 packaging checks, operator-reported Fedora 44/45 tests and remaining limits.
