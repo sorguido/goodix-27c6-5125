@@ -5,8 +5,8 @@
   "branch": "diagnostic",
   "execution_path": "PRIMARY",
   "phase": "DRAFT_RELEASE_3_1_1_DROPIN_PERMISSIONS",
-  "phase_status": "SOURCE_REVIEW_ACCEPTED_PENDING_SIGNED_BUILD4",
-  "primary_artifact": "development/rpm/corrective-v3.1.1/FINAL_REPORT.md",
+  "phase_status": "DRAFT_ONLY_MAINTAINER_FEDORA45_RETEST_REQUIRED",
+  "primary_artifact": "development/rpm/dropin-0755-v3.1.1/FINAL_REPORT.md",
   "completed_gates": [
     "DIAG0_DESIDERATA_RECORDED",
     "DIAG0_LOCAL_ARTIFACT_VERIFICATION",
@@ -32,11 +32,13 @@
     "CORRECTIVE_3_1_1_CONTROLLED_TAG_LEASE",
     "CORRECTIVE_3_1_1_NEW_PAIR_VERIFIED_BEFORE_OLD_DELETE",
     "CORRECTIVE_3_1_1_REAL_METADATA_CANONICAL_GATE",
-    "CORRECTIVE_3_1_1_INDEPENDENT_FINAL_REVIEW"
+    "CORRECTIVE_3_1_1_INDEPENDENT_FINAL_REVIEW",
+    "DROPIN4_MINIMAL_SOURCE_REVIEW",
+    "DROPIN4_CANONICAL_BUILD_AND_SIGNATURES",
+    "DROPIN4_NEW_DOWNLOADS_VERIFIED_BEFORE_OLD_DELETE",
+    "DROPIN4_SAME_DRAFT_FINAL_GATE_AND_REVIEW"
   ],
   "pending_gates": [
-    "SIGNED_REBUILD4_AND_SOURCE",
-    "SAME_DRAFT_REPLACEMENT4_POSTFLIGHT",
     "MAINTAINER_FEDORA45_RETEST_NEW_4",
     "DIAG4_REAL_TARGET_QUALIFICATION",
     "DIAG5_ACCEPTANCE",
@@ -79,8 +81,8 @@
   "relevant_corroborations": [
     "C4"
   ],
-  "next_action": "Qualify minimal unconditional0755 FD normalization, build/sign first free revision4 on Fedora44, lease-update v3.1.1 and replace old3 pair in same draft442694338 only after new authenticated downloads verified. No publish, merge, forced runtime update or live tests authorized.",
-  "last_verified_head": "1eb2fabc22808c59dcc4f06e15cb9d1c9c3e4ddf",
+  "next_action": "STOP with same draft442694338 updated to signed4 and unpublished. Maintainer must retest ordinary3.0.1→3.1.1 Apply Update on Fedora45. RPM-only does not normalize permissions; runtime already3.1.1 may not offer Update. No force/repair/live/merge/publication authorized.",
+  "last_verified_head": "cbc8042a793a0185523d0b7fbab70419c40cbf09",
   "observed_remote_base_head": "4bc1f308071768b4f8045e58b4d12937bfa8ada2",
   "documentation_only": false,
   "previous_milestone": {
@@ -162,7 +164,7 @@
     "reference_note": "HTML, diagramma e tavole guidano struttura e navigazione a tre scelte; mokeup icon to be used.png è il riferimento vincolante dello stile icone. Nessuna sidebar aggiunta dal concept.",
     "gui_implementation_comparison": "ACCEPT_AND_CONTINUE_CORRECTIVE_HTML_LAYOUT_NAVIGATION_AND_PNG_ICON_STYLE_24PX_DARK_LIGHT"
   },
-  "independent_review": "ACCEPT_AND_CONTINUE_DRAFT_READY_FOR_MAINTAINER_RETEST_ONLY",
+  "independent_review": "ACCEPT_AND_CONTINUE_DRAFT_ONLY_MAINTAINER_FEDORA45_RETEST_REQUIRED",
   "offline_authorization": {
     "phases": [
       "DIAG1",
@@ -189,12 +191,14 @@
     "synthetic_screens": "19_CORRECTIVE_GITIGNORED_SYNTHETIC_OUTPUTS_SEPARATE_FROM_13_BASELINE_CAPTURES",
     "rpm_staging_new_files": "PASS_ACTUAL_RPM_6_MANAGER_FILES_14_SVG_IDENTICAL",
     "reader": "PASS_23_FAKE_TRANSPORT_AND_PRIVATE_BUS",
-    "live_sensor_host_and_vm": "NOT_PERFORMED_NEW_CANDIDATE",
-    "rpm_packaging": "PASS_3.1.1_3_FC44_SIGNED_PAIR_AND_REAL_METADATA_GATE",
-    "final_independent_review": "ACCEPT_AND_CONTINUE_DRAFT_READY_FOR_MAINTAINER_RETEST_ONLY",
-    "reviewer_targeted_repeats": "PASS_3_REPEATS_NOT_ADDED_TO_52_UNIQUE_CASES"
+    "live_sensor_host_and_vm": "NOT_PERFORMED_NEW_4",
+    "rpm_packaging": "PASS_3.1.1_4_FC44_SIGNED_PAIR_REAL_METADATA_GATE",
+    "final_independent_review": "ACCEPT_AND_CONTINUE_DROPIN4_DRAFT_ONLY",
+    "reviewer_targeted_repeats": "PASS_3_REPEATS_NOT_ADDED_TO_52_UNIQUE_CASES",
+    "targeted_dropin_installer": "44_PASS_WITH_NEW_700_755_NORMALIZATION_AND_NEGATIVES",
+    "dropin_regressions": "219_PASS_2_NATIVE_CASES_COMPLETED_BY_CANONICAL_BUILD"
   },
-  "implementation_status": "MINIMAL_DROPIN_PERMISSION_SOURCE_REVIEWED_PENDING_BUILD4",
+  "implementation_status": "MINIMAL_DROPIN_FD_NORMALIZATION_COMMITTED_SIGNED_AND_SAME_DRAFT_REPLACED",
   "baseline_qualification": {
     "commit": "dbdff8dc70f33cd8cc6a9b141942ad3371a28080",
     "unique_unit_integration_cases": 123,
@@ -210,21 +214,21 @@
     "draft_created": true,
     "live_and_installation": "NOT_AUTHORIZED_NOT_TESTED",
     "evidence_directory": "development/rpm/release-v3.1.1/",
-    "source_commit": "8427e1ba27ebc76ae9c8485bde1289f48b5df8c7",
+    "source_commit": "cbc8042a793a0185523d0b7fbab70419c40cbf09",
     "tag": "v3.1.1",
-    "packaging_release": 3,
+    "packaging_release": 4,
     "draft_release_id": 442694338,
-    "draft_url": "https://github.com/sorguido/goodix-27c6-5125/releases/tag/untagged-083049173c437f95635f",
+    "draft_url": "https://github.com/sorguido/goodix-27c6-5125/releases/tag/untagged-41147acfd282a5b05d61",
     "draft": true,
     "prerelease": false,
     "published_at": null,
     "ready_for_publication": false,
     "signed_fingerprint": "5FB20F583C831729D5FF073FE99ADAE5B7EA4918",
     "signed_sha256": {
-      "goodix-manager-3.1.1-3.fc44.x86_64.rpm": "a03a26015202fc89dc056cdde1cda7c389f2e1bcaf3d275b235b7b6f6de4ee7a",
-      "goodix-manager-3.1.1-3.fc44.src.rpm": "a38ae7cd4e7d4c4513230dbb3617856d1ba214ffb10fb1392bc36788ccf59e9e"
+      "goodix-manager-3.1.1-4.fc44.x86_64.rpm": "4327b8b4b03bc3bf08d25ca541c34246b76b7d9be6bde6227bd98c4c268e448a",
+      "goodix-manager-3.1.1-4.fc44.src.rpm": "11d4d47755919e13990f86783a17f59a88057863d045b051834b35ed817be451"
     },
-    "build_record": "development/rpm/builds/3.1.1-3.fc44/result.json",
+    "build_record": "development/rpm/builds/3.1.1-4.fc44/result.json",
     "verification": {
       "offline_cases": "344_PASS_PLUS_2_NATIVE_CASES_EXECUTED_BY_CANONICAL_PRODUCTION_BUILD",
       "qml_palettes_cache_and_page_cleanup": "PASS_STRICT_PLUS_9_FIRST_SHOW_GEOMETRY_CONFIGURATIONS",
@@ -232,14 +236,14 @@
       "rpm_payload_metadata_resources_and_inactive_layout": "PASS",
       "approved_signatures_and_digests": "PASS_BOTH_LOCAL_AND_AUTHENTICATED_DOWNLOADS_ISOLATED_KEYRING",
       "rpmlint": "0_ERRORS_8_EXISTING_WARNINGS",
-      "authenticated_draft_and_assets": "PASS_SAME_PRIVATE_DRAFT_ONLY_NEW_PAIR_OLD_REMOVED_AFTER_DOWNLOAD_AUDIT",
-      "canonical_draft_verifier": "PASS_LOCAL_CONTRACT_REAL_UNCHANGED_FINAL_JSON_ORIGINAL_AND_DOWNLOADED_PAIR",
-      "independent_final_review": "ACCEPT_AND_CONTINUE_DRAFT_READY_FOR_MAINTAINER_RETEST_ONLY",
-      "installation_live_login_fedora45": "NOT_TESTED_NEW_CANDIDATE_BY_CODEX",
+      "authenticated_draft_and_assets": "PASS_ONLY_NEW_4_PAIR_OLD_3_REMOVED_AFTER_NEW_DOWNLOAD_VALIDATION",
+      "canonical_draft_verifier": "PASS_REAL_UNMODIFIED_FINAL_JSON_ORIGINAL_AND_DOWNLOADED_4",
+      "independent_final_review": "ACCEPT_AND_CONTINUE_DRAFT_ONLY_MAINTAINER_FEDORA45_RETEST_REQUIRED",
+      "installation_live_login_fedora45": "NOT_TESTED_NEW_4_BY_CODEX",
       "test_only_private_key_signature_fixtures": "NOT_RUN_NO_NEW_PRIVATE_KEYS"
     },
     "failed_build_preserved": "development/rpm/builds/3.1.1-1.fc44/",
-    "final_report": "development/rpm/corrective-v3.1.1/FINAL_REPORT.md",
+    "final_report": "development/rpm/dropin-0755-v3.1.1/FINAL_REPORT.md",
     "ready_for_maintainer_retest": true,
     "additional_release_created": false
   },
@@ -315,6 +319,24 @@
     "source_review": "ACCEPT_AND_CONTINUE",
     "targeted_installer_tests": "44_PASS",
     "independent_directory_tests": "5_PASS_REPEATS_NOT_ADDED",
-    "regression_cases": "219_PASS_2_NATIVE_PENDING_CANONICAL_BUILD"
+    "regression_cases": "219_PASS_2_NATIVE_PENDING_CANONICAL_BUILD",
+    "source_commit": "cbc8042a793a0185523d0b7fbab70419c40cbf09",
+    "source_archive_sha256": "39deccadc3267a5669d64bd08b220a2cb7fc013feb73601a523fcefbd8352451",
+    "build_record": "development/rpm/builds/3.1.1-4.fc44/result.json",
+    "signature": "VERIFIED_BOTH_APPROVED_CERT_ISOLATED",
+    "canonical_full_build": "PASS",
+    "canonical_draft_gate": "PASS_REAL_METADATA_LOCAL_AND_DOWNLOADED_PAIR",
+    "old_asset_ids_removed": [
+      739358376,
+      739358535
+    ],
+    "new_asset_ids": [
+      739650006,
+      739650098
+    ],
+    "old3_private_files_preserved": true,
+    "final_draft_url": "https://github.com/sorguido/goodix-27c6-5125/releases/tag/untagged-41147acfd282a5b05d61",
+    "final_state": "DRAFT ONLY — MAINTAINER FEDORA 45 RETEST REQUIRED",
+    "final_report": "development/rpm/dropin-0755-v3.1.1/FINAL_REPORT.md"
   }
 }
