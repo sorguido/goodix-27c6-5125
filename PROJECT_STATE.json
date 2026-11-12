@@ -5,8 +5,8 @@
   "branch": "diagnostic",
   "execution_path": "PRIMARY",
   "phase": "DRAFT_RELEASE_3_1_1_CORRECTIVE",
-  "phase_status": "HUMAN_REQUIRED_SIGNING_PINENTRY_TIMEOUT",
-  "primary_artifact": "docs/DIAGNOSTICS_VALIDATION.md",
+  "phase_status": "ACCEPT_AND_CONTINUE_DRAFT_UPDATED_VERIFIED_FOR_MAINTAINER_RETEST",
+  "primary_artifact": "development/rpm/corrective-v3.1.1/FINAL_REPORT.md",
   "completed_gates": [
     "DIAG0_DESIDERATA_RECORDED",
     "DIAG0_LOCAL_ARTIFACT_VERIFICATION",
@@ -26,15 +26,19 @@
     "DIAGNOSTIC_CORRECTIVE_FINAL_REVIEW",
     "DRAFT_3_1_1_SOURCE_REVIEW",
     "DRAFT_3_1_1_CANONICAL_BUILD_AND_APPROVED_SIGNATURES",
-    "DRAFT_3_1_1_TAG_AND_AUTHENTICATED_ASSET_CORRESPONDENCE"
+    "DRAFT_3_1_1_TAG_AND_AUTHENTICATED_ASSET_CORRESPONDENCE",
+    "CORRECTIVE_3_1_1_FIVE_FIXES_REVIEW",
+    "CORRECTIVE_3_1_1_SIGNED_REBUILD_AND_SOURCE",
+    "CORRECTIVE_3_1_1_CONTROLLED_TAG_LEASE",
+    "CORRECTIVE_3_1_1_NEW_PAIR_VERIFIED_BEFORE_OLD_DELETE",
+    "CORRECTIVE_3_1_1_REAL_METADATA_CANONICAL_GATE",
+    "CORRECTIVE_3_1_1_INDEPENDENT_FINAL_REVIEW"
   ],
   "pending_gates": [
-    "SIGNING_PINENTRY_INTERACTION_REQUIRED",
-    "SIGNED_REBUILD_AND_SOURCE_ARCHIVE",
-    "SAME_DRAFT_ASSET_REPLACEMENT_AND_TAG_POSTFLIGHT",
+    "MAINTAINER_FEDORA45_RETEST_NEW_3",
     "DIAG4_REAL_TARGET_QUALIFICATION",
     "DIAG5_ACCEPTANCE",
-    "MAINTAINER_EVALUATION_BEFORE_PUBLICATION"
+    "MAINTAINER_PUBLICATION_DECISION"
   ],
   "host_modified": false,
   "host_runtime_modified": false,
@@ -73,8 +77,8 @@
   "relevant_corroborations": [
     "C4"
   ],
-  "next_action": "Complete protected GnuPG/pinentry interaction and sign the existing successful3.1.1-3 build with canonical --sign-existing. Then isolated signatures, controlled tag lease, upload/validate new pair before deleting old2 assets, same-draft raw final verification. No new release, publish, rebuild or live action needed at this gate.",
-  "last_verified_head": "4060c7a55fa08d1d868e5ed63906ac9d360e5a4b",
+  "next_action": "STOP with existing draft442694338 updated and unpublished. Maintainer must retest new3.1.1-3 on Fedora45 and decide publication personally. No further source, tag, asset, branch, installation or live action authorized.",
+  "last_verified_head": "1eb2fabc22808c59dcc4f06e15cb9d1c9c3e4ddf",
   "observed_remote_base_head": "4bc1f308071768b4f8045e58b4d12937bfa8ada2",
   "documentation_only": false,
   "previous_milestone": {
@@ -156,7 +160,7 @@
     "reference_note": "HTML, diagramma e tavole guidano struttura e navigazione a tre scelte; mokeup icon to be used.png è il riferimento vincolante dello stile icone. Nessuna sidebar aggiunta dal concept.",
     "gui_implementation_comparison": "ACCEPT_AND_CONTINUE_CORRECTIVE_HTML_LAYOUT_NAVIGATION_AND_PNG_ICON_STYLE_24PX_DARK_LIGHT"
   },
-  "independent_review": "HUMAN_REQUIRED_DRAFT_NOT_READY",
+  "independent_review": "ACCEPT_AND_CONTINUE_DRAFT_READY_FOR_MAINTAINER_RETEST_ONLY",
   "offline_authorization": {
     "phases": [
       "DIAG1",
@@ -172,23 +176,23 @@
     "live_authorized": false
   },
   "verification": {
-    "diagnostic_collector": "PASS_27_CORRECTIVE_TESTS_INCLUDING_SUBSECOND_FUTURE_TIMESTAMP",
+    "diagnostic_collector": "PASS_29",
     "manager_staging": "PASS_3_TEMP_FIXTURE_TESTS_NO_BUILD_OR_INSTALL",
-    "controller_and_qml_flows": "PASS_22_AFTER_CORRECTIVE_STRICT_QT",
-    "unique_unit_integration_cases": 287,
+    "controller_and_qml_flows": "PASS_25",
+    "unique_unit_integration_cases": 346,
     "existing_manager_palettes": "PASS_DARK_AND_LIGHT_13_IN_MEMORY_RENDER_STATES_PER_RUN",
     "qml_cache": "PASS_CURRENT_MANAGER_AND_DIAGNOSTIC_QML_WITH_SVG_RESOURCES",
     "gui_mockup_comparison": "PASS_HTML_LAYOUT_AND_PNG_ICON_MORPHOLOGY_STYLE_24PX_DARK_LIGHT_INDEPENDENT_REVIEW",
     "approved_assets": "PASS_6_SHA256_UNCHANGED",
     "synthetic_screens": "19_CORRECTIVE_GITIGNORED_SYNTHETIC_OUTPUTS_SEPARATE_FROM_13_BASELINE_CAPTURES",
     "rpm_staging_new_files": "PASS_ACTUAL_RPM_6_MANAGER_FILES_14_SVG_IDENTICAL",
-    "reader": "PASS_21_FAKE_TRANSPORT_AND_PRIVATE_BUS",
-    "live_sensor_host_and_vm": "NOT_PERFORMED",
-    "rpm_packaging": "PASS_3.1.1_2_FC44_SIGNED_BINARY_AND_SRPM",
-    "final_independent_review": "HUMAN_REQUIRED_DRAFT_NOT_READY_URL_CONTRACT",
+    "reader": "PASS_23_FAKE_TRANSPORT_AND_PRIVATE_BUS",
+    "live_sensor_host_and_vm": "NOT_PERFORMED_NEW_CANDIDATE",
+    "rpm_packaging": "PASS_3.1.1_3_FC44_SIGNED_PAIR_AND_REAL_METADATA_GATE",
+    "final_independent_review": "ACCEPT_AND_CONTINUE_DRAFT_READY_FOR_MAINTAINER_RETEST_ONLY",
     "reviewer_targeted_repeats": "PASS_3_REPEATS_NOT_ADDED_TO_52_UNIQUE_CASES"
   },
-  "implementation_status": "RELEASE_SOURCE_COMMITTED_TAGGED_SIGNED_DRAFT_CREATED_CANONICAL_GATE_FAILED",
+  "implementation_status": "CORRECTIVE_SOURCE_COMMITTED_SIGNED_TAG_REALIGNED_EXISTING_DRAFT_REPLACED_AND_CANONICALLY_VERIFIED",
   "baseline_qualification": {
     "commit": "dbdff8dc70f33cd8cc6a9b141942ad3371a28080",
     "unique_unit_integration_cases": 123,
@@ -204,36 +208,38 @@
     "draft_created": true,
     "live_and_installation": "NOT_AUTHORIZED_NOT_TESTED",
     "evidence_directory": "development/rpm/release-v3.1.1/",
-    "source_commit": "4060c7a55fa08d1d868e5ed63906ac9d360e5a4b",
+    "source_commit": "8427e1ba27ebc76ae9c8485bde1289f48b5df8c7",
     "tag": "v3.1.1",
-    "packaging_release": 2,
+    "packaging_release": 3,
     "draft_release_id": 442694338,
-    "draft_url": "https://github.com/sorguido/goodix-27c6-5125/releases/tag/untagged-9e008443590cf1a75c55",
+    "draft_url": "https://github.com/sorguido/goodix-27c6-5125/releases/tag/untagged-083049173c437f95635f",
     "draft": true,
     "prerelease": false,
     "published_at": null,
     "ready_for_publication": false,
     "signed_fingerprint": "5FB20F583C831729D5FF073FE99ADAE5B7EA4918",
     "signed_sha256": {
-      "goodix-manager-3.1.1-2.fc44.x86_64.rpm": "a43f4a9e7464bbbcddafe5590c11ae9ba72f8baf204b0ae472bcf1c69cf32574",
-      "goodix-manager-3.1.1-2.fc44.src.rpm": "164848169b548636e2259658390cc72e8abd3f0c577e8a389473143353735bb7"
+      "goodix-manager-3.1.1-3.fc44.x86_64.rpm": "a03a26015202fc89dc056cdde1cda7c389f2e1bcaf3d275b235b7b6f6de4ee7a",
+      "goodix-manager-3.1.1-3.fc44.src.rpm": "a38ae7cd4e7d4c4513230dbb3617856d1ba214ffb10fb1392bc36788ccf59e9e"
     },
-    "build_record": "development/rpm/builds/3.1.1-2.fc44/result.json",
+    "build_record": "development/rpm/builds/3.1.1-3.fc44/result.json",
     "verification": {
-      "offline_cases": "287_PASS_WITH_AFFECTED_SUITES_RERUN_AFTER_CORRECTIVE",
-      "qml_palettes_cache_and_page_cleanup": "PASS_STRICT_NO_QT_WARNING_FILTERS",
-      "source_archive": "478_FILES_IDENTICAL_TO_TAGGED_COMMIT_AND_SRPM",
+      "offline_cases": "344_PASS_PLUS_2_NATIVE_CASES_EXECUTED_BY_CANONICAL_PRODUCTION_BUILD",
+      "qml_palettes_cache_and_page_cleanup": "PASS_STRICT_PLUS_9_FIRST_SHOW_GEOMETRY_CONFIGURATIONS",
+      "source_archive": "478_FILES_IDENTICAL_TO_TAGGED_SOURCE_AND_SRPM",
       "rpm_payload_metadata_resources_and_inactive_layout": "PASS",
       "approved_signatures_and_digests": "PASS_BOTH_LOCAL_AND_AUTHENTICATED_DOWNLOADS_ISOLATED_KEYRING",
       "rpmlint": "0_ERRORS_8_EXISTING_WARNINGS",
-      "authenticated_draft_and_assets": "PASS_DRAFT_TRUE_TWO_IDENTICAL_SIGNED_ASSETS",
-      "canonical_draft_verifier": "FAIL_UNTRUSTED_RELEASE_URL_REAL_GITHUB_UNTAGGED_DRAFT_URLS",
-      "independent_final_review": "HUMAN_REQUIRED_DRAFT_NOT_READY",
-      "installation_live_login_fedora45": "NOT_TESTED",
+      "authenticated_draft_and_assets": "PASS_SAME_PRIVATE_DRAFT_ONLY_NEW_PAIR_OLD_REMOVED_AFTER_DOWNLOAD_AUDIT",
+      "canonical_draft_verifier": "PASS_LOCAL_CONTRACT_REAL_UNCHANGED_FINAL_JSON_ORIGINAL_AND_DOWNLOADED_PAIR",
+      "independent_final_review": "ACCEPT_AND_CONTINUE_DRAFT_READY_FOR_MAINTAINER_RETEST_ONLY",
+      "installation_live_login_fedora45": "NOT_TESTED_NEW_CANDIDATE_BY_CODEX",
       "test_only_private_key_signature_fixtures": "NOT_RUN_NO_NEW_PRIVATE_KEYS"
     },
     "failed_build_preserved": "development/rpm/builds/3.1.1-1.fc44/",
-    "final_report": "development/rpm/release-v3.1.1/FINAL_REPORT.md"
+    "final_report": "development/rpm/corrective-v3.1.1/FINAL_REPORT.md",
+    "ready_for_maintainer_retest": true,
+    "additional_release_created": false
   },
   "draft_corrective_authorization": {
     "product_version": "3.1.1",
@@ -249,16 +255,32 @@
     "candidate_revision": 3,
     "source_review": "ACCEPT_AND_CONTINUE_A_B_C_D_E_AND_DRAFT_VERIFIER",
     "offline_cases_pass": 344,
-    "native_cases_pending_canonical_build": 2,
+    "native_cases_pending_canonical_build": 0,
     "gui_source_evidence": "development/rpm/corrective-v3.1.1/gui-results.json",
     "backend_source_evidence": "development/rpm/corrective-v3.1.1/backend-results.json",
     "source_commit": "8427e1ba27ebc76ae9c8485bde1289f48b5df8c7",
     "build_record": "development/rpm/builds/3.1.1-3.fc44/result.json",
     "canonical_build": "PASS_FULL_CHECK",
-    "signature": "UNSIGNED_PINENTRY_TIMEOUT",
+    "signature": "VERIFIED_BOTH_APPROVED_CERT_ISOLATED",
     "source_archive": "PASS_478_FILES_IDENTICAL",
-    "old_tag_and_draft_assets": "UNCHANGED",
-    "human_gate": "SIGNING_PINENTRY_INTERACTION_REQUIRED"
+    "old_tag_and_draft_assets": "CONTROLLED_TAG_LEASE_COMPLETED_OLD_ASSETS_REMOVED_AFTER_NEW_PAIR_AUDIT",
+    "human_gate": null,
+    "result": "ACCEPT_AND_CONTINUE_DRAFT_READY_FOR_MAINTAINER_RETEST_ONLY",
+    "source_archive_sha256": "e557b82e2f6ca624ef0387bb6f85e74d80538fa9eb4977cb035f2b6a26f39dcb",
+    "draft_replaced_same_id": true,
+    "old_asset_ids_removed": [
+      738761035,
+      738761038
+    ],
+    "new_asset_ids": [
+      739358376,
+      739358535
+    ],
+    "old_build2_preserved": true,
+    "source_and_tag_lease_verified": true,
+    "new_metadata_gate": "PASS_LOCAL_CONTRACT_UNMODIFIED_REAL_JSON",
+    "final_report": "development/rpm/corrective-v3.1.1/FINAL_REPORT.md",
+    "native_cases_pass_canonical_build": 2
   },
   "operator_reported_3_1_1_2": {
     "source": "CURRENT_USER_CORRECTIVE_PROMPT",
@@ -271,5 +293,6 @@
       "cold_login": "PASS_OPERATOR_REPORTED"
     },
     "limits": "Not Codex-executed tests; not qualification of replacement candidate or other firmware/machines/scenarios."
-  }
+  },
+  "operational_closure_excluded_from_packaged_source": true
 }
