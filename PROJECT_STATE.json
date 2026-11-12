@@ -5,7 +5,7 @@
   "branch": "diagnostic",
   "execution_path": "PRIMARY",
   "phase": "DRAFT_RELEASE_3_1_1_CORRECTIVE",
-  "phase_status": "SOURCE_REVIEW_ACCEPTED_PENDING_SIGNED_REBUILD",
+  "phase_status": "HUMAN_REQUIRED_SIGNING_PINENTRY_TIMEOUT",
   "primary_artifact": "docs/DIAGNOSTICS_VALIDATION.md",
   "completed_gates": [
     "DIAG0_DESIDERATA_RECORDED",
@@ -29,7 +29,7 @@
     "DRAFT_3_1_1_TAG_AND_AUTHENTICATED_ASSET_CORRESPONDENCE"
   ],
   "pending_gates": [
-    "FIVE_FIXES_SOURCE_REVIEW",
+    "SIGNING_PINENTRY_INTERACTION_REQUIRED",
     "SIGNED_REBUILD_AND_SOURCE_ARCHIVE",
     "SAME_DRAFT_ASSET_REPLACEMENT_AND_TAG_POSTFLIGHT",
     "DIAG4_REAL_TARGET_QUALIFICATION",
@@ -73,7 +73,7 @@
   "relevant_corroborations": [
     "C4"
   ],
-  "next_action": "Build/sign complete new3.1.1-3.fc44 pair from reviewed source on Fedora44; verify archive/source/package/signatures before tag lease and existing-draft asset replacement. Old2 remains intact; no publication or live tests authorized.",
+  "next_action": "Complete protected GnuPG/pinentry interaction and sign the existing successful3.1.1-3 build with canonical --sign-existing. Then isolated signatures, controlled tag lease, upload/validate new pair before deleting old2 assets, same-draft raw final verification. No new release, publish, rebuild or live action needed at this gate.",
   "last_verified_head": "4060c7a55fa08d1d868e5ed63906ac9d360e5a4b",
   "observed_remote_base_head": "4bc1f308071768b4f8045e58b4d12937bfa8ada2",
   "documentation_only": false,
@@ -251,7 +251,14 @@
     "offline_cases_pass": 344,
     "native_cases_pending_canonical_build": 2,
     "gui_source_evidence": "development/rpm/corrective-v3.1.1/gui-results.json",
-    "backend_source_evidence": "development/rpm/corrective-v3.1.1/backend-results.json"
+    "backend_source_evidence": "development/rpm/corrective-v3.1.1/backend-results.json",
+    "source_commit": "8427e1ba27ebc76ae9c8485bde1289f48b5df8c7",
+    "build_record": "development/rpm/builds/3.1.1-3.fc44/result.json",
+    "canonical_build": "PASS_FULL_CHECK",
+    "signature": "UNSIGNED_PINENTRY_TIMEOUT",
+    "source_archive": "PASS_478_FILES_IDENTICAL",
+    "old_tag_and_draft_assets": "UNCHANGED",
+    "human_gate": "SIGNING_PINENTRY_INTERACTION_REQUIRED"
   },
   "operator_reported_3_1_1_2": {
     "source": "CURRENT_USER_CORRECTIVE_PROMPT",
