@@ -4,8 +4,8 @@
   "project": "Goodix 27c6:5125 — Goodix Manager diagnostics",
   "branch": "diagnostic",
   "execution_path": "PRIMARY",
-  "phase": "DRAFT_RELEASE_3_1_1_PREPARATION",
-  "phase_status": "SOURCE_QUALIFICATION_IN_PROGRESS",
+  "phase": "DRAFT_RELEASE_3_1_1_VERIFICATION",
+  "phase_status": "HUMAN_REQUIRED_DRAFT_NOT_READY_URL_CONTRACT",
   "primary_artifact": "docs/DIAGNOSTICS_VALIDATION.md",
   "completed_gates": [
     "DIAG0_DESIDERATA_RECORDED",
@@ -23,13 +23,17 @@
     "DIAG3_OFFLINE_EXIT_GATE",
     "DIAG4_OFFLINE_COVERAGE",
     "DIAG4_FINAL_INDEPENDENT_REVIEW",
-    "DIAGNOSTIC_CORRECTIVE_FINAL_REVIEW"
+    "DIAGNOSTIC_CORRECTIVE_FINAL_REVIEW",
+    "DRAFT_3_1_1_SOURCE_REVIEW",
+    "DRAFT_3_1_1_CANONICAL_BUILD_AND_APPROVED_SIGNATURES",
+    "DRAFT_3_1_1_TAG_AND_AUTHENTICATED_ASSET_CORRESPONDENCE"
   ],
   "pending_gates": [
-    "SIGNED_RPM_AND_DRAFT_VERIFICATION",
+    "DRAFT_METADATA_URL_CONTRACT_DECISION",
     "FEDORA45_VM_AUTHORIZATION",
     "DIAG4_REAL_TARGET_QUALIFICATION",
-    "DIAG5_ACCEPTANCE"
+    "DIAG5_ACCEPTANCE",
+    "MAINTAINER_EVALUATION_BEFORE_PUBLICATION"
   ],
   "host_modified": false,
   "host_runtime_modified": false,
@@ -68,8 +72,8 @@
   "relevant_corroborations": [
     "C4"
   ],
-  "next_action": "Qualify source with independent review; build/sign RPM and SRPM on Fedora 44; create and verify draft only. No publication, installation, live sensor or Fedora 45 VM authorized.",
-  "last_verified_head": "6c6fc18c80e0443ebc8ac276afb5dd4c35496b34",
+  "next_action": "STOP with draft v3.1.1 unpublished. Canonical verifier rejects real GitHub untagged draft URLs. A specific decision and review of that trust contract are required before readiness; do not normalize JSON, publish to bypass, retag, merge or alter signed source. Installation/live/Fedora45 remain unauthorized and unqualified.",
+  "last_verified_head": "4060c7a55fa08d1d868e5ed63906ac9d360e5a4b",
   "observed_remote_base_head": "4bc1f308071768b4f8045e58b4d12937bfa8ada2",
   "documentation_only": false,
   "previous_milestone": {
@@ -151,7 +155,7 @@
     "reference_note": "HTML, diagramma e tavole guidano struttura e navigazione a tre scelte; mokeup icon to be used.png è il riferimento vincolante dello stile icone. Nessuna sidebar aggiunta dal concept.",
     "gui_implementation_comparison": "ACCEPT_AND_CONTINUE_CORRECTIVE_HTML_LAYOUT_NAVIGATION_AND_PNG_ICON_STYLE_24PX_DARK_LIGHT"
   },
-  "independent_review": "ACCEPT_AND_CONTINUE_DIAGNOSTIC_CORRECTIVE_FINAL",
+  "independent_review": "HUMAN_REQUIRED_DRAFT_NOT_READY",
   "offline_authorization": {
     "phases": [
       "DIAG1",
@@ -169,21 +173,21 @@
   "verification": {
     "diagnostic_collector": "PASS_27_CORRECTIVE_TESTS_INCLUDING_SUBSECOND_FUTURE_TIMESTAMP",
     "manager_staging": "PASS_3_TEMP_FIXTURE_TESTS_NO_BUILD_OR_INSTALL",
-    "controller_and_qml_flows": "PASS_22_CORRECTIVE_TESTS_13_CONTROLLER_9_QML",
-    "unique_unit_integration_cases": 52,
+    "controller_and_qml_flows": "PASS_22_AFTER_CORRECTIVE_STRICT_QT",
+    "unique_unit_integration_cases": 287,
     "existing_manager_palettes": "PASS_DARK_AND_LIGHT_13_IN_MEMORY_RENDER_STATES_PER_RUN",
     "qml_cache": "PASS_CURRENT_MANAGER_AND_DIAGNOSTIC_QML_WITH_SVG_RESOURCES",
     "gui_mockup_comparison": "PASS_HTML_LAYOUT_AND_PNG_ICON_MORPHOLOGY_STYLE_24PX_DARK_LIGHT_INDEPENDENT_REVIEW",
     "approved_assets": "PASS_6_SHA256_UNCHANGED",
     "synthetic_screens": "19_CORRECTIVE_GITIGNORED_SYNTHETIC_OUTPUTS_SEPARATE_FROM_13_BASELINE_CAPTURES",
-    "rpm_staging_new_files": "SOURCE_AND_SPEC_CORRECTED_FIXTURE_VERIFIED_NO_RPM_BUILD",
-    "reader": "UNCHANGED_BASELINE_EVIDENCE_NOT_RERUN_IN_CORRECTIVE_PASS",
+    "rpm_staging_new_files": "PASS_ACTUAL_RPM_6_MANAGER_FILES_14_SVG_IDENTICAL",
+    "reader": "PASS_21_FAKE_TRANSPORT_AND_PRIVATE_BUS",
     "live_sensor_host_and_vm": "NOT_PERFORMED",
-    "rpm_packaging": "NOT_PERFORMED_STOP_BOUNDARY",
-    "final_independent_review": "ACCEPT_AND_CONTINUE_ALL_7_CORRECTIVE_POINTS_OFFLINE_ONLY",
+    "rpm_packaging": "PASS_3.1.1_2_FC44_SIGNED_BINARY_AND_SRPM",
+    "final_independent_review": "HUMAN_REQUIRED_DRAFT_NOT_READY_URL_CONTRACT",
     "reviewer_targeted_repeats": "PASS_3_REPEATS_NOT_ADDED_TO_52_UNIQUE_CASES"
   },
-  "implementation_status": "DIAGNOSTIC_BASELINE_AND_CORRECTIVE_COMMITTED_RELEASE_DELTA_IN_WORKTREE",
+  "implementation_status": "RELEASE_SOURCE_COMMITTED_TAGGED_SIGNED_DRAFT_CREATED_CANONICAL_GATE_FAILED",
   "baseline_qualification": {
     "commit": "dbdff8dc70f33cd8cc6a9b141942ad3371a28080",
     "unique_unit_integration_cases": 123,
@@ -196,8 +200,38 @@
     "base_source_commit": "6c6fc18c80e0443ebc8ac276afb5dd4c35496b34",
     "version": "3.1.1",
     "build_baseline": "Fedora 44 x86_64",
-    "draft_created": false,
+    "draft_created": true,
     "live_and_installation": "NOT_AUTHORIZED_NOT_TESTED",
-    "evidence_directory": "development/rpm/release-v3.1.1/"
+    "evidence_directory": "development/rpm/release-v3.1.1/",
+    "source_commit": "4060c7a55fa08d1d868e5ed63906ac9d360e5a4b",
+    "tag": "v3.1.1",
+    "packaging_release": 2,
+    "draft_release_id": 442694338,
+    "draft_url": "https://github.com/sorguido/goodix-27c6-5125/releases/tag/untagged-9e008443590cf1a75c55",
+    "draft": true,
+    "prerelease": false,
+    "published_at": null,
+    "ready_for_publication": false,
+    "signed_fingerprint": "5FB20F583C831729D5FF073FE99ADAE5B7EA4918",
+    "signed_sha256": {
+      "goodix-manager-3.1.1-2.fc44.x86_64.rpm": "a43f4a9e7464bbbcddafe5590c11ae9ba72f8baf204b0ae472bcf1c69cf32574",
+      "goodix-manager-3.1.1-2.fc44.src.rpm": "164848169b548636e2259658390cc72e8abd3f0c577e8a389473143353735bb7"
+    },
+    "build_record": "development/rpm/builds/3.1.1-2.fc44/result.json",
+    "verification": {
+      "offline_cases": "287_PASS_WITH_AFFECTED_SUITES_RERUN_AFTER_CORRECTIVE",
+      "qml_palettes_cache_and_page_cleanup": "PASS_STRICT_NO_QT_WARNING_FILTERS",
+      "source_archive": "478_FILES_IDENTICAL_TO_TAGGED_COMMIT_AND_SRPM",
+      "rpm_payload_metadata_resources_and_inactive_layout": "PASS",
+      "approved_signatures_and_digests": "PASS_BOTH_LOCAL_AND_AUTHENTICATED_DOWNLOADS_ISOLATED_KEYRING",
+      "rpmlint": "0_ERRORS_8_EXISTING_WARNINGS",
+      "authenticated_draft_and_assets": "PASS_DRAFT_TRUE_TWO_IDENTICAL_SIGNED_ASSETS",
+      "canonical_draft_verifier": "FAIL_UNTRUSTED_RELEASE_URL_REAL_GITHUB_UNTAGGED_DRAFT_URLS",
+      "independent_final_review": "HUMAN_REQUIRED_DRAFT_NOT_READY",
+      "installation_live_login_fedora45": "NOT_TESTED",
+      "test_only_private_key_signature_fixtures": "NOT_RUN_NO_NEW_PRIVATE_KEYS"
+    },
+    "failed_build_preserved": "development/rpm/builds/3.1.1-1.fc44/",
+    "final_report": "development/rpm/release-v3.1.1/FINAL_REPORT.md"
   }
 }
