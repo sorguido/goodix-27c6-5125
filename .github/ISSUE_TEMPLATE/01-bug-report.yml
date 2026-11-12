@@ -26,8 +26,6 @@ body:
         4. **For fingerprint login after starting or restarting the PC:** press Enter with the password field empty, **wait about 2 seconds**, then place an enrolled finger on the reader. This is practical timing guidance for the Goodix driver, not a guarantee that the sensor is ready after exactly two seconds.
         5. **If the problem remains,** describe exactly when it occurred, how often it happens and what you already tried. Attach only relevant, reviewed and redacted diagnostics when available.
 
-        General fingerprint tips are adapted from [Microsoft's Windows Hello troubleshooting advice](https://support.microsoft.com/en-us/windows/security/windows-hello-common-issues-and-troubleshooting-tips); the two-second wait is specific advice for this Goodix integration.
-
         ### ![Safety](https://raw.githubusercontent.com/sorguido/goodix-27c6-5125/main/.github/ISSUE_TEMPLATE/assets/shield-alert.svg) Safety and privacy
 
         Keep password login available. Share only relevant, redacted logs. **Never upload** pairing keys or state directories, fingerprint templates/images, passwords, firmware dumps, raw USB captures or other secrets. Do not flash or reset the reader to reproduce a bug.
