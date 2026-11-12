@@ -11,7 +11,35 @@ body:
 
         Before filing, check the [supported configuration](https://github.com/sorguido/goodix-27c6-5125#supported-configuration) and [known limitations](https://github.com/sorguido/goodix-27c6-5125/blob/main/docs/VALIDATION.md). Fedora 44 KDE with APP12509 is the qualified target; APP12508 has narrower contributor-reported evidence. Other environments are welcome as reports, but are not automatically supported.
 
-        **Privacy and safety:** Share only relevant, redacted diagnostics. Do not upload pairing keys or state directories, fingerprint templates/images, firmware dumps, raw USB captures, passwords, or other secrets. Do not flash or reset the reader to reproduce a bug.
+        For fingerprint enrollment, recognition or login problems, please review the practical guidance below. Other issue types can skip steps that do not apply.
+
+  - type: markdown
+    attributes:
+      value: |
+        ### ![Fingerprint](https://raw.githubusercontent.com/sorguido/goodix-27c6-5125/main/.github/ISSUE_TEMPLATE/assets/fingerprint.svg) Before reporting a fingerprint problem
+
+        Many enrollment and recognition problems are related to finger placement, reader condition or timing. **If applicable, try these steps before reporting:**
+
+        1. **Keep your finger and the reader clean and dry.** Place your finger flat and centered, using light, steady pressure. Avoid moving it while recognition is in progress.
+        2. **During enrollment, slightly vary the position and angle** between captures, following the on-screen instructions. This helps register different parts of your fingerprint.
+        3. **If recognition is unreliable,** try re-enrolling that finger or enrolling another finger as an alternative.
+        4. **For fingerprint login after starting or restarting the PC:** press Enter with the password field empty, **wait about 2 seconds**, then place an enrolled finger on the reader. This is practical timing guidance for the Goodix driver, not a guarantee that the sensor is ready after exactly two seconds.
+        5. **If the problem remains,** describe exactly when it occurred, how often it happens and what you already tried. Attach only relevant, reviewed and redacted diagnostics when available.
+
+        General fingerprint tips are adapted from [Microsoft's Windows Hello troubleshooting advice](https://support.microsoft.com/en-us/windows/security/windows-hello-common-issues-and-troubleshooting-tips); the two-second wait is specific advice for this Goodix integration.
+
+        ### ![Safety](https://raw.githubusercontent.com/sorguido/goodix-27c6-5125/main/.github/ISSUE_TEMPLATE/assets/shield-alert.svg) Safety and privacy
+
+        Keep password login available. Share only relevant, redacted logs. **Never upload** pairing keys or state directories, fingerprint templates/images, passwords, firmware dumps, raw USB captures or other secrets. Do not flash or reset the reader to reproduce a bug.
+
+  - type: checkboxes
+    id: troubleshooting
+    attributes:
+      label: Troubleshooting guidance
+      description: Confirm you have read the tips above. Enrollment and login tips may not apply to unrelated issues such as installation failures.
+      options:
+        - label: I have read the troubleshooting guidance and tried the applicable steps, or they do not apply to my issue.
+          required: true
 
   - type: input
     id: version
