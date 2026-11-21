@@ -9,7 +9,7 @@ Install **Goodix Manager** with KDE Discover, then use it to activate the finger
 
 ### 1. Download Goodix Manager
 
-Open the **[official GitHub Releases](https://github.com/sorguido/goodix-27c6-5125/releases)** and download the latest RPM explicitly marked compatible with your Fedora release from **Assets**. A `.fc44` suffix indicates the Fedora 44 build baseline, not necessarily the supported installation range. **The existing 3.0.0 RPM requires Fedora 44.** Version 3.0.1 has no package lock to a specific Fedora release, while retaining dependency and runtime compatibility checks. It is being prepared as an unpublished draft and is not publicly downloadable until publication.
+Open the **[official GitHub Releases](https://github.com/sorguido/goodix-27c6-5125/releases)** and download the latest RPM explicitly marked compatible with your Fedora release from **Assets**. A `.fc44` suffix indicates the Fedora 44 build baseline, not necessarily the supported installation range. **The existing 3.0.0 RPM requires Fedora 44.** Version 3.0.1 is available as a [published release](https://github.com/sorguido/goodix-27c6-5125/releases/tag/v3.0.1). It removes the Fedora-version package restriction while retaining dependency and runtime compatibility checks.
 
 ### 2. Install the RPM
 
