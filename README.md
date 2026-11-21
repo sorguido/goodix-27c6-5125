@@ -31,6 +31,17 @@ Fedora qualification for the current biometric engine. These observations do
 not establish general recognition accuracy or cross-device compatibility. See
 [validation and limitations](docs/VALIDATION.md).
 
+## Support and issue reporting
+
+> [!CAUTION]
+> **Before opening a GitHub issue, please consult the [Goodix 27c6:5125 - Support Assistant](https://github.com/copilot/spaces/sorguido/2).**
+>
+> The assistant can help you troubleshoot problems, collect relevant diagnostics, and prepare a useful bug report. If the problem remains unresolved, include the steps already tried and any relevant, redacted logs in your issue.
+
+**Support scope:** This project focuses on the configurations described in [Supported configuration](#supported-configuration) and [Validation and limitations](docs/VALIDATION.md). Reports from other environments are welcome, but third-party ports and unsupported desktop integrations are outside the project's maintained support scope.
+
+For installation questions and general assistance, use [Discussions](https://github.com/sorguido/goodix-27c6-5125/discussions). For reproducible driver problems, [open a bug report](https://github.com/sorguido/goodix-27c6-5125/issues/new/choose).
+
 ## Installation
 
 > [!WARNING]
