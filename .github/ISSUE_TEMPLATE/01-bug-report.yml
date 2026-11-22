@@ -44,6 +44,15 @@ body:
         - label: I have read the troubleshooting guidance and tried the applicable steps, or they do not apply to my issue.
           required: true
 
+  - type: checkboxes
+    id: support_assistant
+    attributes:
+      label: Support Assistant consultation
+      description: Optional — let us know whether you consulted the assistant before opening this issue.
+      options:
+        - label: I consulted the [Goodix 27c6:5125 - Support Assistant](https://github.com/copilot/spaces/sorguido/2) before opening this issue.
+          required: false
+
   - type: input
     id: version
     attributes:
@@ -78,12 +87,16 @@ body:
     attributes:
       label: Desktop environment
       placeholder: "e.g. KDE Plasma 6, GNOME, or headless"
+    validations:
+      required: true
 
   - type: input
     id: hardware
     attributes:
       label: Laptop / host model
       placeholder: "e.g. Huawei MateBook D 15"
+    validations:
+      required: true
 
   - type: dropdown
     id: area
