@@ -48,7 +48,7 @@ body:
     id: support_assistant
     attributes:
       label: Support Assistant consultation
-      description: Optional — let us know whether you consulted the assistant before opening this issue.
+      description: Optional — let me know whether you consulted the assistant before opening this issue.
       options:
         - label: I consulted the [Goodix 27c6:5125 - Support Assistant](https://github.com/copilot/spaces/sorguido/2) before opening this issue.
           required: false
