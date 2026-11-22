@@ -1,0 +1,131 @@
+name: Issue preflight
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+
+permissions:
+  issues: write
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate required issue information
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const issue = context.payload.issue;
+            if (!issue || issue.pull_request) return;
+            const {owner, repo} = context.repo;
+            const issue_number = issue.number;
+            const label = 'preflight:needs-info';
+            const marker = '<!-- goodix-issue-preflight-v1 -->';
+
+            // Parse GitHub Issue Form output, not arbitrary prose or pasted logs.
+            const pieces = (issue.body || '').split(/^###\s+(.+?)\s*$/gm);
+            const fields = new Map();
+            for (let i = 1; i + 1 < pieces.length; i += 2) {
+              fields.set(pieces[i].trim().toLowerCase(), pieces[i + 1].trim());
+            }
+
+            const requirements = [
+              ['Troubleshooting guidance', 'Confirm that you read the guidance, or that it does not apply.'],
+              ['Driver version', 'Provide the release tag or commit hash you installed.'],
+              ['Reader firmware application', 'Select APP12509, APP12508, or the valid choice "Other / unknown".'],
+              ['Linux distribution and version', 'Run cat /etc/os-release and provide the distribution and version.'],
+              ['Desktop environment', 'Specify KDE Plasma, GNOME, or headless, as appropriate.'],
+              ['Laptop / host model', 'Provide the manufacturer and laptop or host model.'],
+              ['Affected feature', 'Specify the feature affected by this problem.'],
+              ['Frequency', 'State how often the problem occurs.'],
+              ['Severity', 'Indicate the severity.'],
+              ['What happened?', 'Describe what went wrong, including any visible error.'],
+              ['Steps to reproduce', 'Provide the steps to reproduce the issue.']
+            ];
+            const placeholders = new Set([
+              '', 'no response', 'not provided', 'not known', 'unknown', 'n/a', 'na',
+              'i do not know', "i don't know", 'do not know', "don't know",
+              'idk', 'none', 'tbd', 'to be determined', '-', '?', '...', 'test'
+            ]);
+            function noInformation(value) {
+              const normalized = value.replace(/[_*]/g, '').replace(/\s+/g, ' ')
+                .trim().replace(/[.!?]+$/, '').trim().toLowerCase();
+              return placeholders.has(normalized) ||
+                /^(?:\d+[.)]\s*\.{3}\s*)+$/.test(normalized);
+            }
+
+            const missing = [];
+            for (const [heading, guidance] of requirements) {
+              const value = fields.get(heading.toLowerCase());
+              const confirmationMissing = heading === 'Troubleshooting guidance' &&
+                !/^-\s*\[[xX]\]/m.test(value || '');
+              if (value === undefined || confirmationMissing || noInformation(value)) {
+                missing.push({heading, guidance, unrecognized: value === undefined});
+              }
+            }
+            // "Other / unknown" is valid firmware information; Copilot
+            // consultation, optional logs and other optional fields are ignored.
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number, per_page: 100
+            });
+            const previous = comments.find(c =>
+              c.user?.login === 'github-actions[bot]' && (c.body || '').includes(marker));
+            const isLabeled = (issue.labels || []).some(l =>
+              (typeof l === 'string' ? l : l.name) === label);
+
+            const banner = '> **Automated GitHub Actions message — not a personal reply from the maintainer.**\n\n';
+            if (missing.length) {
+              try {
+                await github.rest.issues.getLabel({owner, repo, name: label});
+              } catch (error) {
+                if (error.status !== 404) throw error;
+                await github.rest.issues.createLabel({
+                  owner, repo, name: label, color: 'FBCA04',
+                  description: 'Automated preflight: information needs review'
+                });
+              }
+              if (!isLabeled) {
+                await github.rest.issues.addLabels({owner, repo, issue_number, labels: [label]});
+              }
+              const requests = missing.map(item =>
+                '- **' + item.heading + ':** ' +
+                (item.unrecognized
+                  ? 'This required field was not recognizable in the issue body. '
+                  : 'The response does not confirm the required information. ') +
+                item.guidance).join('\n');
+              const message = marker + '\n### Automated issue preflight — additional information requested\n\n' +
+                banner + 'Thank you for the report. Please review the following items before maintainer triage:\n\n' +
+                requests + '\n\n' +
+                'If you used a different issue-creation method, a detail written elsewhere in free text may not be ' +
+                'recognized by this form-based check. Please add the corresponding headings and answers or ' +
+                'use the [Bug report form](https://github.com/' + owner + '/' + repo +
+                '/issues/new?template=01-bug-report.yml).\n\n' +
+                'The [Goodix 27c6:5125 - Support Assistant](https://github.com/copilot/spaces/sorguido/2) ' +
+                'can help collect this information. **Edit this issue** after completing it; do not open another one. ' +
+                'The automatic check will run again.\n\n' +
+                '_This check does not close or block the issue and does not determine whether the driver has a defect._';
+              if (previous) {
+                if (previous.body !== message) {
+                  await github.rest.issues.updateComment({
+                    owner, repo, comment_id: previous.id, body: message
+                  });
+                }
+              } else {
+                await github.rest.issues.createComment({owner, repo, issue_number, body: message});
+              }
+            } else {
+              if (isLabeled) {
+                await github.rest.issues.removeLabel({owner, repo, issue_number, name: label});
+              }
+              if (previous) {
+                const message = marker + '\n### Automated issue preflight — information received\n\n' +
+                  banner + 'All required Issue Form fields are now present with non-placeholder answers. ' +
+                  'This checks format and completeness only, not technical correctness.';
+                if (previous.body !== message) {
+                  await github.rest.issues.updateComment({
+                    owner, repo, comment_id: previous.id, body: message
+                  });
+                }
+              }
+            }
