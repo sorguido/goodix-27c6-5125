@@ -42,29 +42,17 @@ jobs:
               ['What happened?', 'Describe what went wrong, including any visible error.'],
               ['Steps to reproduce', 'Provide the steps to reproduce the issue.']
             ];
-            const placeholders = new Set([
-              '', 'no response', 'not provided', 'not known', 'unknown', 'n/a', 'na',
-              'i do not know', "i don't know", 'do not know', "don't know",
-              'idk', 'none', 'tbd', 'to be determined', '-', '?', '...', 'test'
-            ]);
-            function noInformation(value) {
-              const normalized = value.replace(/[_*]/g, '').replace(/\s+/g, ' ')
-                .trim().replace(/[.!?]+$/, '').trim().toLowerCase();
-              return placeholders.has(normalized) ||
-                /^(?:\d+[.)]\s*\.{3}\s*)+$/.test(normalized);
-            }
-
             const missing = [];
             for (const [heading, guidance] of requirements) {
               const value = fields.get(heading.toLowerCase());
               const confirmationMissing = heading === 'Troubleshooting guidance' &&
                 !/^-\s*\[[xX]\]/m.test(value || '');
-              if (value === undefined || confirmationMissing || noInformation(value)) {
+              if (value === undefined || value.trim() === '' || confirmationMissing) {
                 missing.push({heading, guidance, unrecognized: value === undefined});
               }
             }
-            // "Other / unknown" is valid firmware information; Copilot
-            // consultation, optional logs and other optional fields are ignored.
+            // Check presence/completeness only: dropdown choices and free-text
+            // answers are never interpreted. Optional fields are ignored.
 
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner, repo, issue_number, per_page: 100
@@ -92,7 +80,7 @@ jobs:
                 '- **' + item.heading + ':** ' +
                 (item.unrecognized
                   ? 'This required field was not recognizable in the issue body. '
-                  : 'The response does not confirm the required information. ') +
+                  : 'This required field is empty or its mandatory checkbox is not checked. ') +
                 item.guidance).join('\n');
               const message = marker + '\n### Automated issue preflight — additional information requested\n\n' +
                 banner + 'Thank you for the report. Please review the following items before maintainer triage:\n\n' +
@@ -120,7 +108,7 @@ jobs:
               }
               if (previous) {
                 const message = marker + '\n### Automated issue preflight — information received\n\n' +
-                  banner + 'All required Issue Form fields are now present with non-placeholder answers. ' +
+                  banner + 'All required Issue Form fields are now present with non-empty answers. ' +
                   'This checks format and completeness only, not technical correctness.';
                 if (previous.body !== message) {
                   await github.rest.issues.updateComment({
