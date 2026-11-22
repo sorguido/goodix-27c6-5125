@@ -7,6 +7,11 @@ on:
 permissions:
   issues: write
 
+# Serialize checks for the same issue; unrelated issues may run in parallel.
+concurrency:
+  group: issue-preflight-${{ github.repository }}-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
 jobs:
   preflight:
     runs-on: ubuntu-latest
@@ -15,10 +20,14 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
-            const issue = context.payload.issue;
-            if (!issue || issue.pull_request) return;
+            const eventIssue = context.payload.issue;
+            if (!eventIssue || eventIssue.pull_request) return;
             const {owner, repo} = context.repo;
-            const issue_number = issue.number;
+            const issue_number = eventIssue.number;
+            // Always inspect the latest issue state, not an obsolete event snapshot.
+            const {data: issue} = await github.rest.issues.get({
+              owner, repo, issue_number
+            });
             const label = 'preflight:needs-info';
             const marker = '<!-- goodix-issue-preflight-v1 -->';
 
